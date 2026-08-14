@@ -20,24 +20,27 @@ export default function EscapeRoomPage() {
   };
 
   const handleInteract = () => {
-    triggerMessage("Interacting... (Raycaster needed to pick up items!)");
+    triggerMessage("SYSTEM: Interacting with object...");
   };
 
   return (
-    <main className="relative w-full h-screen overflow-hidden bg-stone-950 font-mono select-none">
+    <main className="relative w-full h-screen overflow-hidden bg-black font-mono select-none">
       {!gameStarted ? (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-stone-950 text-amber-400">
-          <div className="border border-amber-500/30 p-8 rounded-lg bg-stone-900/80 shadow-2xl shadow-amber-900/20 text-center max-w-lg">
-            <h1 className="text-4xl font-bold mb-2 tracking-widest text-amber-300">THE OFFICE DUNGEON</h1>
-            <p className="text-xs uppercase tracking-widest text-stone-500 mb-6">Executive Suite Escape</p>
-            <p className="mb-8 text-stone-400 text-sm leading-relaxed">
-              Click to start. Use <span className="text-amber-300 font-bold">WASD</span> to walk, mouse to look around, and <span className="text-amber-300 font-bold">'E'</span> to interact.
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black text-red-600">
+          <div className="border-4 border-stone-700 bg-stone-900 p-8 text-center max-w-md shadow-[0_0_50px_rgba(220,38,38,0.3)]">
+            <h1 className="text-4xl font-extrabold mb-1 tracking-widest text-red-600 drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">
+              OFFICE DUNGEON
+            </h1>
+            <p className="text-xs uppercase tracking-widest text-stone-500 mb-6 font-bold">1993 ESCAPE ENGINE</p>
+            <p className="mb-8 text-stone-300 text-xs leading-relaxed border-y border-stone-800 py-4">
+              Use <span className="text-yellow-500 font-bold">WASD</span> to run. Mouse to look around.<br />
+              Press <span className="text-yellow-500 font-bold">'E'</span> to operate doors and terminals.
             </p>
             <button
               onClick={() => setGameStarted(true)}
-              className="px-8 py-3 bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold text-sm tracking-wider rounded transition-all cursor-pointer shadow-md shadow-amber-900/40"
+              className="w-full py-3 bg-red-700 hover:bg-red-600 text-black font-extrabold text-base tracking-widest uppercase border-2 border-red-500 transition-all cursor-pointer shadow-lg"
             >
-              ENTER BUILDING
+              START ESCAPE
             </button>
           </div>
         </div>
@@ -48,48 +51,61 @@ export default function EscapeRoomPage() {
             onTriggerEvent={handleInteract}
           />
 
-          {/* Location UI Panel */}
-          <div className="absolute top-4 left-4 z-40 bg-stone-900/90 border border-amber-500/40 p-4 rounded text-amber-400 min-w-[250px] shadow-lg">
-            <h2 className="font-bold border-b border-amber-500/30 pb-1 mb-2 text-xs tracking-wider uppercase text-amber-300">LOCATION</h2>
-            <p className="text-sm text-stone-200">{FLOORS[currentFloor].name}</p>
-            
-            <div className="mt-4 flex gap-2">
-              {[0, 1, 2].map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setCurrentFloor(f)}
-                  className={`px-3 py-1 text-xs font-bold border transition-all cursor-pointer ${
-                    currentFloor === f
-                      ? 'bg-amber-500 text-stone-950 border-amber-400'
-                      : 'border-stone-700 text-stone-400 hover:border-amber-500/50 hover:text-amber-400'
-                  }`}
-                >
-                  F{f}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Inventory UI Bar */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 bg-stone-900/90 border border-amber-500/30 px-6 py-3 rounded-full text-stone-300 flex items-center gap-4 shadow-lg">
-            <span className="text-xs uppercase tracking-wider text-amber-400 font-bold">Inventory:</span>
-            {inventory.length === 0 ? (
-              <span className="text-xs italic text-stone-500">Empty</span>
-            ) : (
-              inventory.map((item, idx) => (
-                <span key={idx} className="bg-stone-800 text-amber-300 px-3 py-1 text-xs rounded border border-amber-500/40 font-bold">
-                  {item}
-                </span>
-              ))
-            )}
-          </div>
-
-          {/* Message Popup Overlay */}
+          {/* Messages Overlay */}
           {message && (
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-12 z-50 bg-stone-900/90 text-amber-300 border border-amber-500/50 px-5 py-2 rounded text-sm shadow-xl pointer-events-none">
+            <div className="absolute top-1/4 left-1/2 -translate-x-1/2 z-50 bg-stone-950 text-yellow-400 border-2 border-yellow-600 px-6 py-2 text-sm font-bold shadow-[0_0_20px_rgba(0,0,0,0.9)] pointer-events-none uppercase tracking-wider">
               {message}
             </div>
           )}
+
+          {/* Classic DOOM Full-Width Bottom Status Bar */}
+          <div className="absolute bottom-0 left-0 right-0 z-40 bg-stone-900 border-t-4 border-stone-600 p-2 flex items-center justify-between text-stone-200 h-20 shadow-[0_-5px_25px_rgba(0,0,0,0.9)]">
+            
+            {/* FLOOR SELECTOR */}
+            <div className="bg-stone-950 border-2 border-stone-700 px-4 py-1 flex flex-col items-center justify-center min-w-[120px]">
+              <span className="text-[10px] uppercase text-stone-500 font-bold tracking-widest">LEVEL</span>
+              <div className="flex gap-1 mt-1">
+                {[0, 1, 2].map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setCurrentFloor(f)}
+                    className={`px-2 py-0.5 text-xs font-black border transition-all cursor-pointer ${
+                      currentFloor === f
+                        ? 'bg-red-600 text-black border-red-400'
+                        : 'bg-stone-800 text-stone-400 border-stone-700 hover:border-stone-500'
+                    }`}
+                  >
+                    E1M{f + 1}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* LOCATION INDICATOR */}
+            <div className="hidden md:flex bg-stone-950 border-2 border-stone-700 px-6 py-2 flex-col items-center justify-center flex-1 mx-4">
+              <span className="text-[10px] uppercase text-stone-500 font-bold tracking-widest">CURRENT SECTOR</span>
+              <span className="text-xs font-bold text-yellow-500 uppercase tracking-wider mt-0.5">
+                {FLOORS[currentFloor].name}
+              </span>
+            </div>
+
+            {/* INVENTORY / KEYCARDS DISPLAY */}
+            <div className="bg-stone-950 border-2 border-stone-700 px-4 py-1 flex flex-col items-center justify-center min-w-[180px]">
+              <span className="text-[10px] uppercase text-stone-500 font-bold tracking-widest">KEYCARDS / ITEMS</span>
+              <div className="flex gap-2 mt-1">
+                {inventory.length === 0 ? (
+                  <span className="text-xs text-stone-600 italic">NONE</span>
+                ) : (
+                  inventory.map((item, idx) => (
+                    <span key={idx} className="bg-red-950 border border-red-600 text-red-400 px-2 py-0.5 text-[10px] font-bold uppercase">
+                      {item}
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
+
+          </div>
         </>
       )}
     </main>
