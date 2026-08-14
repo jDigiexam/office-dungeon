@@ -5,19 +5,50 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { PointerLockControls, Billboard, Text } from '@react-three/drei';
 import { FLOORS } from '@/lib/mapData';
 
-// Animated 3D Floating Gold Keycard with High-Contrast Icon
+// 3D Metallic Wall Sconce / Lamp with Point Light
+function WallLampMesh({ position }) {
+  return (
+    <group position={position}>
+      {/* Metallic Brass Backplate */}
+      <mesh position={[0, 1.2, 0]}>
+        <boxGeometry args={[0.25, 0.35, 0.15]} />
+        <meshStandardMaterial color="#fbbf24" metalness={0.8} roughness={0.2} />
+      </mesh>
+      {/* Glowing Shade Fixture */}
+      <mesh position={[0, 1.35, 0]}>
+        <cylinderGeometry args={[0.12, 0.18, 0.25, 12]} />
+        <meshStandardMaterial color="#fef08a" emissive="#f59e0b" emissiveIntensity={0.9} />
+      </mesh>
+      {/* Localized Warm Corridor Light */}
+      <pointLight position={[0, 1.3, 0]} intensity={3.5} distance={7} color="#fbbf24" />
+      {/* Overhead Text Marker */}
+      <Billboard position={[0, 1.7, 0]}>
+        <Text
+          fontSize={0.2}
+          color="#fef08a"
+          outlineWidth={0.02}
+          outlineColor="#000000"
+          font="https://fonts.gstatic.com/s/roboto/v18/KFOmCnqEu92Fr1Mu4mxM.woff"
+        >
+          💡 LIGHT
+        </Text>
+      </Billboard>
+    </group>
+  );
+}
+
+// 3D Animated Gold Keycard
 function KeycardMesh({ position }) {
   const cardRef = useRef();
 
   useFrame((_, delta) => {
     if (cardRef.current) {
-      cardRef.current.rotation.y += delta * 1.8; // Gentle rotation
+      cardRef.current.rotation.y += delta * 1.8;
     }
   });
 
   return (
     <group position={position}>
-      {/* Rotating Metallic Card */}
       <mesh ref={cardRef} position={[0, 0.5, 0]} rotation={[0.2, 0, 0]}>
         <boxGeometry args={[0.35, 0.22, 0.02]} />
         <meshStandardMaterial
@@ -28,8 +59,6 @@ function KeycardMesh({ position }) {
           emissiveIntensity={0.4}
         />
       </mesh>
-
-      {/* Floating High-Contrast Badge Icon */}
       <Billboard position={[0, 0.9, 0]}>
         <Text
           fontSize={0.25}
@@ -45,21 +74,18 @@ function KeycardMesh({ position }) {
   );
 }
 
-// 3D Terminal Console
+// 3D Interactive Terminal
 function TerminalMesh({ position }) {
   return (
     <group position={position}>
-      {/* Terminal Base */}
       <mesh position={[0, 0.4, 0]}>
         <boxGeometry args={[0.6, 0.8, 0.4]} />
         <meshStandardMaterial color="#27272a" metalness={0.5} roughness={0.5} />
       </mesh>
-      {/* Screen Monitor */}
       <mesh position={[0, 0.9, 0]}>
         <boxGeometry args={[0.5, 0.35, 0.1]} />
         <meshStandardMaterial color="#fbbf24" emissive="#f59e0b" emissiveIntensity={0.6} />
       </mesh>
-      {/* High-Contrast Icon Label */}
       <Billboard position={[0, 1.3, 0]}>
         <Text
           fontSize={0.25}
@@ -160,22 +186,20 @@ export default function DungeonEngine({ currentFloor, onTriggerEvent }) {
   return (
     <div className="w-full h-screen bg-stone-950 relative cursor-crosshair">
       <Canvas camera={{ position: FLOORS[currentFloor].spawn, fov: 75 }}>
-        {/* High-Contrast Dual Lighting Setup */}
-        <ambientLight intensity={0.7} color="#ffffff" />
-        <pointLight position={[2.5, 1.8, 3.5]} intensity={3} color="#fef08a" />
+        {/* Ambient & Overhead Fill Light */}
+        <ambientLight intensity={0.5} color="#ffffff" />
+        <pointLight position={[5, 1.8, 5]} intensity={2} color="#fef08a" />
 
         {currentMap.map((row, z) =>
           row.map((tile, x) => {
-            // 1 = High-Contrast Wood Partition Walls with Gold Trim
+            // 1 = Wood Partition Walls with Gold Baseboards
             if (tile === 1) {
               return (
                 <group key={`${x}-${z}`} position={[x + 0.5, 1, z + 0.5]}>
-                  {/* Main Wall Block */}
                   <mesh>
                     <boxGeometry args={[1, 2, 1]} />
                     <meshStandardMaterial color="#582f0e" roughness={0.4} />
                   </mesh>
-                  {/* High-Visibility Baseboard Accent */}
                   <mesh position={[0, -0.9, 0]}>
                     <boxGeometry args={[1.02, 0.2, 1.02]} />
                     <meshStandardMaterial color="#fbbf24" metalness={0.6} roughness={0.2} />
@@ -183,7 +207,7 @@ export default function DungeonEngine({ currentFloor, onTriggerEvent }) {
                 </group>
               );
             }
-            // 2 = High-Contrast Crimson Doors with Brass Trim
+            // 2 = High-Contrast Crimson Doors
             if (tile === 2) {
               return (
                 <group key={`${x}-${z}`} position={[x + 0.5, 1, z + 0.5]}>
@@ -191,7 +215,6 @@ export default function DungeonEngine({ currentFloor, onTriggerEvent }) {
                     <boxGeometry args={[0.9, 2, 0.15]} />
                     <meshStandardMaterial color="#dc2626" roughness={0.3} />
                   </mesh>
-                  {/* Gold Handle Trim */}
                   <mesh position={[0.3, 0, 0.1]}>
                     <boxGeometry args={[0.08, 0.3, 0.08]} />
                     <meshStandardMaterial color="#fbbf24" metalness={0.8} />
@@ -219,30 +242,33 @@ export default function DungeonEngine({ currentFloor, onTriggerEvent }) {
             if (tile === 4) {
               return <TerminalMesh key={`${x}-${z}`} position={[x + 0.5, 0, z + 0.5]} />;
             }
-            // 5 = 3D Animated Gold Keycard
+            // 5 = 3D Keycard
             if (tile === 5) {
               return <KeycardMesh key={`${x}-${z}`} position={[x + 0.5, 0, z + 0.5]} />;
+            }
+            // 6 = 3D Wall Lamp Sconce
+            if (tile === 6) {
+              return <WallLampMesh key={`${x}-${z}`} position={[x + 0.5, 0, z + 0.5]} />;
             }
             return null;
           })
         )}
 
-        {/* Floor Plane: Dark Slate (High contrast against white ceiling and brown walls) */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[10, 0, 10]}>
-          <planeGeometry args={[40, 40]} />
+        {/* Floor Plane (60x60 units to cover larger map) */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[15, 0, 15]}>
+          <planeGeometry args={[60, 60]} />
           <meshStandardMaterial color="#0f172a" roughness={0.9} />
         </mesh>
 
-        {/* Ceiling Plane: Off-White Acoustic Tiles (Provides spatial depth & orientation) */}
-        <mesh rotation={[Math.PI / 2, 0, 0]} position={[10, 2, 10]}>
-          <planeGeometry args={[40, 40]} />
+        {/* Ceiling Plane (60x60 units) */}
+        <mesh rotation={[Math.PI / 2, 0, 0]} position={[15, 2, 15]}>
+          <planeGeometry args={[60, 60]} />
           <meshStandardMaterial color="#f1f5f9" roughness={0.5} />
         </mesh>
 
         <PlayerControls grid={currentMap} onInteract={() => onTriggerEvent('INTERACT')} />
       </Canvas>
 
-      {/* High-Contrast Crosshair */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-amber-300 text-2xl font-bold select-none drop-shadow-[0_2px_2px_rgba(0,0,0,0.9)]">
         +
       </div>
