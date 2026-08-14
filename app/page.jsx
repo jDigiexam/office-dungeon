@@ -23,7 +23,7 @@ export default function EscapeRoomPage() {
     <main className="relative w-full h-screen overflow-hidden bg-black font-mono">
       {!gameStarted ? (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950 text-green-500">
-          <h1 className="text-4xl font-bold mb-4 tracking-widest">THE OFFICE DUNGEON</h1>
+          <h1 className="text-4xl font-bold mb-4 tracking-widest">THE OFFICE BUILDING</h1>
           <p className="mb-6 text-zinc-400">Click to start. Use WASD to walk, Mouse to look around, 'E' to interact.</p>
           <button
             onClick={() => setGameStarted(true)}
