@@ -36,7 +36,7 @@ function PlayerControls({ onInteract }) {
   useFrame((state, delta) => {
     if (!controlsRef.current?.isLocked) return;
 
-    // Force classic Doom lock: set pitch (x-axis rotation) to 0
+    // Classic Doom lock: keep camera level
     state.camera.rotation.x = 0;
 
     const speed = 4 * delta;
@@ -57,8 +57,9 @@ export default function DungeonEngine({ currentFloor, onTriggerEvent }) {
   return (
     <div className="w-full h-screen bg-black relative cursor-crosshair">
       <Canvas camera={{ position: FLOORS[currentFloor].spawn, fov: 75 }}>
-        <ambientLight intensity={0.4} />
-        <pointLight position={[10, 10, 10]} intensity={1} />
+        {/* Ambient & Overhead Room Lighting */}
+        <ambientLight intensity={0.8} />
+        <pointLight position={[2.5, 3, 3.5]} intensity={2} color="#ffffff" />
 
         {currentMap.map((row, z) =>
           row.map((tile, x) => {
@@ -66,7 +67,7 @@ export default function DungeonEngine({ currentFloor, onTriggerEvent }) {
               return (
                 <mesh key={`${x}-${z}`} position={[x + 0.5, 1, z + 0.5]}>
                   <boxGeometry args={[1, 2, 1]} />
-                  <meshStandardMaterial color="#334155" />
+                  <meshStandardMaterial color="#475569" />
                 </mesh>
               );
             }
@@ -74,7 +75,7 @@ export default function DungeonEngine({ currentFloor, onTriggerEvent }) {
               return (
                 <mesh key={`${x}-${z}`} position={[x + 0.5, 1, z + 0.5]}>
                   <boxGeometry args={[0.9, 2, 0.2]} />
-                  <meshStandardMaterial color="#dc2626" />
+                  <meshStandardMaterial color="#ef4444" />
                 </mesh>
               );
             }
@@ -109,6 +110,7 @@ export default function DungeonEngine({ currentFloor, onTriggerEvent }) {
           })
         )}
 
+        {/* Floor Plane */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[5, 0, 5]}>
           <planeGeometry args={[20, 20]} />
           <meshStandardMaterial color="#1e293b" />

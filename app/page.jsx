@@ -1,8 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import DungeonEngine from '@/components/DungeonEngine';
+import dynamic from 'next/dynamic';
 import { FLOORS } from '@/lib/mapData';
+
+// Disable SSR for 3D Canvas to guarantee WebGL mounts cleanly in Next.js
+const DungeonEngine = dynamic(() => import('@/components/DungeonEngine'), {
+  ssr: false,
+});
 
 export default function EscapeRoomPage() {
   const [currentFloor, setCurrentFloor] = useState(0);
@@ -23,13 +28,13 @@ export default function EscapeRoomPage() {
     <main className="relative w-full h-screen overflow-hidden bg-black font-mono">
       {!gameStarted ? (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950 text-green-500">
-          <h1 className="text-4xl font-bold mb-4 tracking-widest">THE OFFICE BUILDING</h1>
+          <h1 className="text-4xl font-bold mb-4 tracking-widest">THE OFFICE DUNGEON</h1>
           <p className="mb-6 text-zinc-400">Click to start. Use WASD to walk, Mouse to look around, 'E' to interact.</p>
           <button
             onClick={() => setGameStarted(true)}
-            className="px-6 py-3 bg-green-600 hover:bg-green-500 text-black font-bold text-lg rounded shadow-lg shadow-green-900/50 transition-all"
+            className="px-6 py-3 bg-green-600 hover:bg-green-500 text-black font-bold text-lg rounded shadow-lg shadow-green-900/50 transition-all cursor-pointer"
           >
-            ENTER BUILDING
+            ENTER THE DUNGEON
           </button>
         </div>
       ) : (
@@ -64,7 +69,7 @@ export default function EscapeRoomPage() {
           </div>
 
           {message && (
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-12 z-50 bg-black/80 text-yellow-400 border border-yellow-500/50 px-4 py-2 rounded text-sm animate-pulse">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-12 z-50 bg-black/80 text-yellow-400 border border-yellow-500/50 px-4 py-2 rounded text-sm animate-pulse pointer-events-none">
               {message}
             </div>
           )}
