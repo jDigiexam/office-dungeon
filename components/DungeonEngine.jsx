@@ -87,7 +87,7 @@ function ElevatorMesh({ position }) {
   );
 }
 
-// Player Controls with Anti-Clipping Y-Position Lock & Raycasting
+// Player Controls
 function PlayerControls({ grid, onInteract }) {
   const controlsRef = useRef();
   const moveState = useRef({ forward: false, backward: false, left: false, right: false });
@@ -139,7 +139,6 @@ function PlayerControls({ grid, onInteract }) {
   useFrame((state, delta) => {
     if (!controlsRef.current?.isLocked) return;
 
-    // 1. Lock eye height exactly at 0.8 to prevent passing through floor/ceiling
     camera.position.y = 0.8;
 
     const oldX = camera.position.x;
@@ -184,7 +183,6 @@ function PlayerControls({ grid, onInteract }) {
     }
   });
 
-  // Natively lock the vertical viewing angle (pitch) to strictly horizontal (90 degrees / Math.PI / 2)
   return (
     <PointerLockControls 
       ref={controlsRef} 
@@ -202,8 +200,11 @@ export default function DungeonEngine({ currentFloor, grid, onInteract }) {
         gl={{ antialias: false }}
         style={{ imageRendering: 'pixelated' }}
       >
-        <fog attach="fog" args={['#000000', 1, 9]} />
-        <ambientLight intensity={0.15} color="#ffffff" />
+        {/* Pushed fog further back (starts at 3, ends at 16) */}
+        <fog attach="fog" args={['#000000', 3, 16]} />
+        
+        {/* Boosted ambient light for base visibility */}
+        <ambientLight intensity={0.5} color="#ffffff" />
 
         {grid.map((row, z) =>
           row.map((tile, x) => {
@@ -211,7 +212,8 @@ export default function DungeonEngine({ currentFloor, grid, onInteract }) {
               return (
                 <mesh key={`${x}-${z}`} position={[x + 0.5, 0.8, z + 0.5]}>
                   <boxGeometry args={[1, 1.6, 1]} />
-                  <meshStandardMaterial color="#3f3f46" roughness={0.9} />
+                  {/* Medium-toned walls */}
+                  <meshStandardMaterial color="#78716c" roughness={0.9} />
                 </mesh>
               );
             }
@@ -245,16 +247,16 @@ export default function DungeonEngine({ currentFloor, grid, onInteract }) {
           })
         )}
 
-        {/* Floor */}
+        {/* Floor - Dark charcoal to ground the room */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[15, 0, 15]}>
           <planeGeometry args={[60, 60]} />
-          <meshStandardMaterial color="#18181b" roughness={1.0} side={THREE.DoubleSide} />
+          <meshStandardMaterial color="#27272a" roughness={1.0} side={THREE.DoubleSide} />
         </mesh>
 
-        {/* Low Ceiling */}
+        {/* Ceiling - Light industrial grey for high vertical contrast */}
         <mesh rotation={[Math.PI / 2, 0, 0]} position={[15, 1.6, 15]}>
           <planeGeometry args={[60, 60]} />
-          <meshStandardMaterial color="#09090b" roughness={1.0} side={THREE.DoubleSide} />
+          <meshStandardMaterial color="#d6d3d1" roughness={1.0} side={THREE.DoubleSide} />
         </mesh>
 
         <PlayerControls grid={grid} onInteract={onInteract} />
