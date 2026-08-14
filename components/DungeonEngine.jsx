@@ -36,12 +36,10 @@ function PlayerControls({ onInteract }) {
   }, [onInteract]);
 
   useFrame((_, delta) => {
-    // Only move if the player has clicked and locked the pointer lock controls
     if (!controlsRef.current?.isLocked) return;
 
-    const moveSpeed = 4 * delta; // Adjust speed smooth over frame rate
+    const moveSpeed = 4 * delta;
 
-    // Call moveForward / moveRight directly on PointerLockControls
     if (moveState.current.forward) controlsRef.current.moveForward(moveSpeed);
     if (moveState.current.backward) controlsRef.current.moveForward(-moveSpeed);
     if (moveState.current.right) controlsRef.current.moveRight(moveSpeed);
@@ -55,53 +53,58 @@ export default function DungeonEngine({ currentFloor, onTriggerEvent }) {
   const currentMap = FLOORS[currentFloor].grid;
 
   return (
-    <div className="w-full h-screen bg-black relative cursor-crosshair">
+    <div className="w-full h-screen bg-stone-950 relative cursor-crosshair">
       <Canvas camera={{ position: FLOORS[currentFloor].spawn, fov: 75 }}>
-        {/* Ambient & Point Lighting */}
-        <ambientLight intensity={0.8} />
-        <pointLight position={[2.5, 3, 3.5]} intensity={2} color="#ffffff" />
+        {/* Warm Golden Office Overhead Lighting */}
+        <ambientLight intensity={0.6} color="#fef3c7" />
+        <pointLight position={[2.5, 3, 3.5]} intensity={2.5} color="#fbbf24" />
 
         {currentMap.map((row, z) =>
           row.map((tile, x) => {
+            // 1 = Office Partition / Wood Panel Walls (Warm Brown)
             if (tile === 1) {
               return (
                 <mesh key={`${x}-${z}`} position={[x + 0.5, 1, z + 0.5]}>
                   <boxGeometry args={[1, 2, 1]} />
-                  <meshStandardMaterial color="#475569" />
+                  <meshStandardMaterial color="#4a3b32" roughness={0.6} />
                 </mesh>
               );
             }
+            // 2 = Executive Mahogany Doors with Gold Accents
             if (tile === 2) {
               return (
                 <mesh key={`${x}-${z}`} position={[x + 0.5, 1, z + 0.5]}>
                   <boxGeometry args={[0.9, 2, 0.2]} />
-                  <meshStandardMaterial color="#ef4444" />
+                  <meshStandardMaterial color="#78350f" metalness={0.2} roughness={0.3} />
                 </mesh>
               );
             }
+            // 3 = Elevator (Gold / Brass Text)
             if (tile === 3) {
               return (
                 <Billboard key={`${x}-${z}`} position={[x + 0.5, 1, z + 0.5]}>
-                  <Text fontSize={0.4} color="yellow">
+                  <Text fontSize={0.4} color="#f59e0b">
                     [ELEVATOR]
                   </Text>
                 </Billboard>
               );
             }
+            // 4 = Computer Terminal (Amber/Gold Screen Glow)
             if (tile === 4) {
               return (
                 <Billboard key={`${x}-${z}`} position={[x + 0.5, 0.8, z + 0.5]}>
-                  <Text fontSize={0.5} color="#22c55e">
+                  <Text fontSize={0.5} color="#fbbf24">
                     🖥️ TERMINAL
                   </Text>
                 </Billboard>
               );
             }
+            // 5 = Executive Gold Keycard
             if (tile === 5) {
               return (
                 <Billboard key={`${x}-${z}`} position={[x + 0.5, 0.5, z + 0.5]}>
-                  <Text fontSize={0.4} color="#3b82f6">
-                    💳 KEYCARD
+                  <Text fontSize={0.4} color="#d97706">
+                    💳 GOLD KEYCARD
                   </Text>
                 </Billboard>
               );
@@ -110,16 +113,17 @@ export default function DungeonEngine({ currentFloor, onTriggerEvent }) {
           })
         )}
 
-        {/* Floor Plane */}
+        {/* Floor Plane: Dark Slate / Charcoal Carpet */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[5, 0, 5]}>
           <planeGeometry args={[20, 20]} />
-          <meshStandardMaterial color="#1e293b" />
+          <meshStandardMaterial color="#18181b" roughness={0.8} />
         </mesh>
 
         <PlayerControls onInteract={() => onTriggerEvent('INTERACT')} />
       </Canvas>
 
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-green-500 text-xl font-mono">
+      {/* Reticle / Crosshair in Brass Gold */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-amber-400 text-xl font-mono select-none">
         +
       </div>
     </div>

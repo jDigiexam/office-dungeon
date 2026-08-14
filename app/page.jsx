@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { FLOORS } from '@/lib/mapData';
 
-// Disable SSR for 3D Canvas to guarantee WebGL mounts cleanly in Next.js
 const DungeonEngine = dynamic(() => import('@/components/DungeonEngine'), {
   ssr: false,
 });
@@ -21,21 +20,26 @@ export default function EscapeRoomPage() {
   };
 
   const handleInteract = () => {
-    triggerMessage("Interacting... (Raycaster needed to pick up specific items!)");
+    triggerMessage("Interacting... (Raycaster needed to pick up items!)");
   };
 
   return (
-    <main className="relative w-full h-screen overflow-hidden bg-black font-mono">
+    <main className="relative w-full h-screen overflow-hidden bg-stone-950 font-mono select-none">
       {!gameStarted ? (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950 text-green-500">
-          <h1 className="text-4xl font-bold mb-4 tracking-widest">THE OFFICE DUNGEON</h1>
-          <p className="mb-6 text-zinc-400">Click to start. Use WASD to walk, Mouse to look around, 'E' to interact.</p>
-          <button
-            onClick={() => setGameStarted(true)}
-            className="px-6 py-3 bg-green-600 hover:bg-green-500 text-black font-bold text-lg rounded shadow-lg shadow-green-900/50 transition-all cursor-pointer"
-          >
-            ENTER THE DUNGEON
-          </button>
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-stone-950 text-amber-400">
+          <div className="border border-amber-500/30 p-8 rounded-lg bg-stone-900/80 shadow-2xl shadow-amber-900/20 text-center max-w-lg">
+            <h1 className="text-4xl font-bold mb-2 tracking-widest text-amber-300">THE OFFICE DUNGEON</h1>
+            <p className="text-xs uppercase tracking-widest text-stone-500 mb-6">Executive Suite Escape</p>
+            <p className="mb-8 text-stone-400 text-sm leading-relaxed">
+              Click to start. Use <span className="text-amber-300 font-bold">WASD</span> to walk, mouse to look around, and <span className="text-amber-300 font-bold">'E'</span> to interact.
+            </p>
+            <button
+              onClick={() => setGameStarted(true)}
+              className="px-8 py-3 bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold text-sm tracking-wider rounded transition-all cursor-pointer shadow-md shadow-amber-900/40"
+            >
+              ENTER BUILDING
+            </button>
+          </div>
         </div>
       ) : (
         <>
@@ -44,32 +48,45 @@ export default function EscapeRoomPage() {
             onTriggerEvent={handleInteract}
           />
 
-          <div className="absolute top-4 left-4 z-40 bg-zinc-900/90 border border-green-500/40 p-4 rounded text-green-400 min-w-[250px]">
-            <h2 className="font-bold border-b border-green-500/30 pb-1 mb-2">LOCATION</h2>
-            <p className="text-sm text-zinc-200">{FLOORS[currentFloor].name}</p>
+          {/* Location UI Panel */}
+          <div className="absolute top-4 left-4 z-40 bg-stone-900/90 border border-amber-500/40 p-4 rounded text-amber-400 min-w-[250px] shadow-lg">
+            <h2 className="font-bold border-b border-amber-500/30 pb-1 mb-2 text-xs tracking-wider uppercase text-amber-300">LOCATION</h2>
+            <p className="text-sm text-stone-200">{FLOORS[currentFloor].name}</p>
             
             <div className="mt-4 flex gap-2">
-              <button onClick={() => setCurrentFloor(0)} className={`px-2 py-1 text-xs border ${currentFloor === 0 ? 'bg-green-500 text-black' : 'border-green-500'}`}>F0</button>
-              <button onClick={() => setCurrentFloor(1)} className={`px-2 py-1 text-xs border ${currentFloor === 1 ? 'bg-green-500 text-black' : 'border-green-500'}`}>F1</button>
-              <button onClick={() => setCurrentFloor(2)} className={`px-2 py-1 text-xs border ${currentFloor === 2 ? 'bg-green-500 text-black' : 'border-green-500'}`}>F2</button>
+              {[0, 1, 2].map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setCurrentFloor(f)}
+                  className={`px-3 py-1 text-xs font-bold border transition-all cursor-pointer ${
+                    currentFloor === f
+                      ? 'bg-amber-500 text-stone-950 border-amber-400'
+                      : 'border-stone-700 text-stone-400 hover:border-amber-500/50 hover:text-amber-400'
+                  }`}
+                >
+                  F{f}
+                </button>
+              ))}
             </div>
           </div>
 
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 bg-zinc-900/90 border border-zinc-700 px-6 py-3 rounded-full text-zinc-300 flex items-center gap-4">
-            <span className="text-xs uppercase tracking-wider text-zinc-500">Inventory:</span>
+          {/* Inventory UI Bar */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 bg-stone-900/90 border border-amber-500/30 px-6 py-3 rounded-full text-stone-300 flex items-center gap-4 shadow-lg">
+            <span className="text-xs uppercase tracking-wider text-amber-400 font-bold">Inventory:</span>
             {inventory.length === 0 ? (
-              <span className="text-xs italic text-zinc-600">Empty</span>
+              <span className="text-xs italic text-stone-500">Empty</span>
             ) : (
               inventory.map((item, idx) => (
-                <span key={idx} className="bg-zinc-800 text-green-400 px-2 py-1 text-xs rounded border border-green-500/30">
+                <span key={idx} className="bg-stone-800 text-amber-300 px-3 py-1 text-xs rounded border border-amber-500/40 font-bold">
                   {item}
                 </span>
               ))
             )}
           </div>
 
+          {/* Message Popup Overlay */}
           {message && (
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-12 z-50 bg-black/80 text-yellow-400 border border-yellow-500/50 px-4 py-2 rounded text-sm animate-pulse pointer-events-none">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-12 z-50 bg-stone-900/90 text-amber-300 border border-amber-500/50 px-5 py-2 rounded text-sm shadow-xl pointer-events-none">
               {message}
             </div>
           )}
