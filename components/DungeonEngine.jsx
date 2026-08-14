@@ -141,9 +141,6 @@ function PlayerControls({ grid, onInteract }) {
 
     // 1. Lock eye height exactly at 0.8 to prevent passing through floor/ceiling
     camera.position.y = 0.8;
-    
-    // 2. Lock pitch for DOOM classic camera lock
-    state.camera.rotation.x = 0;
 
     const oldX = camera.position.x;
     const oldZ = camera.position.z;
@@ -187,7 +184,14 @@ function PlayerControls({ grid, onInteract }) {
     }
   });
 
-  return <PointerLockControls ref={controlsRef} />;
+  // Natively lock the vertical viewing angle (pitch) to strictly horizontal (90 degrees / Math.PI / 2)
+  return (
+    <PointerLockControls 
+      ref={controlsRef} 
+      minPolarAngle={Math.PI / 2} 
+      maxPolarAngle={Math.PI / 2} 
+    />
+  );
 }
 
 export default function DungeonEngine({ currentFloor, grid, onInteract }) {
@@ -241,13 +245,13 @@ export default function DungeonEngine({ currentFloor, grid, onInteract }) {
           })
         )}
 
-        {/* Floor: DoubleSide prevents backface clipping */}
+        {/* Floor */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[15, 0, 15]}>
           <planeGeometry args={[60, 60]} />
           <meshStandardMaterial color="#18181b" roughness={1.0} side={THREE.DoubleSide} />
         </mesh>
 
-        {/* Low Ceiling: DoubleSide prevents backface clipping */}
+        {/* Low Ceiling */}
         <mesh rotation={[Math.PI / 2, 0, 0]} position={[15, 1.6, 15]}>
           <planeGeometry args={[60, 60]} />
           <meshStandardMaterial color="#09090b" roughness={1.0} side={THREE.DoubleSide} />
