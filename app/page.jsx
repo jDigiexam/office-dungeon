@@ -12,7 +12,6 @@ export default function EscapeRoomPage() {
   const [gameStarted, setGameStarted] = useState(false);
   const [message, setMessage] = useState('');
   
-  // Interactive UI States
   const [showElevatorMenu, setShowElevatorMenu] = useState(false);
   const [teleportCoords, setTeleportCoords] = useState(null);
   
@@ -24,18 +23,21 @@ export default function EscapeRoomPage() {
   };
 
   const handleInteract = (tileType, x, z, fIdx) => {
+    // 2 = Locked Door
     if (tileType === 2) {
       if (inventory.includes('RED KEYCARD')) {
-        triggerMessage("ACCESS GRANTED - DOOR OPENED");
+        triggerMessage("ACCESS GRANTED - OPENING DOOR");
         const newGrids = [...grids];
+        // 🚨 Swap tile 2 (closed) to 8 (opened door state)
         newGrids[fIdx] = grids[fIdx].map((row, rIdx) =>
-          row.map((col, cIdx) => (rIdx === z && cIdx === x ? 0 : col))
+          row.map((col, cIdx) => (rIdx === z && cIdx === x ? 8 : col))
         );
         setGrids(newGrids);
       } else {
         triggerMessage("LOCKED - RED KEYCARD REQUIRED");
       }
     }
+    // 5 = Keycard Pickup
     else if (tileType === 5) {
       triggerMessage("ACQUIRED RED KEYCARD");
       setInventory([...inventory, 'RED KEYCARD']);
@@ -45,18 +47,18 @@ export default function EscapeRoomPage() {
       );
       setGrids(newGrids);
     }
+    // 4 = Terminal
     else if (tileType === 4) {
       triggerMessage("SYSTEM TERMINAL: SECURITY SYSTEM OVERRIDE ACTIVE");
     }
+    // 3 = Elevator Menu
     else if (tileType === 3) {
-      // Open Elevator UI Menu and pause pointer lock
       document.exitPointerLock();
       setShowElevatorMenu(true);
     }
   };
 
   const handleElevatorSelect = (targetFloorIndex) => {
-    // Instantly teleport to elevator position at new floor height
     setTeleportCoords({ x: 2.5, y: targetFloorIndex * 3 + 0.8, z: 1.5 });
     setShowElevatorMenu(false);
     triggerMessage(`ELEVATOR TRANSIT: FLOOR E1M${targetFloorIndex + 1}`);
@@ -87,7 +89,6 @@ export default function EscapeRoomPage() {
             onFloorChange={(f) => setCurrentFloor(f)}
           />
 
-          {/* Elevator Selection UI Menu */}
           {showElevatorMenu && (
             <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
               <div className="bg-stone-900 border-4 border-yellow-600 p-8 w-96 text-center">
@@ -113,7 +114,6 @@ export default function EscapeRoomPage() {
             </div>
           )}
 
-          {/* HUD OVERLAYS */}
           {message && (
             <div className="absolute top-1/4 left-1/2 -translate-x-1/2 z-40 bg-stone-950 text-yellow-400 border-2 border-yellow-600 px-6 py-2 text-sm font-bold pointer-events-none uppercase">
               {message}
