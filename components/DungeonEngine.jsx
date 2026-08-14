@@ -11,18 +11,20 @@ function PlayerControls({ onInteract }) {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.code === 'KeyW') moveState.current.forward = true;
-      if (e.code === 'KeyS') moveState.current.backward = true;
-      if (e.code === 'KeyA') moveState.current.left = true;
-      if (e.code === 'KeyD') moveState.current.right = true;
-      if (e.code === 'KeyE') onInteract();
+      const key = e.key.toLowerCase();
+      if (key === 'w' || e.code === 'KeyW') moveState.current.forward = true;
+      if (key === 's' || e.code === 'KeyS') moveState.current.backward = true;
+      if (key === 'a' || e.code === 'KeyA') moveState.current.left = true;
+      if (key === 'd' || e.code === 'KeyD') moveState.current.right = true;
+      if (key === 'e' || e.code === 'KeyE') onInteract();
     };
 
     const handleKeyUp = (e) => {
-      if (e.code === 'KeyW') moveState.current.forward = false;
-      if (e.code === 'KeyS') moveState.current.backward = false;
-      if (e.code === 'KeyA') moveState.current.left = false;
-      if (e.code === 'KeyD') moveState.current.right = false;
+      const key = e.key.toLowerCase();
+      if (key === 'w' || e.code === 'KeyW') moveState.current.forward = false;
+      if (key === 's' || e.code === 'KeyS') moveState.current.backward = false;
+      if (key === 'a' || e.code === 'KeyA') moveState.current.left = false;
+      if (key === 'd' || e.code === 'KeyD') moveState.current.right = false;
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -33,19 +35,17 @@ function PlayerControls({ onInteract }) {
     };
   }, [onInteract]);
 
-  useFrame((state, delta) => {
+  useFrame((_, delta) => {
+    // Only move if the player has clicked and locked the pointer lock controls
     if (!controlsRef.current?.isLocked) return;
 
-    // Classic Doom lock: keep camera level
-    state.camera.rotation.x = 0;
+    const moveSpeed = 4 * delta; // Adjust speed smooth over frame rate
 
-    const speed = 4 * delta;
-    const camera = state.camera;
-
-    if (moveState.current.forward) camera.moveForward(speed);
-    if (moveState.current.backward) camera.moveForward(-speed);
-    if (moveState.current.left) camera.moveRight(-speed);
-    if (moveState.current.right) camera.moveRight(speed);
+    // Call moveForward / moveRight directly on PointerLockControls
+    if (moveState.current.forward) controlsRef.current.moveForward(moveSpeed);
+    if (moveState.current.backward) controlsRef.current.moveForward(-moveSpeed);
+    if (moveState.current.right) controlsRef.current.moveRight(moveSpeed);
+    if (moveState.current.left) controlsRef.current.moveRight(-moveSpeed);
   });
 
   return <PointerLockControls ref={controlsRef} />;
@@ -57,7 +57,7 @@ export default function DungeonEngine({ currentFloor, onTriggerEvent }) {
   return (
     <div className="w-full h-screen bg-black relative cursor-crosshair">
       <Canvas camera={{ position: FLOORS[currentFloor].spawn, fov: 75 }}>
-        {/* Ambient & Overhead Room Lighting */}
+        {/* Ambient & Point Lighting */}
         <ambientLight intensity={0.8} />
         <pointLight position={[2.5, 3, 3.5]} intensity={2} color="#ffffff" />
 
