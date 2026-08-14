@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { FLOORS } from '@/lib/mapData';
 
@@ -13,14 +13,54 @@ export default function EscapeRoomPage() {
   const [inventory, setInventory] = useState([]);
   const [gameStarted, setGameStarted] = useState(false);
   const [message, setMessage] = useState('');
+  
+  // Active dynamic grids for each floor (allows mutating doors/items)
+  const [grids, setGrids] = useState({
+    0: FLOORS[0].grid,
+    1: FLOORS[1].grid,
+    2: FLOORS[2].grid,
+  });
 
   const triggerMessage = (msg) => {
     setMessage(msg);
     setTimeout(() => setMessage(''), 3000);
   };
 
-  const handleInteract = () => {
-    triggerMessage("SYSTEM: Interacting with object...");
+  // Handle Raycast Interactions when hitting 'E'
+  const handleInteract = (tileType, x, z) => {
+    // 2 = Locked Door
+    if (tileType === 2) {
+      if (inventory.includes('RED KEYCARD')) {
+        triggerMessage("ACCESS GRANTED - DOOR OPENED");
+        // Update grid to make door tile walkable floor (0)
+        const newGrid = grids[currentFloor].map((row, rIdx) =>
+          row.map((col, cIdx) => (rIdx === z && cIdx === x ? 0 : col))
+        );
+        setGrids({ ...grids, [currentFloor]: newGrid });
+      } else {
+        triggerMessage("LOCKED - RED KEYCARD REQUIRED");
+      }
+    }
+    // 5 = Keycard Pickup
+    else if (tileType === 5) {
+      triggerMessage("ACQUIRED RED KEYCARD");
+      setInventory([...inventory, 'RED KEYCARD']);
+      // Remove keycard from grid
+      const newGrid = grids[currentFloor].map((row, rIdx) =>
+        row.map((col, cIdx) => (rIdx === z && cIdx === x ? 0 : col))
+      );
+      setGrids({ ...grids, [currentFloor]: newGrid });
+    }
+    // 4 = Terminal
+    else if (tileType === 4) {
+      triggerMessage("SYSTEM TERMINAL: SECURITY SYSTEM OVERRIDE ACTIVE");
+    }
+    // 3 = Elevator
+    else if (tileType === 3) {
+      const nextFloor = (currentFloor + 1) % 3;
+      setCurrentFloor(nextFloor);
+      triggerMessage(`ELEVATOR TRANSIT: FLOOR E1M${nextFloor + 1}`);
+    }
   };
 
   return (
@@ -34,7 +74,7 @@ export default function EscapeRoomPage() {
             <p className="text-xs uppercase tracking-widest text-stone-500 mb-6 font-bold">1993 ESCAPE ENGINE</p>
             <p className="mb-8 text-stone-300 text-xs leading-relaxed border-y border-stone-800 py-4">
               Use <span className="text-yellow-500 font-bold">WASD</span> to run. Mouse to look around.<br />
-              Press <span className="text-yellow-500 font-bold">'E'</span> to operate doors and terminals.
+              Press <span className="text-yellow-500 font-bold">'E'</span> to open doors, pick up keycards, and use terminals.
             </p>
             <button
               onClick={() => setGameStarted(true)}
@@ -48,7 +88,8 @@ export default function EscapeRoomPage() {
         <>
           <DungeonEngine
             currentFloor={currentFloor}
-            onTriggerEvent={handleInteract}
+            grid={grids[currentFloor]}
+            onInteract={handleInteract}
           />
 
           {/* Messages Overlay */}
@@ -58,10 +99,9 @@ export default function EscapeRoomPage() {
             </div>
           )}
 
-          {/* Classic DOOM Full-Width Bottom Status Bar */}
+          {/* Classic DOOM Status Bar */}
           <div className="absolute bottom-0 left-0 right-0 z-40 bg-stone-900 border-t-4 border-stone-600 p-2 flex items-center justify-between text-stone-200 h-20 shadow-[0_-5px_25px_rgba(0,0,0,0.9)]">
             
-            {/* FLOOR SELECTOR */}
             <div className="bg-stone-950 border-2 border-stone-700 px-4 py-1 flex flex-col items-center justify-center min-w-[120px]">
               <span className="text-[10px] uppercase text-stone-500 font-bold tracking-widest">LEVEL</span>
               <div className="flex gap-1 mt-1">
@@ -81,7 +121,6 @@ export default function EscapeRoomPage() {
               </div>
             </div>
 
-            {/* LOCATION INDICATOR */}
             <div className="hidden md:flex bg-stone-950 border-2 border-stone-700 px-6 py-2 flex-col items-center justify-center flex-1 mx-4">
               <span className="text-[10px] uppercase text-stone-500 font-bold tracking-widest">CURRENT SECTOR</span>
               <span className="text-xs font-bold text-yellow-500 uppercase tracking-wider mt-0.5">
@@ -89,7 +128,6 @@ export default function EscapeRoomPage() {
               </span>
             </div>
 
-            {/* INVENTORY / KEYCARDS DISPLAY */}
             <div className="bg-stone-950 border-2 border-stone-700 px-4 py-1 flex flex-col items-center justify-center min-w-[180px]">
               <span className="text-[10px] uppercase text-stone-500 font-bold tracking-widest">KEYCARDS / ITEMS</span>
               <div className="flex gap-2 mt-1">
