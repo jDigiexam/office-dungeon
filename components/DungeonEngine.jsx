@@ -5,7 +5,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { PointerLockControls } from '@react-three/drei';
 import * as THREE from 'three';
 
-// 1. Pure 3D Keycard Mesh (Rotating Emissive Red Access Card)
+// 1. Pure 3D Keycard Mesh
 function KeycardMesh({ position }) {
   const cardRef = useRef();
 
@@ -17,12 +17,10 @@ function KeycardMesh({ position }) {
 
   return (
     <group position={position}>
-      {/* Pedestal */}
       <mesh position={[0, 0.2, 0]}>
         <cylinderGeometry args={[0.2, 0.25, 0.4, 8]} />
         <meshStandardMaterial color="#27272a" roughness={0.8} />
       </mesh>
-      {/* Floating Rotating Red Keycard */}
       <mesh ref={cardRef} position={[0, 0.65, 0]} rotation={[0.2, 0, 0]}>
         <boxGeometry args={[0.35, 0.22, 0.03]} />
         <meshStandardMaterial
@@ -40,17 +38,14 @@ function KeycardMesh({ position }) {
 function TerminalMesh({ position }) {
   return (
     <group position={position}>
-      {/* Computer Tower & Desk */}
       <mesh position={[0, 0.35, 0]}>
         <boxGeometry args={[0.6, 0.7, 0.5]} />
         <meshStandardMaterial color="#18181b" roughness={0.7} />
       </mesh>
-      {/* Glowing CRT Monitor */}
       <mesh position={[0, 0.85, 0]}>
         <boxGeometry args={[0.45, 0.35, 0.3]} />
         <meshStandardMaterial color="#09090b" roughness={0.5} />
       </mesh>
-      {/* CRT Screen Glow */}
       <mesh position={[0, 0.85, 0.16]}>
         <planeGeometry args={[0.38, 0.28]} />
         <meshStandardMaterial color="#22c55e" emissive="#16a34a" emissiveIntensity={0.9} />
@@ -63,12 +58,10 @@ function TerminalMesh({ position }) {
 function WallLampMesh({ position }) {
   return (
     <group position={position}>
-      {/* Industrial Metal Fixture */}
       <mesh position={[0, 1.1, 0]}>
         <boxGeometry args={[0.2, 0.25, 0.15]} />
         <meshStandardMaterial color="#52525b" metalness={0.8} />
       </mesh>
-      {/* Glowing Bulb Shade */}
       <mesh position={[0, 1.0, 0.1]}>
         <sphereGeometry args={[0.08, 12, 12]} />
         <meshStandardMaterial color="#fef08a" emissive="#f59e0b" emissiveIntensity={1} />
@@ -78,16 +71,14 @@ function WallLampMesh({ position }) {
   );
 }
 
-// 4. Pure 3D Elevator Frame & Indicator
+// 4. Pure 3D Elevator Frame
 function ElevatorMesh({ position }) {
   return (
     <group position={position}>
-      {/* Elevator Frame */}
       <mesh position={[0, 0.8, 0]}>
         <boxGeometry args={[0.95, 1.55, 0.1]} />
         <meshStandardMaterial color="#3f3f46" metalness={0.9} roughness={0.2} />
       </mesh>
-      {/* Arrow Indicator Light */}
       <mesh position={[0, 1.5, 0.08]}>
         <boxGeometry args={[0.2, 0.1, 0.02]} />
         <meshStandardMaterial color="#f59e0b" emissive="#d97706" emissiveIntensity={1} />
@@ -96,7 +87,7 @@ function ElevatorMesh({ position }) {
   );
 }
 
-// Player Controls & Interaction Raycaster
+// Player Controls with Anti-Clipping Y-Position Lock & Raycasting
 function PlayerControls({ grid, onInteract }) {
   const controlsRef = useRef();
   const moveState = useRef({ forward: false, backward: false, left: false, right: false });
@@ -110,12 +101,10 @@ function PlayerControls({ grid, onInteract }) {
       if (key === 'a' || e.code === 'KeyA') moveState.current.left = true;
       if (key === 'd' || e.code === 'KeyD') moveState.current.right = true;
 
-      // Interaction Key 'E' -> Raycast Forward
       if (key === 'e' || e.code === 'KeyE') {
         const dir = new THREE.Vector3();
         camera.getWorldDirection(dir);
 
-        // Check target tile in front of camera
         const targetX = Math.floor(camera.position.x + dir.x * 1.3);
         const targetZ = Math.floor(camera.position.z + dir.z * 1.3);
 
@@ -150,7 +139,11 @@ function PlayerControls({ grid, onInteract }) {
   useFrame((state, delta) => {
     if (!controlsRef.current?.isLocked) return;
 
-    state.camera.rotation.x = 0; // Classic DOOM camera lock
+    // 1. Lock eye height exactly at 0.8 to prevent passing through floor/ceiling
+    camera.position.y = 0.8;
+    
+    // 2. Lock pitch for DOOM classic camera lock
+    state.camera.rotation.x = 0;
 
     const oldX = camera.position.x;
     const oldZ = camera.position.z;
@@ -170,7 +163,7 @@ function PlayerControls({ grid, onInteract }) {
       const gz = Math.floor(z);
       if (gz < 0 || gz >= grid.length || gx < 0 || gx >= grid[0].length) return true;
       const tile = grid[gz][gx];
-      return tile === 1 || tile === 2; // Walls & Closed Doors block movement
+      return tile === 1 || tile === 2;
     };
 
     const collidesAt = (x, z) => {
@@ -201,7 +194,7 @@ export default function DungeonEngine({ currentFloor, grid, onInteract }) {
   return (
     <div className="w-full h-screen bg-black relative cursor-crosshair">
       <Canvas
-        camera={{ position: [2.5, 0.8, 2.5], fov: 80 }}
+        camera={{ position: [2.5, 0.8, 2.5], fov: 80, near: 0.01, far: 50 }}
         gl={{ antialias: false }}
         style={{ imageRendering: 'pixelated' }}
       >
@@ -210,7 +203,6 @@ export default function DungeonEngine({ currentFloor, grid, onInteract }) {
 
         {grid.map((row, z) =>
           row.map((tile, x) => {
-            // 1 = Dark Industrial Wall
             if (tile === 1) {
               return (
                 <mesh key={`${x}-${z}`} position={[x + 0.5, 0.8, z + 0.5]}>
@@ -219,7 +211,6 @@ export default function DungeonEngine({ currentFloor, grid, onInteract }) {
                 </mesh>
               );
             }
-            // 2 = Heavy Steel Vault Door
             if (tile === 2) {
               return (
                 <group key={`${x}-${z}`} position={[x + 0.5, 0.8, z + 0.5]}>
@@ -227,7 +218,6 @@ export default function DungeonEngine({ currentFloor, grid, onInteract }) {
                     <boxGeometry args={[0.9, 1.6, 0.15]} />
                     <meshStandardMaterial color="#7f1d1d" roughness={0.5} emissive="#450a0a" emissiveIntensity={0.5} />
                   </mesh>
-                  {/* Door Keycard Slot Light */}
                   <mesh position={[0.35, 0, 0.09]}>
                     <boxGeometry args={[0.08, 0.15, 0.02]} />
                     <meshStandardMaterial color="#ef4444" emissive="#dc2626" emissiveIntensity={1} />
@@ -235,19 +225,15 @@ export default function DungeonEngine({ currentFloor, grid, onInteract }) {
                 </group>
               );
             }
-            // 3 = 3D Elevator Frame
             if (tile === 3) {
               return <ElevatorMesh key={`${x}-${z}`} position={[x + 0.5, 0, z + 0.5]} />;
             }
-            // 4 = 3D Terminal Console
             if (tile === 4) {
               return <TerminalMesh key={`${x}-${z}`} position={[x + 0.5, 0, z + 0.5]} />;
             }
-            // 5 = 3D Keycard
             if (tile === 5) {
               return <KeycardMesh key={`${x}-${z}`} position={[x + 0.5, 0, z + 0.5]} />;
             }
-            // 6 = 3D Wall Lamp Sconce
             if (tile === 6) {
               return <WallLampMesh key={`${x}-${z}`} position={[x + 0.5, 0, z + 0.5]} />;
             }
@@ -255,22 +241,21 @@ export default function DungeonEngine({ currentFloor, grid, onInteract }) {
           })
         )}
 
-        {/* Floor */}
+        {/* Floor: DoubleSide prevents backface clipping */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[15, 0, 15]}>
           <planeGeometry args={[60, 60]} />
-          <meshStandardMaterial color="#18181b" roughness={1.0} />
+          <meshStandardMaterial color="#18181b" roughness={1.0} side={THREE.DoubleSide} />
         </mesh>
 
-        {/* Low Ceiling */}
+        {/* Low Ceiling: DoubleSide prevents backface clipping */}
         <mesh rotation={[Math.PI / 2, 0, 0]} position={[15, 1.6, 15]}>
           <planeGeometry args={[60, 60]} />
-          <meshStandardMaterial color="#09090b" roughness={1.0} />
+          <meshStandardMaterial color="#09090b" roughness={1.0} side={THREE.DoubleSide} />
         </mesh>
 
         <PlayerControls grid={grid} onInteract={onInteract} />
       </Canvas>
 
-      {/* Red Reticle */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-red-600 text-3xl font-bold select-none">
         +
       </div>
