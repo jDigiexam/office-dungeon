@@ -117,7 +117,7 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
   const downVector = useMemo(() => new THREE.Vector3(0, -1, 0), []);
 
   // Load the 2D Hand Sprite
-  const texture = useTexture('/weaponspell1.png');
+  const texture = useTexture('/hand.png');
   useEffect(() => {
     // Crop exactly 1/3 of the width, starting at the left
     texture.repeat.set(1/3, 1);
