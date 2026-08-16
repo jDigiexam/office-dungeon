@@ -71,7 +71,6 @@ function DoorMesh({ position, grid, gx, gz, isOpened }) {
   );
 }
 
-// 🌀 WIDER Spiral Staircase
 function SpiralStaircase({ position }) {
   const steps = 40; 
   const heightPerStep = 3 / steps;
@@ -103,7 +102,7 @@ function SpiralStaircase({ position }) {
   );
 }
 
-// Player Controls & Physics with Sprite View Model
+// Player Controls & Physics with Single Sprite View Model
 function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   const controlsRef = useRef();
   const moveState = useRef({ forward: false, backward: false, left: false, right: false });
@@ -116,13 +115,10 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const downVector = useMemo(() => new THREE.Vector3(0, -1, 0), []);
 
-  // Load the 2D Hand Sprite
+  // Load the perfectly cropped hand.png
   const texture = useTexture('/hand.png');
   useEffect(() => {
-    // Crop exactly 1/3 of the width, starting at the left
-    texture.repeat.set(1/3, 1);
-    texture.offset.set(0, 0);
-    // Use nearest neighbor filtering for that crunchy retro pixel look
+    // Keep it crunchy and pixelated
     texture.magFilter = THREE.NearestFilter;
     texture.minFilter = THREE.NearestFilter;
     texture.needsUpdate = true;
@@ -186,16 +182,14 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
     }
 
     if (handRef.current) {
-      // Place the 2D plane in front of the camera, slightly down and left
-      const handOffset = new THREE.Vector3(-0.25, -0.2, -0.4);
+      // Anchors the sprite to the bottom right of the screen
+      const handOffset = new THREE.Vector3(0.18, -0.15, -0.3);
       handOffset.applyQuaternion(camera.quaternion);
       handRef.current.position.copy(camera.position).add(handOffset);
       
-      // Face the camera perfectly
       handRef.current.quaternion.copy(camera.quaternion);
       
-      // Apply walking bob animation to the sprite
-      handRef.current.position.y += Math.abs(Math.sin(bobTime.current)) * 0.03;
+      handRef.current.position.y += Math.abs(Math.sin(bobTime.current)) * 0.02;
       handRef.current.rotation.z += Math.cos(bobTime.current / 2) * 0.02; 
     }
 
@@ -241,13 +235,12 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
     <>
       <PointerLockControls ref={controlsRef} minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI * 3 / 4} />
       
-      {/* 2D Sprite View Model */}
       <mesh ref={handRef} renderOrder={999}>
-        <planeGeometry args={[0.5, 0.5]} />
+        <planeGeometry args={[0.35, 0.35]} />
         <meshBasicMaterial 
           map={texture} 
           transparent={true} 
-          depthTest={false} // Prevents sprite from clipping into walls
+          depthTest={false}
         />
       </mesh>
     </>
@@ -261,7 +254,6 @@ export default function DungeonEngine({ grids, onInteract, teleportCoords, clear
         <fog attach="fog" args={['#000000', 3, 16]} />
         <ambientLight intensity={0.5} color="#ffffff" />
         
-        {/* Suspense handles the asynchronous texture loading */}
         <Suspense fallback={null}>
           {grids.map((grid, fIdx) => (
             <group key={`floor-group-${fIdx}`} position={[0, fIdx * 3, 0]}>
