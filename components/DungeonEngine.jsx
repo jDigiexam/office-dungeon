@@ -80,12 +80,10 @@ function SpiralStaircase({ position }) {
 
   return (
     <group position={position}>
-      {/* Central Support Pole */}
       <mesh position={[0, 1.5, 0]}>
         <cylinderGeometry args={[0.1, 0.1, 3, 8]} />
         <meshStandardMaterial color="#27272a" />
       </mesh>
-      {/* Individual Walkable Steps */}
       {Array.from({ length: steps }).map((_, i) => (
         <mesh
           key={i}
@@ -95,7 +93,7 @@ function SpiralStaircase({ position }) {
             Math.sin(i * anglePerStep) * radius
           ]}
           rotation={[0, -i * anglePerStep, 0]}
-          userData={{ walkable: true }} // Allows raycaster gravity to snap to it
+          userData={{ walkable: true }}
         >
           <boxGeometry args={[radius * 2.2, 0.1, 0.4]} />
           <meshStandardMaterial color="#52525b" roughness={0.9} />
@@ -105,13 +103,12 @@ function SpiralStaircase({ position }) {
   );
 }
 
-// Player Controls, Physics, & DOOM View Model
+// Player Controls & Safe Physics
 function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   const controlsRef = useRef();
   const moveState = useRef({ forward: false, backward: false, left: false, right: false });
   const lastFloor = useRef(0);
   
-  // View Bobbing State
   const bobTime = useRef(0);
   const handRef = useRef();
   
@@ -160,41 +157,37 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
   useFrame((state, delta) => {
     if (!controlsRef.current?.isLocked) return;
 
-    // Movement speeds
     const moveSpeed = 4.5 * delta;
     const isMoving = moveState.current.forward || moveState.current.backward || moveState.current.left || moveState.current.right;
 
-    // Classic DOOM View Bobbing Math
-    if (isMoving) bobTime.current += delta * 12; // Walking speed frequency
-    else bobTime.current = THREE.MathUtils.lerp(bobTime.current, 0, delta * 10); // Smooth return to center
+    if (isMoving) bobTime.current += delta * 12;
+    else bobTime.current = THREE.MathUtils.lerp(bobTime.current, 0, delta * 10);
     
-    const bobOffset = Math.sin(bobTime.current) * 0.05; // Y-axis bob
-    const swayOffset = Math.cos(bobTime.current / 2) * 0.015; // Z-axis sway
+    const bobOffset = Math.sin(bobTime.current) * 0.05; 
+    
+    // NOTE: Removed camera.rotation.z to prevent gimbal lock / rapid spinning!
 
-    // Apply sway to camera
-    camera.rotation.z = swayOffset;
-
-    // Gravity Raycaster (Snaps to floor and bumps up physical stairs)
+    // Gravity Raycaster
     raycaster.set(new THREE.Vector3(camera.position.x, camera.position.y + 1, camera.position.z), downVector);
     const intersects = raycaster.intersectObjects(scene.children, true);
     const groundHit = intersects.find(i => i.object.userData?.walkable);
     
     if (groundHit) {
-      // Lerp camera Y position factoring in step bumps and walking bob
+      // Safe Y-axis bobbing directly integrated into gravity
       camera.position.y = THREE.MathUtils.lerp(camera.position.y, groundHit.point.y + 0.8 + bobOffset, 0.4);
     }
 
-    // Attach Marine View Model (Hand) to Camera
+    // Attach Marine View Model safely
     if (handRef.current) {
-      // Keep hand locked to bottom right of viewport
       const handOffset = new THREE.Vector3(0.25, -0.25, -0.4);
       handOffset.applyQuaternion(camera.quaternion);
       handRef.current.position.copy(camera.position).add(handOffset);
       handRef.current.quaternion.copy(camera.quaternion);
       
-      // Animate Hand Bobbing
+      // Apply sway and bob directly to the hand model instead of the camera
       handRef.current.position.y += Math.abs(Math.sin(bobTime.current)) * 0.04;
       handRef.current.rotation.x -= Math.sin(bobTime.current) * 0.05;
+      handRef.current.rotation.z += Math.cos(bobTime.current / 2) * 0.05; // Hand sway
     }
 
     const currentFIdx = Math.max(0, Math.min(2, Math.round(camera.position.y / 3)));
@@ -239,14 +232,12 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
     <>
       <PointerLockControls ref={controlsRef} minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI * 3 / 4} />
       
-      {/* Space Marine View Model (Right Hand Fist) */}
+      {/* Space Marine View Model */}
       <group ref={handRef} scale={0.5}>
-        {/* Green Marine Armor Sleeve */}
         <mesh position={[0, -0.2, 0.2]} rotation={[-0.2, 0, 0]}>
           <boxGeometry args={[0.15, 0.15, 0.4]} />
           <meshStandardMaterial color="#166534" roughness={0.9} />
         </mesh>
-        {/* Brown Leather Combat Glove */}
         <mesh position={[0, 0, -0.05]}>
           <boxGeometry args={[0.16, 0.16, 0.18]} />
           <meshStandardMaterial color="#92400e" roughness={0.7} />
@@ -285,7 +276,7 @@ export default function DungeonEngine({ grids, onInteract, teleportCoords, clear
           </group>
         ))}
 
-        {/* 3D Physical Spiral Staircases replacing Ramps */}
+        {/* 3D Physical Spiral Staircases */}
         <SpiralStaircase position={[13.5, 0, 10.5]} />
         <SpiralStaircase position={[13.5, 3, 4.5]} />
 
