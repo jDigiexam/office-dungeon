@@ -71,11 +71,11 @@ function DoorMesh({ position, grid, gx, gz, isOpened }) {
   );
 }
 
-// 🌀 Physical Spiral Staircase Mesh
+// 🌀 WIDER Spiral Staircase
 function SpiralStaircase({ position }) {
-  const steps = 30; // 30 steps to climb 3 units
+  const steps = 40; // Dense steps for smooth walking
   const heightPerStep = 3 / steps;
-  const radius = 0.5;
+  const stairRadius = 1.6; // Increased diameter for a much wider staircase
   const anglePerStep = (Math.PI * 2) / steps;
 
   return (
@@ -88,14 +88,14 @@ function SpiralStaircase({ position }) {
         <mesh
           key={i}
           position={[
-            Math.cos(i * anglePerStep) * radius,
-            i * heightPerStep + 0.1,
-            Math.sin(i * anglePerStep) * radius
+            Math.cos(i * anglePerStep) * (stairRadius / 2),
+            i * heightPerStep + 0.05,
+            Math.sin(i * anglePerStep) * (stairRadius / 2)
           ]}
           rotation={[0, -i * anglePerStep, 0]}
           userData={{ walkable: true }}
         >
-          <boxGeometry args={[radius * 2.2, 0.1, 0.4]} />
+          <boxGeometry args={[stairRadius, 0.1, 0.5]} />
           <meshStandardMaterial color="#52525b" roughness={0.9} />
         </mesh>
       ))}
@@ -103,7 +103,7 @@ function SpiralStaircase({ position }) {
   );
 }
 
-// Player Controls & Safe Physics
+// Player Controls & Physics
 function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   const controlsRef = useRef();
   const moveState = useRef({ forward: false, backward: false, left: false, right: false });
@@ -164,30 +164,24 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
     else bobTime.current = THREE.MathUtils.lerp(bobTime.current, 0, delta * 10);
     
     const bobOffset = Math.sin(bobTime.current) * 0.05; 
-    
-    // NOTE: Removed camera.rotation.z to prevent gimbal lock / rapid spinning!
 
-    // Gravity Raycaster
     raycaster.set(new THREE.Vector3(camera.position.x, camera.position.y + 1, camera.position.z), downVector);
     const intersects = raycaster.intersectObjects(scene.children, true);
     const groundHit = intersects.find(i => i.object.userData?.walkable);
     
     if (groundHit) {
-      // Safe Y-axis bobbing directly integrated into gravity
       camera.position.y = THREE.MathUtils.lerp(camera.position.y, groundHit.point.y + 0.8 + bobOffset, 0.4);
     }
 
-    // Attach Marine View Model safely
     if (handRef.current) {
       const handOffset = new THREE.Vector3(0.25, -0.25, -0.4);
       handOffset.applyQuaternion(camera.quaternion);
       handRef.current.position.copy(camera.position).add(handOffset);
       handRef.current.quaternion.copy(camera.quaternion);
       
-      // Apply sway and bob directly to the hand model instead of the camera
       handRef.current.position.y += Math.abs(Math.sin(bobTime.current)) * 0.04;
       handRef.current.rotation.x -= Math.sin(bobTime.current) * 0.05;
-      handRef.current.rotation.z += Math.cos(bobTime.current / 2) * 0.05; // Hand sway
+      handRef.current.rotation.z += Math.cos(bobTime.current / 2) * 0.05; 
     }
 
     const currentFIdx = Math.max(0, Math.min(2, Math.round(camera.position.y / 3)));
@@ -232,7 +226,6 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
     <>
       <PointerLockControls ref={controlsRef} minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI * 3 / 4} />
       
-      {/* Space Marine View Model */}
       <group ref={handRef} scale={0.5}>
         <mesh position={[0, -0.2, 0.2]} rotation={[-0.2, 0, 0]}>
           <boxGeometry args={[0.15, 0.15, 0.4]} />
@@ -259,7 +252,17 @@ export default function DungeonEngine({ grids, onInteract, teleportCoords, clear
             {grid.map((row, z) =>
               row.map((tile, x) => {
                 const elements = [];
-                if (tile === 1) elements.push(<mesh key="wall" position={[x + 0.5, 0.8, z + 0.5]}><boxGeometry args={[1, 1.6, 1]} /><meshStandardMaterial color="#78716c" roughness={0.9} /></mesh>);
+                
+                // 🛑 FIXED: Walls are now 3 units high (y=0 to y=3) to perfectly connect the floors!
+                if (tile === 1) {
+                  elements.push(
+                    <mesh key="wall" position={[x + 0.5, 1.5, z + 0.5]}>
+                      <boxGeometry args={[1, 3, 1]} />
+                      <meshStandardMaterial color="#78716c" roughness={0.9} />
+                    </mesh>
+                  );
+                }
+                
                 if (tile === 2 || tile === 8) elements.push(<DoorMesh key="door" position={[x + 0.5, 0, z + 0.5]} grid={grid} gx={x} gz={z} isOpened={tile === 8} />);
                 if (tile === 3) elements.push(<ElevatorMesh key="elev" position={[x + 0.5, 0, z + 0.5]} />);
                 if (tile === 4) elements.push(<TerminalMesh key="term" position={[x + 0.5, 0, z + 0.5]} />);
