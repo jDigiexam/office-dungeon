@@ -34,8 +34,6 @@ function TerminalMesh({ position }) {
 
 function LitWindowMesh({ position, grid, gx, gz, texture }) {
   let rotY = 0; let offsetX = 0; let offsetZ = 0;
-  
-  // FIX: Look for an adjacent WALKABLE FLOOR (0), not a wall, and mount facing the hallway!
   if (gx > 0 && grid[gz][gx - 1] === 0) { offsetX = -0.505; rotY = -Math.PI / 2; }
   else if (gx < grid[0].length - 1 && grid[gz][gx + 1] === 0) { offsetX = 0.505; rotY = Math.PI / 2; }
   else if (gz > 0 && grid[gz - 1][gx] === 0) { offsetZ = -0.505; rotY = Math.PI; }
@@ -133,10 +131,12 @@ function SpiralStaircase({ position, wallTexture, floorTexture }) {
         <cylinderGeometry args={[0.4, 0.4, 4, 16]} />
         <meshStandardMaterial map={wallTexture} roughness={0.9} />
       </mesh>
+      
       <mesh position={[0, 2.0, 0]} rotation={[0, Math.PI * 1.25, 0]}>
         <cylinderGeometry args={[2.5, 2.5, 4, 16, 1, true, 0, Math.PI * 1.5]} />
         <meshStandardMaterial map={wallTexture} roughness={0.9} side={THREE.DoubleSide} />
       </mesh>
+
       {Array.from({ length: steps }).map((_, i) => (
         <mesh key={i} position={[Math.cos(i * anglePerStep) * (stairRadius / 2), i * heightPerStep + 0.1, Math.sin(i * anglePerStep) * (stairRadius / 2)]} rotation={[0, -i * anglePerStep, 0]}>
           <boxGeometry args={[stairRadius, 0.2, 1.2]} />
@@ -150,11 +150,12 @@ function SpiralStaircase({ position, wallTexture, floorTexture }) {
 // ----------------------------------------------------
 // 2. BULLETPROOF PHYSICS & CONTROLS
 // ----------------------------------------------------
-function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
+function PlayerControls({ grids, stairsRef, handTexture, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   const controlsRef = useRef();
   const moveState = useRef({ forward: false, backward: false, left: false, right: false });
   const currentFloorRef = useRef(0);
   const bobTime = useRef(0);
+  const handRef = useRef();
   
   const { camera } = useThree();
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
@@ -237,6 +238,15 @@ function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTel
 
     camera.position.y = THREE.MathUtils.lerp(camera.position.y, targetY + 0.8 + bobOffset, 0.4);
 
+    if (handRef.current) {
+      const handOffset = new THREE.Vector3(0.18, -0.15, -0.3);
+      handOffset.applyQuaternion(camera.quaternion);
+      handRef.current.position.copy(camera.position).add(handOffset);
+      handRef.current.quaternion.copy(camera.quaternion);
+      handRef.current.position.y += Math.abs(Math.sin(bobTime.current)) * 0.02;
+      handRef.current.rotation.z += Math.cos(bobTime.current / 2) * 0.02; 
+    }
+
     const currentFIdx = currentFloorRef.current;
     const oldX = camera.position.x;
     const oldZ = camera.position.z;
@@ -270,7 +280,15 @@ function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTel
     if (collidesAt(camera.position.x, camera.position.z)) camera.position.z = oldZ;
   });
 
-  return <PointerLockControls makeDefault ref={controlsRef} minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI * 3 / 4} />;
+  return (
+    <>
+      <PointerLockControls makeDefault ref={controlsRef} minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI * 3 / 4} />
+      <mesh ref={handRef} renderOrder={999}>
+        <planeGeometry args={[0.23, 0.23]} />
+        <meshBasicMaterial map={handTexture} transparent={true} depthTest={false} />
+      </mesh>
+    </>
+  );
 }
 
 // ----------------------------------------------------
@@ -279,7 +297,6 @@ function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTel
 function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   const stairsRef = useRef();
 
-  // Load variant textures
   const woodTexList = useTexture([
     '/wall_timber_structure_cross.png',
     '/wall_timber_structure_diagonal.png',
@@ -298,17 +315,18 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
     '/wall_stone.png'
   ]);
 
-  const [tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow] = useTexture([
+  const [tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand] = useTexture([
     '/floor_stone_pattern.png',
     '/floor_tiles_tan_large.png',
     '/door_wood.png',
     '/door_metal_gate.png',
     '/door_metal_frame.png',
-    '/window_round_pane_lit.png'
+    '/window_round_pane_lit.png',
+    '/hand.png'
   ]);
 
   useEffect(() => {
-    [...woodTexList, ...stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow].forEach(t => {
+    [...woodTexList, ...stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand].forEach(t => {
       if(t) {
         t.magFilter = t.minFilter = THREE.NearestFilter;
         t.wrapS = t.wrapT = THREE.RepeatWrapping;
@@ -317,14 +335,12 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
     });
     woodTexList.forEach(t => t.repeat.set(1, 4));
     stoneTexList.forEach(t => t.repeat.set(1, 4));
-  }, [woodTexList, stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow]);
+  }, [woodTexList, stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand]);
 
-  // Deterministic texture selector
   const getTextureIndex = (x, z, fIdx, max) => (x * 7 + z * 13 + fIdx * 3) % max;
 
   return (
     <>
-      {/* WOOD WALLS (Varied) */}
       {woodTexList.map((tex, texIdx) => (
         <Instances key={`wood-inst-${texIdx}`} limit={1500}>
           <boxGeometry args={[1, 4, 1]} />
@@ -338,7 +354,6 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
         </Instances>
       ))}
 
-      {/* STONE WALLS (Varied) */}
       {stoneTexList.map((tex, texIdx) => (
         <Instances key={`stone-inst-${texIdx}`} limit={1500}>
           <boxGeometry args={[1, 4, 1]} />
@@ -352,7 +367,6 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
         </Instances>
       ))}
 
-      {/* WOOD FLOORS */}
       <Instances limit={1500}>
         <planeGeometry args={[1, 1]} />
         <meshStandardMaterial map={tFloorWood} color="#ffffff" roughness={1.0} />
@@ -362,7 +376,6 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
         })))}
       </Instances>
 
-      {/* STONE FLOORS */}
       <Instances limit={1500}>
         <planeGeometry args={[1, 1]} />
         <meshStandardMaterial map={tFloorStone} color="#ffffff" roughness={1.0} />
@@ -372,7 +385,6 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
         })))}
       </Instances>
 
-      {/* CEILINGS */}
       <Instances limit={1500}>
         <planeGeometry args={[1, 1]} />
         <meshStandardMaterial color="#18181b" roughness={1.0} />
@@ -382,7 +394,6 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
         })))}
       </Instances>
 
-      {/* INTERACTIVE ELEMENTS */}
       {grids.map((grid, fIdx) => (
         <group key={`interactive-${fIdx}`} position={[0, fIdx * 4, 0]}>
           {grid.map((row, z) =>
@@ -408,7 +419,7 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
         <SpiralStaircase position={[16.5, 4.0, 9.5]} wallTexture={stoneTexList[0]} floorTexture={tFloorStone} />
       </group>
 
-      <PlayerControls grids={grids} stairsRef={stairsRef} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
+      <PlayerControls grids={grids} stairsRef={stairsRef} handTexture={tHand} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
     </>
   );
 }
