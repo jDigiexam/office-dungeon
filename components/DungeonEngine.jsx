@@ -6,7 +6,7 @@ import { PointerLockControls, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 
 // ----------------------------------------------------
-// 1. FAST RAW INSTANCED MESH BUFFER (BYPASSES REACT VDOM)
+// 1. FAST RAW INSTANCED MESH BUFFER
 // ----------------------------------------------------
 function FastInstancedMesh({ geometryArgs, materialProps, coords }) {
   const meshRef = useRef();
@@ -315,7 +315,7 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
     stoneTexList.forEach(t => t.repeat.set(1, 4));
   }, [woodTexList, stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow]);
 
-  // Pre-calculate ALL coordinates so we can dump them into GPU buffers instantly
+  // Pre-calculate ALL coordinates and aggressively cull hidden surfaces!
   const { woodWallCoords, stoneWallCoords, woodFloorCoords, stoneFloorCoords, ceilingCoords, interactiveElements } = useMemo(() => {
     const wWalls = woodTexList.map(() => []);
     const sWalls = stoneTexList.map(() => []);
@@ -329,27 +329,39 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
       const isWoodFloor = fIdx < 2;
       const wLen = woodTexList.length;
       const sLen = stoneTexList.length;
+      const rows = grid.length;
+      const cols = grid[0].length;
 
-      for (let z = 0; z < grid.length; z++) {
-        for (let x = 0; x < grid[z].length; x++) {
+      for (let z = 0; z < rows; z++) {
+        for (let x = 0; x < cols; x++) {
           const tile = grid[z][x];
           
+          // 🚨 HIDDEN SURFACE REMOVAL: Only render walls that touch a playable space
+          if (tile === 1) {
+            let isVisible = false;
+            // Check N, S, W, E to see if this wall touches an empty space or interactable tile
+            if (z > 0 && grid[z-1][x] !== 1) isVisible = true;
+            else if (z < rows - 1 && grid[z+1][x] !== 1) isVisible = true;
+            else if (x > 0 && grid[z][x-1] !== 1) isVisible = true;
+            else if (x < cols - 1 && grid[z][x+1] !== 1) isVisible = true;
+
+            if (isVisible) {
+              const tIdx = (x * 7 + z * 13 + fIdx * 3) % (isWoodFloor ? wLen : sLen);
+              const wPos = [x + 0.5, fIdx * 4 + 2.0, z + 0.5];
+              if (isWoodFloor) wWalls[tIdx].push(wPos); else sWalls[tIdx].push(wPos);
+            }
+            continue; // Move on to the next tile
+          }
+
           // Fast Ceilings
-          if (![1,6,7,3,10].includes(tile)) {
+          if (![7,3,10].includes(tile) && tile !== 6) {
             ceils.push([x + 0.5, fIdx * 4 + 3.98, z + 0.5, Math.PI / 2, 0, 0]);
           }
 
           // Fast Floors
-          if (![1,7,3,10].includes(tile)) {
+          if (![7,3,10].includes(tile)) {
             const fPos = [x + 0.5, fIdx * 4, z + 0.5, -Math.PI / 2, 0, 0];
             if (isWoodFloor) wFloors.push(fPos); else sFloors.push(fPos);
-          }
-
-          // Fast Walls
-          if (tile === 1) {
-            const tIdx = (x * 7 + z * 13 + fIdx * 3) % (isWoodFloor ? wLen : sLen);
-            const wPos = [x + 0.5, fIdx * 4 + 2.0, z + 0.5];
-            if (isWoodFloor) wWalls[tIdx].push(wPos); else sWalls[tIdx].push(wPos);
           }
 
           // Fast Lintels (Above doors)
@@ -372,11 +384,11 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
 
   return (
     <>
-      {/* 🚨 BUFFERED WALLS */}
+      {/* 🚨 BUFFERED CULLED WALLS */}
       {woodTexList.map((tex, i) => <FastInstancedMesh key={`wwall-${i}`} geometryArgs={{type: 'box', args: [1, 4, 1]}} materialProps={{map: tex, color: "#ffffff", roughness: 0.9}} coords={woodWallCoords[i]} />)}
       {stoneTexList.map((tex, i) => <FastInstancedMesh key={`swall-${i}`} geometryArgs={{type: 'box', args: [1, 4, 1]}} materialProps={{map: tex, color: "#ffffff", roughness: 0.9}} coords={stoneWallCoords[i]} />)}
 
-      {/* 🚨 BUFFERED FLOORS & CEILINGS */}
+      {/* 🚨 BUFFERED CULLED FLOORS & CEILINGS */}
       <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorWood, color: "#ffffff", roughness: 1.0}} coords={woodFloorCoords} />
       <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorStone, color: "#ffffff", roughness: 1.0}} coords={stoneFloorCoords} />
       <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{color: "#18181b", roughness: 1.0}} coords={ceilingCoords} />
