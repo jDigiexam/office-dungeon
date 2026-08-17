@@ -5,7 +5,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { PointerLockControls, useTexture, Instances, Instance } from '@react-three/drei';
 import * as THREE from 'three';
 
-// 3D Objects
+// 1. Static 3D Objects
 function KeycardMesh({ position }) {
   const cardRef = useRef();
   useFrame((_, delta) => { if (cardRef.current) cardRef.current.rotation.y += delta * 2.5; });
@@ -30,6 +30,7 @@ function TerminalMesh({ position }) {
   );
 }
 
+// 🪟 Optimized Lit Window Mesh (REMOVED pointLight to fix GPU Shader crash)
 function LitWindowMesh({ position, grid, gx, gz }) {
   let rotY = 0; let offsetX = 0; let offsetZ = 0;
   if (gx > 0 && grid[gz][gx - 1] === 1) { offsetX = -0.49; rotY = Math.PI / 2; }
@@ -51,7 +52,6 @@ function LitWindowMesh({ position, grid, gx, gz }) {
         <planeGeometry args={[0.8, 1.6]} />
         <meshStandardMaterial map={windowTexture} emissive="#f59e0b" emissiveIntensity={0.8} emissiveMap={windowTexture} side={THREE.DoubleSide} transparent={true} />
       </mesh>
-      <pointLight position={[0, 2.0, 0.2]} intensity={4} distance={6} color="#fbbf24" />
     </group>
   );
 }
@@ -69,7 +69,7 @@ function ElevatorMesh({ position, wallTexture }) {
 function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture }) {
   const groupRef = useRef();
   useFrame((_, delta) => {
-    if (isOpened && groupRef.current.position.y > -1.6) groupRef.current.position.y -= delta * 2;
+    if (isOpened && groupRef.current.position.y > -1.6) groupRef.current.position.y -= Math.min(delta * 2, 0.1);
   });
   let rotY = 0;
   if (gx > 0 && gx < grid[0].length - 1 && grid[gz][gx - 1] === 1 && grid[gz][gx + 1] === 1) rotY = 0;
@@ -95,18 +95,11 @@ function SpiralStaircase({ position }) {
 
   return (
     <group position={position}>
-      <mesh position={[0, 2.0, 0]}>
-        <cylinderGeometry args={[0.2, 0.2, 4, 8]} />
-        <meshStandardMaterial color="#27272a" />
-      </mesh>
+      <mesh position={[0, 2.0, 0]}><cylinderGeometry args={[0.2, 0.2, 4, 8]} /><meshStandardMaterial color="#27272a" /></mesh>
       {Array.from({ length: steps }).map((_, i) => (
         <mesh
           key={i}
-          position={[
-            Math.cos(i * anglePerStep) * (stairRadius / 2),
-            i * heightPerStep + 0.1,
-            Math.sin(i * anglePerStep) * (stairRadius / 2)
-          ]}
+          position={[Math.cos(i * anglePerStep) * (stairRadius / 2), i * heightPerStep + 0.1, Math.sin(i * anglePerStep) * (stairRadius / 2)]}
           rotation={[0, -i * anglePerStep, 0]}
         >
           <boxGeometry args={[stairRadius, 0.2, 1.2]} />
@@ -117,7 +110,7 @@ function SpiralStaircase({ position }) {
   );
 }
 
-// ⚡ Procedural Player Controls (NO GLOBAL RAYCASTING)
+// ⚡ BUG-FREE Player Controls
 function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   const controlsRef = useRef();
   const moveState = useRef({ forward: false, backward: false, left: false, right: false });
@@ -142,6 +135,21 @@ function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTel
       clearTeleport();
     }
   }, [teleportCoords, camera, clearTeleport]);
+
+  // Decoupled Floor Check (Prevents React State floods freezing the browser)
+  const floorChangeRef = useRef(onFloorChange);
+  useEffect(() => { floorChangeRef.current = onFloorChange; }, [onFloorChange]);
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const stableFloorIndex = Math.max(0, Math.min(2, Math.round(camera.position.y / 4)));
+      if (stableFloorIndex !== lastFloor.current) {
+        lastFloor.current = stableFloorIndex;
+        floorChangeRef.current(stableFloorIndex);
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [camera]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -177,41 +185,27 @@ function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTel
   useFrame((state, delta) => {
     if (!controlsRef.current?.isLocked) return;
 
-    const moveSpeed = 4.5 * delta;
+    // Cap delta to prevent phasing through walls on lag spikes
+    const moveSpeed = Math.min(4.5 * delta, 0.1);
     const isMoving = moveState.current.forward || moveState.current.backward || moveState.current.left || moveState.current.right;
 
     if (isMoving) bobTime.current += delta * 12;
     else bobTime.current = THREE.MathUtils.lerp(bobTime.current, 0, delta * 10);
     const bobOffset = Math.sin(bobTime.current) * 0.05; 
 
-    // ⚡ PROCEDURAL HEIGHT CALCULATION
     const px = camera.position.x;
     const pz = camera.position.z;
-    
-    // Check if player is standing inside the 5x5 Stairwell Shaft (X: 14 to 19, Z: 7 to 12)
     const inStairwell = px >= 14 && px <= 19 && pz >= 7 && pz <= 12;
     
-    let targetY = lastFloor.current * 4.0; // Default flat ground height
+    let targetY = lastFloor.current * 4.0; 
 
-    // Only fire the raycaster if they are actively in the stairwell void
     if (inStairwell && stairsRef.current) {
       raycaster.set(new THREE.Vector3(px, camera.position.y + 1, pz), downVector);
-      // Raycast against the tiny local stair group instead of the whole world!
       const hits = raycaster.intersectObject(stairsRef.current, true);
-      if (hits.length > 0) {
-        targetY = hits[0].point.y;
-      }
+      if (hits.length > 0) targetY = hits[0].point.y;
     }
 
-    // Apply the newly calculated height smoothly
     camera.position.y = THREE.MathUtils.lerp(camera.position.y, targetY + 0.8 + bobOffset, 0.4);
-
-    // Sync Floor HUD securely
-    const stableFloorIndex = Math.max(0, Math.min(2, Math.round(targetY / 4)));
-    if (stableFloorIndex !== lastFloor.current) {
-      lastFloor.current = stableFloorIndex;
-      onFloorChange(stableFloorIndex);
-    }
 
     if (handRef.current) {
       const handOffset = new THREE.Vector3(0.18, -0.15, -0.3);
@@ -254,7 +248,7 @@ function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTel
 
   return (
     <>
-      <PointerLockControls ref={controlsRef} minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI * 3 / 4} />
+      <PointerLockControls makeDefault ref={controlsRef} minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI * 3 / 4} />
       <mesh ref={handRef} renderOrder={999}>
         <planeGeometry args={[0.23, 0.23]} />
         <meshBasicMaterial map={texture} transparent={true} depthTest={false} />
@@ -268,7 +262,6 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
   const floorTexture = useTexture('/floor_stone_pattern.png');
   const stairsRef = useRef();
 
-  // Safely prep textures on mount
   useEffect(() => {
     wallTexture.magFilter = THREE.NearestFilter;
     wallTexture.minFilter = THREE.NearestFilter;
@@ -290,12 +283,8 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
         <boxGeometry args={[1, 4, 1]} />
         <meshStandardMaterial map={wallTexture} color="#ffffff" roughness={0.9} />
         {grids.map((grid, fIdx) => grid.map((row, z) => row.map((tile, x) => {
-          if (tile === 1 || tile === 6) {
-            return <Instance key={`wall-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 2.0, z + 0.5]} />;
-          }
-          if (tile === 2 || tile === 8 || tile === 3) {
-            return <Instance key={`lintel-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 2.8, z + 0.5]} scale={[1, 0.6, 1]} />;
-          }
+          if (tile === 1 || tile === 6) return <Instance key={`wall-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 2.0, z + 0.5]} />;
+          if (tile === 2 || tile === 8 || tile === 3) return <Instance key={`lintel-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 2.8, z + 0.5]} scale={[1, 0.6, 1]} />;
           return null;
         })))}
       </Instances>
@@ -304,9 +293,7 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
         <planeGeometry args={[1, 1]} />
         <meshStandardMaterial map={floorTexture} color="#ffffff" roughness={1.0} />
         {grids.map((grid, fIdx) => grid.map((row, z) => row.map((tile, x) => {
-          if (tile !== 7 && tile !== 1 && tile !== 6) {
-            return <Instance key={`floor-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4, z + 0.5]} rotation={[-Math.PI / 2, 0, 0]} />;
-          }
+          if (tile !== 7 && tile !== 1 && tile !== 6) return <Instance key={`floor-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4, z + 0.5]} rotation={[-Math.PI / 2, 0, 0]} />;
           return null;
         })))}
       </Instances>
@@ -315,9 +302,7 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
         <planeGeometry args={[1, 1]} />
         <meshStandardMaterial color="#18181b" roughness={1.0} />
         {grids.map((grid, fIdx) => grid.map((row, z) => row.map((tile, x) => {
-          if (tile !== 7 && tile !== 1 && tile !== 6) {
-            return <Instance key={`ceil-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 4.0, z + 0.5]} rotation={[Math.PI / 2, 0, 0]} />;
-          }
+          if (tile !== 7 && tile !== 1 && tile !== 6) return <Instance key={`ceil-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 4.0, z + 0.5]} rotation={[Math.PI / 2, 0, 0]} />;
           return null;
         })))}
       </Instances>
@@ -338,7 +323,6 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
         </group>
       ))}
 
-      {/* 🚨 This single group isolates the stairs for O(1) physics calculation */}
       <group ref={stairsRef}>
         <SpiralStaircase position={[16.5, 0, 9.5]} />
         <SpiralStaircase position={[16.5, 4.0, 9.5]} />
@@ -351,8 +335,9 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
 
 export default function DungeonEngine({ grids, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   return (
+    // REMOVED CSS imageRendering: pixelated to fix Chromium pointer-lock crash
     <div className="w-full h-screen bg-black relative cursor-crosshair">
-      <Canvas camera={{ position: [2.5, 0.8, 2.5], fov: 80, near: 0.01, far: 50 }} gl={{ antialias: false }} style={{ imageRendering: 'pixelated' }}>
+      <Canvas camera={{ position: [2.5, 0.8, 2.5], fov: 80, near: 0.01, far: 50 }} gl={{ antialias: false }}>
         <fog attach="fog" args={['#000000', 3, 16]} />
         <ambientLight intensity={0.6} color="#ffffff" />
         <Suspense fallback={null}>
