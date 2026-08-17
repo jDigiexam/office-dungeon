@@ -2,7 +2,7 @@
 
 import React, { useRef, useEffect, useMemo, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { PointerLockControls, useTexture } from '@react-three/drei';
+import { PointerLockControls, useTexture, Instances, Instance } from '@react-three/drei';
 import * as THREE from 'three';
 
 // 3D Objects
@@ -30,6 +30,7 @@ function TerminalMesh({ position }) {
   );
 }
 
+// 🪟 Optimized Lit Window Mesh
 function LitWindowMesh({ position, grid, gx, gz }) {
   let rotY = 0; let offsetX = 0; let offsetZ = 0;
   if (gx > 0 && grid[gz][gx - 1] === 1) { offsetX = -0.49; rotY = Math.PI / 2; }
@@ -45,24 +46,23 @@ function LitWindowMesh({ position, grid, gx, gz }) {
     <group position={[position[0] + offsetX, position[1], position[2] + offsetZ]} rotation={[0, rotY, 0]}>
       <mesh position={[0, 2.0, 0]}>
         <planeGeometry args={[0.8, 1.6]} />
-        <meshStandardMaterial map={windowTexture} emissive="#f59e0b" emissiveIntensity={0.8} emissiveMap={windowTexture} side={THREE.DoubleSide} transparent={true} />
+        <meshStandardMaterial map={windowTexture} emissive="#f59e0b" emissiveIntensity={0.8} emissiveMap={windowTexture} />
       </mesh>
       <pointLight position={[0, 2.0, 0.2]} intensity={4} distance={6} color="#fbbf24" />
     </group>
   );
 }
 
-function ElevatorMesh({ position, wallTexture }) {
+function ElevatorMesh({ position }) {
   return (
     <group position={position}>
-      <mesh position={[0, 2.8, 0]}><boxGeometry args={[1, 2.4, 1]} /><meshStandardMaterial map={wallTexture} roughness={0.9} /></mesh>
       <mesh position={[0, 0.8, 0]}><boxGeometry args={[0.95, 1.6, 0.1]} /><meshStandardMaterial color="#3f3f46" metalness={0.9} /></mesh>
       <mesh position={[0, 1.5, 0.08]}><boxGeometry args={[0.2, 0.1, 0.02]} /><meshStandardMaterial color="#f59e0b" emissive="#d97706" emissiveIntensity={1} /></mesh>
     </group>
   );
 }
 
-function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture }) {
+function DoorMesh({ position, grid, gx, gz, isOpened }) {
   const groupRef = useRef();
   useFrame((_, delta) => {
     if (isOpened && groupRef.current.position.y > -1.6) groupRef.current.position.y -= delta * 2;
@@ -73,7 +73,6 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture }) {
   
   return (
     <group position={position} rotation={[0, rotY, 0]}>
-      <mesh position={[0, 2.8, 0]}><boxGeometry args={[1, 2.4, 1]} /><meshStandardMaterial map={wallTexture} roughness={0.9} /></mesh>
       <group ref={groupRef}>
         <mesh position={[0, 0.8, 0]}><boxGeometry args={[1, 1.6, 0.15]} /><meshStandardMaterial color="#7f1d1d" roughness={0.5} emissive="#450a0a" emissiveIntensity={0.5} /></mesh>
         <mesh position={[0.35, 0.8, 0.08]}><boxGeometry args={[0.1, 0.2, 0.02]} /><meshStandardMaterial color={isOpened ? "#22c55e" : "#ef4444"} emissive={isOpened ? "#16a34a" : "#dc2626"} emissiveIntensity={1} /></mesh>
@@ -114,7 +113,7 @@ function SpiralStaircase({ position }) {
   );
 }
 
-// ⚡ HIGHLY OPTIMIZED Player Controls
+// ⚡ Optimized Player Controls
 function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   const controlsRef = useRef();
   const moveState = useRef({ forward: false, backward: false, left: false, right: false });
@@ -126,7 +125,6 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const downVector = useMemo(() => new THREE.Vector3(0, -1, 0), []);
   
-  // ⚡ PERFORMANCE FIX: Cache only the walkable surfaces so the Raycaster doesn't choke the CPU
   const walkables = useRef([]);
   const frameCount = useRef(0);
 
@@ -178,7 +176,6 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
   useFrame((state, delta) => {
     if (!controlsRef.current?.isLocked) return;
 
-    // ⚡ PERFORMANCE FIX: Update walkable surfaces array only once a second instead of every frame
     if (frameCount.current % 60 === 0) {
       walkables.current = [];
       scene.traverse((child) => {
@@ -194,7 +191,6 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
     else bobTime.current = THREE.MathUtils.lerp(bobTime.current, 0, delta * 10);
     const bobOffset = Math.sin(bobTime.current) * 0.05; 
 
-    // ⚡ PERFORMANCE FIX: Only shoot ray against cached walkable objects, no deep hierarchy search
     raycaster.set(new THREE.Vector3(camera.position.x, camera.position.y + 1, camera.position.z), downVector);
     const intersects = raycaster.intersectObjects(walkables.current, false); 
     const groundHit = intersects[0];
@@ -258,6 +254,7 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
   );
 }
 
+// ⚡ Instanced Environment (Eliminates 2,500 Draw Calls)
 function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   const wallTexture = useTexture('/wall_stone.png');
   const floorTexture = useTexture('/floor_stone_pattern.png');
@@ -275,51 +272,58 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
 
   return (
     <>
+      {/* 1. INSTANCED WALLS (1 Draw Call for the entire game!) */}
+      <Instances limit={1500}>
+        <boxGeometry args={[1, 4, 1]} />
+        <meshStandardMaterial map={wallTexture} color="#ffffff" roughness={0.9} />
+        {grids.map((grid, fIdx) => grid.map((row, z) => row.map((tile, x) => {
+          if (tile === 1 || tile === 6) {
+            return <Instance key={`wall-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 2.0, z + 0.5]} />;
+          }
+          if (tile === 2 || tile === 8 || tile === 3) {
+            // Lintel above doors/elevators
+            return <Instance key={`lintel-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 2.8, z + 0.5]} scale={[1, 0.6, 1]} />;
+          }
+          return null;
+        })))}
+      </Instances>
+
+      {/* 2. INSTANCED FLOORS (1 Draw Call!) */}
+      <Instances limit={1500} userData={{ walkable: true }}>
+        <planeGeometry args={[1, 1]} />
+        <meshStandardMaterial map={floorTexture} color="#ffffff" roughness={1.0} />
+        {grids.map((grid, fIdx) => grid.map((row, z) => row.map((tile, x) => {
+          if (tile !== 7 && tile !== 1 && tile !== 6) {
+            return <Instance key={`floor-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4, z + 0.5]} rotation={[-Math.PI / 2, 0, 0]} />;
+          }
+          return null;
+        })))}
+      </Instances>
+
+      {/* 3. INSTANCED CEILINGS (1 Draw Call!) */}
+      <Instances limit={1500}>
+        <planeGeometry args={[1, 1]} />
+        <meshStandardMaterial color="#18181b" roughness={1.0} />
+        {grids.map((grid, fIdx) => grid.map((row, z) => row.map((tile, x) => {
+          if (tile !== 7 && tile !== 1 && tile !== 6) {
+            return <Instance key={`ceil-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 4.0, z + 0.5]} rotation={[Math.PI / 2, 0, 0]} />;
+          }
+          return null;
+        })))}
+      </Instances>
+
+      {/* 4. DYNAMIC/INTERACTIVE OBJECTS */}
       {grids.map((grid, fIdx) => (
-        <group key={`floor-group-${fIdx}`} position={[0, fIdx * 4, 0]}>
+        <group key={`interactive-${fIdx}`} position={[0, fIdx * 4, 0]}>
           {grid.map((row, z) =>
             row.map((tile, x) => {
               const elements = [];
-              
-              if (tile === 1) {
-                elements.push(
-                  <mesh key="wall" position={[x + 0.5, 2.0, z + 0.5]}>
-                    <boxGeometry args={[1, 4, 1]} />
-                    <meshStandardMaterial map={wallTexture} color="#ffffff" roughness={0.9} />
-                  </mesh>
-                );
-              }
-              
-              if (tile === 2 || tile === 8) elements.push(<DoorMesh key="door" position={[x + 0.5, 0, z + 0.5]} grid={grid} gx={x} gz={z} isOpened={tile === 8} wallTexture={wallTexture} />);
-              if (tile === 3) elements.push(<ElevatorMesh key="elev" position={[x + 0.5, 0, z + 0.5]} wallTexture={wallTexture} />);
+              if (tile === 2 || tile === 8) elements.push(<DoorMesh key="door" position={[x + 0.5, 0, z + 0.5]} grid={grid} gx={x} gz={z} isOpened={tile === 8} />);
+              if (tile === 3) elements.push(<ElevatorMesh key="elev" position={[x + 0.5, 0, z + 0.5]} />);
               if (tile === 4) elements.push(<TerminalMesh key="term" position={[x + 0.5, 0, z + 0.5]} />);
               if (tile === 5) elements.push(<KeycardMesh key="key" position={[x + 0.5, 0, z + 0.5]} />);
-              
-              if (tile === 6) {
-                elements.push(
-                  <mesh key="window-wall" position={[x + 0.5, 2.0, z + 0.5]}>
-                    <boxGeometry args={[1, 4, 1]} />
-                    <meshStandardMaterial map={wallTexture} color="#ffffff" roughness={0.9} />
-                  </mesh>
-                );
-                elements.push(<LitWindowMesh key="window" position={[x + 0.5, 0, z + 0.5]} grid={grid} gx={x} gz={z} />);
-              }
-
-              if (tile !== 7 && tile !== 1 && tile !== 6) {
-                elements.push(
-                  <mesh key="floor" position={[x + 0.5, 0, z + 0.5]} rotation={[-Math.PI / 2, 0, 0]} userData={{ walkable: true }}>
-                    <planeGeometry args={[1, 1]} />
-                    <meshStandardMaterial map={floorTexture} color="#ffffff" roughness={1.0} side={THREE.DoubleSide} />
-                  </mesh>
-                );
-                elements.push(
-                  <mesh key="ceiling" position={[x + 0.5, 4.0, z + 0.5]} rotation={[Math.PI / 2, 0, 0]}>
-                    <planeGeometry args={[1, 1]} />
-                    <meshStandardMaterial color="#18181b" roughness={1.0} side={THREE.DoubleSide} />
-                  </mesh>
-                );
-              }
-              return <group key={`${x}-${z}`}>{elements}</group>;
+              if (tile === 6) elements.push(<LitWindowMesh key="window" position={[x + 0.5, 0, z + 0.5]} grid={grid} gx={x} gz={z} />);
+              return <group key={`int-${x}-${z}`}>{elements}</group>;
             })
           )}
         </group>
