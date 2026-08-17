@@ -315,7 +315,7 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
     stoneTexList.forEach(t => t.repeat.set(1, 4));
   }, [woodTexList, stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow]);
 
-  // Pre-calculate ALL coordinates and aggressively cull hidden surfaces!
+  // Pre-calculate ALL coordinates and aggressively cull hidden surfaces AND VOID FLOORS!
   const { woodWallCoords, stoneWallCoords, woodFloorCoords, stoneFloorCoords, ceilingCoords, interactiveElements } = useMemo(() => {
     const wWalls = woodTexList.map(() => []);
     const sWalls = stoneTexList.map(() => []);
@@ -339,7 +339,6 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
           // 🚨 HIDDEN SURFACE REMOVAL: Only render walls that touch a playable space
           if (tile === 1) {
             let isVisible = false;
-            // Check N, S, W, E to see if this wall touches an empty space or interactable tile
             if (z > 0 && grid[z-1][x] !== 1) isVisible = true;
             else if (z < rows - 1 && grid[z+1][x] !== 1) isVisible = true;
             else if (x > 0 && grid[z][x-1] !== 1) isVisible = true;
@@ -350,9 +349,11 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
               const wPos = [x + 0.5, fIdx * 4 + 2.0, z + 0.5];
               if (isWoodFloor) wWalls[tIdx].push(wPos); else sWalls[tIdx].push(wPos);
             }
-            continue; // Move on to the next tile
+            continue; // Move on to the next tile! No floor/ceiling for void!
           }
 
+          // 🚨 FIX: tile === 1 (The vast Void) is fully skipped before reaching here!
+          
           // Fast Ceilings
           if (![7,3,10].includes(tile) && tile !== 6) {
             ceils.push([x + 0.5, fIdx * 4 + 3.98, z + 0.5, Math.PI / 2, 0, 0]);
