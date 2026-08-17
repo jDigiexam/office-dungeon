@@ -2,9 +2,43 @@
 
 import React, { useRef, useEffect, useMemo, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { PointerLockControls, useTexture, Instances, Instance } from '@react-three/drei';
+import { PointerLockControls, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 
+// ----------------------------------------------------
+// 1. FAST RAW INSTANCED MESH BUFFER (BYPASSES REACT VDOM)
+// ----------------------------------------------------
+function FastInstancedMesh({ geometryArgs, materialProps, coords }) {
+  const meshRef = useRef();
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  
+  useEffect(() => {
+    if (!meshRef.current || coords.length === 0) return;
+    coords.forEach((pos, i) => {
+      dummy.position.set(pos[0], pos[1], pos[2]);
+      if (pos.length > 3) dummy.rotation.set(pos[3], pos[4], pos[5]);
+      else dummy.rotation.set(0, 0, 0);
+      if (pos.length > 6) dummy.scale.set(pos[6], pos[7], pos[8]);
+      else dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      meshRef.current.setMatrixAt(i, dummy.matrix);
+    });
+    meshRef.current.instanceMatrix.needsUpdate = true;
+  }, [coords, dummy]);
+
+  if (coords.length === 0) return null;
+
+  return (
+    <instancedMesh key={coords.length} ref={meshRef} args={[null, null, coords.length]}>
+      {geometryArgs.type === 'box' ? <boxGeometry args={geometryArgs.args} /> : <planeGeometry args={geometryArgs.args} />}
+      <meshStandardMaterial {...materialProps} />
+    </instancedMesh>
+  );
+}
+
+// ----------------------------------------------------
+// 2. 3D INTERACTIVE OBJECTS
+// ----------------------------------------------------
 function KeycardMesh({ position, texture, color }) {
   const cardRef = useRef();
   useFrame((_, delta) => { if (cardRef.current) cardRef.current.rotation.y += Math.min(delta, 0.1) * 2.0; });
@@ -90,7 +124,17 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTexture, 
     <group position={position} rotation={[0, rotY, 0]}>
       <mesh position={[0, 3.0, 0]}><boxGeometry args={[1, 2.0, 1]} /><meshStandardMaterial map={wallTexture} roughness={0.9} /></mesh>
       <group ref={groupRef}>
-        <mesh position={[0, 1.0, 0]}><boxGeometry args={[1, 2.0, 0.15]} /><meshStandardMaterial map={doorTexture} color={isOpened ? "#a8a29e" : "#ffffff"} roughness={0.8} emissive="#ffffff" emissiveMap={doorTexture} emissiveIntensity={0.25} /></mesh>
+        <mesh position={[0, 1.0, 0]}>
+          <boxGeometry args={[1, 2.0, 0.15]} />
+          <meshStandardMaterial 
+            map={doorTexture} 
+            color={isOpened ? "#a8a29e" : "#ffffff"} 
+            roughness={0.8} 
+            emissive="#ffffff" 
+            emissiveMap={doorTexture} 
+            emissiveIntensity={0.25} 
+          />
+        </mesh>
         <mesh position={[0.35, 1.0, 0.08]}><boxGeometry args={[0.1, 0.2, 0.02]} /><meshStandardMaterial color={isOpened ? "#22c55e" : trimColor} emissive={isOpened ? "#16a34a" : trimColor} emissiveIntensity={1} /></mesh>
         <mesh position={[0.35, 1.0, -0.08]}><boxGeometry args={[0.1, 0.2, 0.02]} /><meshStandardMaterial color={isOpened ? "#22c55e" : trimColor} emissive={isOpened ? "#16a34a" : trimColor} emissiveIntensity={1} /></mesh>
       </group>
@@ -98,6 +142,28 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTexture, 
   );
 }
 
+function SpiralStaircase({ position, wallTexture, floorTexture }) {
+  const steps = 20; 
+  const heightPerStep = 4 / steps; 
+  const stairRadius = 2.4; 
+  const anglePerStep = (Math.PI * 2) / steps;
+
+  return (
+    <group position={position}>
+      <mesh position={[0, 2.0, 0]}><cylinderGeometry args={[0.4, 0.4, 4, 16]} /><meshStandardMaterial map={wallTexture} roughness={0.9} /></mesh>
+      <mesh position={[0, 2.0, 0]} rotation={[0, Math.PI * 1.25, 0]}><cylinderGeometry args={[2.5, 2.5, 4, 16, 1, true, 0, Math.PI * 1.5]} /><meshStandardMaterial map={wallTexture} roughness={0.9} side={THREE.DoubleSide} /></mesh>
+      {Array.from({ length: steps }).map((_, i) => (
+        <mesh key={i} position={[Math.cos(i * anglePerStep) * (stairRadius / 2), i * heightPerStep + 0.1, Math.sin(i * anglePerStep) * (stairRadius / 2)]} rotation={[0, -i * anglePerStep, 0]}>
+          <boxGeometry args={[stairRadius, 0.2, 1.2]} /><meshStandardMaterial map={floorTexture} roughness={0.9} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+// ----------------------------------------------------
+// 3. BULLETPROOF PHYSICS & CONTROLS
+// ----------------------------------------------------
 function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   const controlsRef = useRef();
   const moveState = useRef({ forward: false, backward: false, left: false, right: false });
@@ -113,6 +179,18 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
       clearTeleport();
     }
   }, [teleportCoords, camera, clearTeleport]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      let fIdx = Math.round(camera.position.y / 4);
+      fIdx = Math.max(0, Math.min(2, fIdx));
+      if (fIdx !== currentFloorRef.current) {
+        currentFloorRef.current = fIdx;
+        onFloorChange(fIdx);
+      }
+    }, 250);
+    return () => clearInterval(interval);
+  }, [camera, onFloorChange]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -149,7 +227,7 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
     if (!controlsRef.current?.isLocked) return;
 
     const safeDelta = Math.min(delta, 0.1);
-    const moveSpeed = 3.0 * safeDelta; 
+    const moveSpeed = 4.0 * safeDelta; 
     const isMoving = moveState.current.forward || moveState.current.backward || moveState.current.left || moveState.current.right;
 
     if (isMoving) bobTime.current += safeDelta * 8; 
@@ -184,7 +262,6 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
       const gx = Math.floor(x); const gz = Math.floor(z);
       if (gz < 0 || gz >= grids[currentFIdx].length || gx < 0 || gx >= grids[currentFIdx][0].length) return true;
       const tile = grids[currentFIdx][gz][gx];
-      // Note: Tile 6 is omitted, allowing player to walk seamlessly underneath lights!
       return [1, 2, 12, 22, 3, 4].includes(tile);
     };
 
@@ -209,6 +286,9 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
   );
 }
 
+// ----------------------------------------------------
+// 4. MAIN SCENE RENDERING
+// ----------------------------------------------------
 function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   const woodTexList = useTexture([
     '/wall_timber_structure_cross.png', '/wall_timber_structure_diagonal.png',
@@ -235,108 +315,114 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
     stoneTexList.forEach(t => t.repeat.set(1, 4));
   }, [woodTexList, stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow]);
 
-  const getTextureIndex = (x, z, fIdx, max) => (x * 7 + z * 13 + fIdx * 3) % max;
+  // Pre-calculate ALL coordinates so we can dump them into GPU buffers instantly
+  const { woodWallCoords, stoneWallCoords, woodFloorCoords, stoneFloorCoords, ceilingCoords, interactiveElements } = useMemo(() => {
+    const wWalls = woodTexList.map(() => []);
+    const sWalls = stoneTexList.map(() => []);
+    const wFloors = [];
+    const sFloors = [];
+    const ceils = [];
+    const interactives = [];
+
+    grids.forEach((grid, fIdx) => {
+      if (!grid) return;
+      const isWoodFloor = fIdx < 2;
+      const wLen = woodTexList.length;
+      const sLen = stoneTexList.length;
+
+      for (let z = 0; z < grid.length; z++) {
+        for (let x = 0; x < grid[z].length; x++) {
+          const tile = grid[z][x];
+          
+          // Fast Ceilings
+          if (![1,6,7,3,10].includes(tile)) {
+            ceils.push([x + 0.5, fIdx * 4 + 3.98, z + 0.5, Math.PI / 2, 0, 0]);
+          }
+
+          // Fast Floors
+          if (![1,7,3,10].includes(tile)) {
+            const fPos = [x + 0.5, fIdx * 4, z + 0.5, -Math.PI / 2, 0, 0];
+            if (isWoodFloor) wFloors.push(fPos); else sFloors.push(fPos);
+          }
+
+          // Fast Walls
+          if (tile === 1) {
+            const tIdx = (x * 7 + z * 13 + fIdx * 3) % (isWoodFloor ? wLen : sLen);
+            const wPos = [x + 0.5, fIdx * 4 + 2.0, z + 0.5];
+            if (isWoodFloor) wWalls[tIdx].push(wPos); else sWalls[tIdx].push(wPos);
+          }
+
+          // Fast Lintels (Above doors)
+          if ([2,8,12,18,22,28].includes(tile)) {
+            const tIdx = (x * 7 + z * 13 + fIdx * 3) % (isWoodFloor ? wLen : sLen);
+            const lPos = [x + 0.5, fIdx * 4 + 3.0, z + 0.5, 0, 0, 0, 1, 0.5, 1];
+            if (isWoodFloor) wWalls[tIdx].push(lPos); else sWalls[tIdx].push(lPos);
+          }
+
+          // Interactive Items
+          if ([2,8,12,18,22,28, 3,10, 4, 5,15,25, 6].includes(tile)) {
+            interactives.push({ tile, x, z, fIdx });
+          }
+        }
+      }
+    });
+
+    return { woodWallCoords: wWalls, stoneWallCoords: sWalls, woodFloorCoords: wFloors, stoneFloorCoords: sFloors, ceilingCoords: ceils, interactiveElements: interactives };
+  }, [grids, woodTexList.length, stoneTexList.length]);
 
   return (
     <>
-      {woodTexList.map((tex, texIdx) => (
-        <Instances key={`wood-inst-${texIdx}`} limit={1500}>
-          <boxGeometry args={[1, 4, 1]} />
-          <meshStandardMaterial map={tex} color="#ffffff" roughness={0.9} />
-          {grids.map((grid, fIdx) => fIdx < 2 && grid.map((row, z) => row.map((tile, x) => {
-            if (getTextureIndex(x, z, fIdx, woodTexList.length) !== texIdx) return null;
-            if (tile === 1) return <Instance key={`wwall-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 2.0, z + 0.5]} />;
-            if ([2,8,12,18,22,28].includes(tile)) return <Instance key={`wlintel-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 3.0, z + 0.5]} scale={[1, 0.5, 1]} />;
-            return null;
-          })))}
-        </Instances>
-      ))}
+      {/* 🚨 BUFFERED WALLS */}
+      {woodTexList.map((tex, i) => <FastInstancedMesh key={`wwall-${i}`} geometryArgs={{type: 'box', args: [1, 4, 1]}} materialProps={{map: tex, color: "#ffffff", roughness: 0.9}} coords={woodWallCoords[i]} />)}
+      {stoneTexList.map((tex, i) => <FastInstancedMesh key={`swall-${i}`} geometryArgs={{type: 'box', args: [1, 4, 1]}} materialProps={{map: tex, color: "#ffffff", roughness: 0.9}} coords={stoneWallCoords[i]} />)}
 
-      {stoneTexList.map((tex, texIdx) => (
-        <Instances key={`stone-inst-${texIdx}`} limit={1500}>
-          <boxGeometry args={[1, 4, 1]} />
-          <meshStandardMaterial map={tex} color="#ffffff" roughness={0.9} />
-          {grids.map((grid, fIdx) => fIdx >= 2 && grid.map((row, z) => row.map((tile, x) => {
-            if (getTextureIndex(x, z, fIdx, stoneTexList.length) !== texIdx) return null;
-            if (tile === 1) return <Instance key={`swall-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 2.0, z + 0.5]} />;
-            if ([2,8,12,18,22,28].includes(tile)) return <Instance key={`slintel-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 3.0, z + 0.5]} scale={[1, 0.5, 1]} />;
-            return null;
-          })))}
-        </Instances>
-      ))}
+      {/* 🚨 BUFFERED FLOORS & CEILINGS */}
+      <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorWood, color: "#ffffff", roughness: 1.0}} coords={woodFloorCoords} />
+      <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorStone, color: "#ffffff", roughness: 1.0}} coords={stoneFloorCoords} />
+      <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{color: "#18181b", roughness: 1.0}} coords={ceilingCoords} />
 
-      <Instances limit={1500}>
-        <planeGeometry args={[1, 1]} />
-        <meshStandardMaterial map={tFloorWood} color="#ffffff" roughness={1.0} />
-        {grids.map((grid, fIdx) => fIdx < 2 && grid.map((row, z) => row.map((tile, x) => {
-          if (![1,7,3,10].includes(tile)) return <Instance key={`wfloor-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4, z + 0.5]} rotation={[-Math.PI / 2, 0, 0]} />;
-          return null;
-        })))}
-      </Instances>
+      {/* 🚨 DYNAMIC INTERACTIVES */}
+      {interactiveElements.map((el, idx) => {
+        const { tile, x, z, fIdx } = el;
+        const wTexList = fIdx < 2 ? woodTexList : stoneTexList;
+        const wTex = wTexList[(x * 7 + z * 13 + fIdx * 3) % wTexList.length];
+        const dTex = fIdx < 2 ? tDoorWood : tDoorMetal;
+        
+        if ([2,8,12,18,22,28].includes(tile)) {
+          let trimColor = "#dc2626";
+          if (tile === 12 || tile === 18) trimColor = "#2563eb";
+          if (tile === 22 || tile === 28) trimColor = "#eab308";
+          return <DoorMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={[8,18,28].includes(tile)} wallTexture={wTex} doorTexture={dTex} trimColor={trimColor} />;
+        }
+        if (tile === 3 || tile === 10) return <ElevatorMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={tile === 10} wallTexture={wTex} doorTexture={tDoorMetalFrame} litTexture={tWindow} />;
+        if (tile === 4) return <TerminalMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} />;
+        
+        if (tile === 5) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} texture={tKeyRed} color="#dc2626" />;
+        if (tile === 15) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} texture={tKeyBlue} color="#2563eb" />;
+        if (tile === 25) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} texture={tKeyYellow} color="#eab308" />;
+        
+        if (tile === 6) return <CeilingLightMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} texture={tWindow} />;
+        return null;
+      })}
 
-      <Instances limit={1500}>
-        <planeGeometry args={[1, 1]} />
-        <meshStandardMaterial map={tFloorStone} color="#ffffff" roughness={1.0} />
-        {grids.map((grid, fIdx) => fIdx >= 2 && grid.map((row, z) => row.map((tile, x) => {
-          if (![1,7,3,10].includes(tile)) return <Instance key={`sfloor-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4, z + 0.5]} rotation={[-Math.PI / 2, 0, 0]} />;
-          return null;
-        })))}
-      </Instances>
-
-      <Instances limit={1500}>
-        <planeGeometry args={[1, 1]} />
-        <meshStandardMaterial color="#18181b" roughness={1.0} />
-        {grids.map((grid, fIdx) => grid.map((row, z) => row.map((tile, x) => {
-          if (![1,6,7,3,10].includes(tile)) return <Instance key={`ceil-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 3.98, z + 0.5]} rotation={[Math.PI / 2, 0, 0]} />;
-          return null;
-        })))}
-      </Instances>
-
-      {grids.map((grid, fIdx) => (
-        <group key={`interactive-${fIdx}`} position={[0, fIdx * 4, 0]}>
-          {grid.map((row, z) =>
-            row.map((tile, x) => {
-              const elements = [];
-              const wTexList = fIdx < 2 ? woodTexList : stoneTexList;
-              const wTex = wTexList[getTextureIndex(x, z, fIdx, wTexList.length)];
-              const dTex = fIdx < 2 ? tDoorWood : tDoorMetal;
-              
-              if ([2,8,12,18,22,28].includes(tile)) {
-                let trimColor = "#dc2626"; // Default Red Trim
-                if (tile === 12 || tile === 18) trimColor = "#2563eb"; // Blue Trim
-                if (tile === 22 || tile === 28) trimColor = "#eab308"; // Yellow Trim
-                elements.push(<DoorMesh key="door" position={[x + 0.5, 0, z + 0.5]} grid={grid} gx={x} gz={z} isOpened={[8,18,28].includes(tile)} wallTexture={wTex} doorTexture={dTex} trimColor={trimColor} />);
-              }
-              if (tile === 3 || tile === 10) elements.push(<ElevatorMesh key="elev" position={[x + 0.5, 0, z + 0.5]} grid={grid} gx={x} gz={z} isOpened={tile === 10} wallTexture={wTex} doorTexture={tDoorMetalFrame} litTexture={tWindow} />);
-              if (tile === 4) elements.push(<TerminalMesh key="term" position={[x + 0.5, 0, z + 0.5]} />);
-              
-              if (tile === 5) elements.push(<KeycardMesh key="keyR" position={[x + 0.5, 0, z + 0.5]} texture={tKeyRed} color="#dc2626" />);
-              if (tile === 15) elements.push(<KeycardMesh key="keyB" position={[x + 0.5, 0, z + 0.5]} texture={tKeyBlue} color="#2563eb" />);
-              if (tile === 25) elements.push(<KeycardMesh key="keyY" position={[x + 0.5, 0, z + 0.5]} texture={tKeyYellow} color="#eab308" />);
-              
-              if (tile === 6) elements.push(<CeilingLightMesh key="window" position={[x + 0.5, 0, z + 0.5]} texture={tWindow} />);
-              return <group key={`int-${x}-${z}`}>{elements}</group>;
-            })
-          )}
-        </group>
-      ))}
-
+      <SpiralStaircase position={[16.5, 0, 9.5]} wallTexture={woodTexList[0]} floorTexture={tFloorWood} />
+      <SpiralStaircase position={[16.5, 4.0, 9.5]} wallTexture={stoneTexList[0]} floorTexture={tFloorStone} />
+      
       <PlayerControls grids={grids} handTexture={tHand} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
     </>
   );
 }
 
 export default function DungeonEngine({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
-    return (
-      <div className="w-full h-screen bg-black relative">
-        {/* Set the Canvas camera position to dynamically use the passed initialSpawn */}
-        <Canvas camera={{ position: initialSpawn || [5.5, 0.8, 5.5], fov: 80, near: 0.01, far: 50 }} gl={{ antialias: false }}>
-          <fog attach="fog" args={['#000000', 4, 18]} />
-          <ambientLight intensity={0.4} color="#ffffff" />
-          <Suspense fallback={null}>
-            <DungeonScene grids={grids} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
-          </Suspense>
-        </Canvas>
-      </div>
-    );
-  }
+  return (
+    <div className="w-full h-screen bg-black relative">
+      <Canvas camera={{ position: initialSpawn || [5.5, 0.8, 5.5], fov: 80, near: 0.01, far: 50 }} gl={{ antialias: false }}>
+        <fog attach="fog" args={['#000000', 4, 18]} />
+        <ambientLight intensity={0.4} color="#ffffff" />
+        <Suspense fallback={null}>
+          <DungeonScene grids={grids} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
+        </Suspense>
+      </Canvas>
+    </div>
+  );
+}
