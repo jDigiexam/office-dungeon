@@ -55,12 +55,7 @@ function LitWindowMesh({ position, grid, gx, gz }) {
 function ElevatorMesh({ position, wallTexture }) {
   return (
     <group position={position}>
-      {/* Lintel to seal above the elevator */}
-      <mesh position={[0, 2.8, 0]}>
-        <boxGeometry args={[1, 2.4, 1]} />
-        <meshStandardMaterial map={wallTexture} roughness={0.9} />
-      </mesh>
-      {/* Elevator Frame */}
+      <mesh position={[0, 2.8, 0]}><boxGeometry args={[1, 2.4, 1]} /><meshStandardMaterial map={wallTexture} roughness={0.9} /></mesh>
       <mesh position={[0, 0.8, 0]}><boxGeometry args={[0.95, 1.6, 0.1]} /><meshStandardMaterial color="#3f3f46" metalness={0.9} /></mesh>
       <mesh position={[0, 1.5, 0.08]}><boxGeometry args={[0.2, 0.1, 0.02]} /><meshStandardMaterial color="#f59e0b" emissive="#d97706" emissiveIntensity={1} /></mesh>
     </group>
@@ -78,13 +73,7 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture }) {
   
   return (
     <group position={position} rotation={[0, rotY, 0]}>
-      {/* Solid wall lintel ABOVE the door to seal the 4-unit height */}
-      <mesh position={[0, 2.8, 0]}>
-        <boxGeometry args={[1, 2.4, 1]} />
-        <meshStandardMaterial map={wallTexture} roughness={0.9} />
-      </mesh>
-      
-      {/* Sliding Door */}
+      <mesh position={[0, 2.8, 0]}><boxGeometry args={[1, 2.4, 1]} /><meshStandardMaterial map={wallTexture} roughness={0.9} /></mesh>
       <group ref={groupRef}>
         <mesh position={[0, 0.8, 0]}><boxGeometry args={[1, 1.6, 0.15]} /><meshStandardMaterial color="#7f1d1d" roughness={0.5} emissive="#450a0a" emissiveIntensity={0.5} /></mesh>
         <mesh position={[0.35, 0.8, 0.08]}><boxGeometry args={[0.1, 0.2, 0.02]} /><meshStandardMaterial color={isOpened ? "#22c55e" : "#ef4444"} emissive={isOpened ? "#16a34a" : "#dc2626"} emissiveIntensity={1} /></mesh>
@@ -94,11 +83,10 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture }) {
   );
 }
 
-// 🌀 Wider, Faster Staircase
 function SpiralStaircase({ position }) {
-  const steps = 20; // Halved the steps!
-  const heightPerStep = 4 / steps; // Climbing 4 units now
-  const stairRadius = 2.4; // Extremely wide stairs
+  const steps = 20; 
+  const heightPerStep = 4 / steps; 
+  const stairRadius = 2.4; 
   const anglePerStep = (Math.PI * 2) / steps;
 
   return (
@@ -126,7 +114,7 @@ function SpiralStaircase({ position }) {
   );
 }
 
-// Player Controls & Physics
+// ⚡ HIGHLY OPTIMIZED Player Controls
 function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   const controlsRef = useRef();
   const moveState = useRef({ forward: false, backward: false, left: false, right: false });
@@ -137,6 +125,10 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
   const { camera, scene } = useThree();
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const downVector = useMemo(() => new THREE.Vector3(0, -1, 0), []);
+  
+  // ⚡ PERFORMANCE FIX: Cache only the walkable surfaces so the Raycaster doesn't choke the CPU
+  const walkables = useRef([]);
+  const frameCount = useRef(0);
 
   const texture = useTexture('/hand.png');
   useEffect(() => {
@@ -165,8 +157,6 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
         camera.getWorldDirection(dir);
         const targetX = Math.floor(camera.position.x + dir.x * 1.3);
         const targetZ = Math.floor(camera.position.z + dir.z * 1.3);
-        
-        // 🚨 Floor is now 4 units high, not 3!
         const fIdx = Math.max(0, Math.min(2, Math.round(camera.position.y / 4)));
         if (targetZ >= 0 && targetZ < grids[fIdx].length && targetX >= 0 && targetX < grids[fIdx][0].length) {
           onInteract(grids[fIdx][targetZ][targetX], targetX, targetZ, fIdx);
@@ -188,6 +178,15 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
   useFrame((state, delta) => {
     if (!controlsRef.current?.isLocked) return;
 
+    // ⚡ PERFORMANCE FIX: Update walkable surfaces array only once a second instead of every frame
+    if (frameCount.current % 60 === 0) {
+      walkables.current = [];
+      scene.traverse((child) => {
+        if (child.userData?.walkable) walkables.current.push(child);
+      });
+    }
+    frameCount.current++;
+
     const moveSpeed = 4.5 * delta;
     const isMoving = moveState.current.forward || moveState.current.backward || moveState.current.left || moveState.current.right;
 
@@ -195,9 +194,10 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
     else bobTime.current = THREE.MathUtils.lerp(bobTime.current, 0, delta * 10);
     const bobOffset = Math.sin(bobTime.current) * 0.05; 
 
+    // ⚡ PERFORMANCE FIX: Only shoot ray against cached walkable objects, no deep hierarchy search
     raycaster.set(new THREE.Vector3(camera.position.x, camera.position.y + 1, camera.position.z), downVector);
-    const intersects = raycaster.intersectObjects(scene.children, true);
-    const groundHit = intersects.find(i => i.object.userData?.walkable);
+    const intersects = raycaster.intersectObjects(walkables.current, false); 
+    const groundHit = intersects[0];
     
     if (groundHit) {
       camera.position.y = THREE.MathUtils.lerp(camera.position.y, groundHit.point.y + 0.8 + bobOffset, 0.4);
@@ -212,7 +212,6 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
       handRef.current.rotation.z += Math.cos(bobTime.current / 2) * 0.02; 
     }
 
-    // 🚨 Floor bounds check based on 4-unit spacing
     const currentFIdx = Math.max(0, Math.min(2, Math.round(camera.position.y / 4)));
     if (currentFIdx !== lastFloor.current) {
       lastFloor.current = currentFIdx;
@@ -259,7 +258,6 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
   );
 }
 
-// Textured Environment Loader
 function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   const wallTexture = useTexture('/wall_stone.png');
   const floorTexture = useTexture('/floor_stone_pattern.png');
@@ -268,7 +266,7 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
   wallTexture.minFilter = THREE.NearestFilter;
   wallTexture.wrapS = THREE.RepeatWrapping;
   wallTexture.wrapT = THREE.RepeatWrapping;
-  wallTexture.repeat.set(1, 4); // Stretch texture cleanly over 4 units
+  wallTexture.repeat.set(1, 4); 
 
   floorTexture.magFilter = THREE.NearestFilter;
   floorTexture.minFilter = THREE.NearestFilter;
@@ -278,14 +276,12 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
   return (
     <>
       {grids.map((grid, fIdx) => (
-        // 🚨 Stacked floors are now offset by 4 units!
         <group key={`floor-group-${fIdx}`} position={[0, fIdx * 4, 0]}>
           {grid.map((row, z) =>
             row.map((tile, x) => {
               const elements = [];
               
               if (tile === 1) {
-                // Render SOLID wall below windows behind tile 6
                 elements.push(
                   <mesh key="wall" position={[x + 0.5, 2.0, z + 0.5]}>
                     <boxGeometry args={[1, 4, 1]} />
@@ -300,7 +296,6 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
               if (tile === 5) elements.push(<KeycardMesh key="key" position={[x + 0.5, 0, z + 0.5]} />);
               
               if (tile === 6) {
-                // Must render a wall behind the window so you can't see through the gap
                 elements.push(
                   <mesh key="window-wall" position={[x + 0.5, 2.0, z + 0.5]}>
                     <boxGeometry args={[1, 4, 1]} />
@@ -317,7 +312,6 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
                     <meshStandardMaterial map={floorTexture} color="#ffffff" roughness={1.0} side={THREE.DoubleSide} />
                   </mesh>
                 );
-                // 🚨 Ceiling is now flush with the next floor at Y=4.0
                 elements.push(
                   <mesh key="ceiling" position={[x + 0.5, 4.0, z + 0.5]} rotation={[Math.PI / 2, 0, 0]}>
                     <planeGeometry args={[1, 1]} />
@@ -331,7 +325,6 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
         </group>
       ))}
 
-      {/* Positioned directly inside the new 5x5 Grid void center */}
       <SpiralStaircase position={[16.5, 0, 9.5]} />
       <SpiralStaircase position={[16.5, 4.0, 9.5]} />
 
