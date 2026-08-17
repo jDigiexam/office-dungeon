@@ -262,7 +262,8 @@ function PlayerControls({ grids, stairsRef, handTexture, onInteract, teleportCoo
       const gx = Math.floor(x); const gz = Math.floor(z);
       if (gz < 0 || gz >= grids[currentFIdx].length || gx < 0 || gx >= grids[currentFIdx][0].length) return true;
       const tile = grids[currentFIdx][gz][gx];
-      return tile === 1 || tile === 2 || tile === 3;
+      // 🚨 FIX: Added tile 6 (Window) and 4 (Terminal) so you can no longer walk through them!
+      return tile === 1 || tile === 2 || tile === 3 || tile === 4 || tile === 6;
     };
 
     const collidesAt = (x, z) => (
@@ -425,9 +426,7 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
 export default function DungeonEngine({ grids, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   return (
     <div className="w-full h-screen bg-black relative">
-      {/* 🚨 THE FIX: Spawn position correctly set to the Southern cavern start */}
       <Canvas camera={{ position: [5.5, 0.8, 27.5], fov: 80, near: 0.01, far: 50 }} gl={{ antialias: false }}>
-        {/* Fog pushed back, Ambient Light raised to fix extreme darkness */}
         <fog attach="fog" args={['#000000', 4, 18]} />
         <ambientLight intensity={0.4} color="#ffffff" />
         <Suspense fallback={null}>
