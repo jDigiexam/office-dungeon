@@ -3,10 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { loadMapFromImage } from '@/lib/mapParser';
+import { TERMINAL_PUZZLES } from '@/lib/puzzleData';
 
 const DungeonEngine = dynamic(() => import('@/components/DungeonEngine'), { ssr: false });
 
-// Fallback blank 10x10 room just in case an image is missing
 const FALLBACK_GRID = Array(10).fill(Array(10).fill(0)).map((row, z) => 
   row.map((col, x) => (x === 0 || x === 9 || z === 0 || z === 9 ? 1 : 0))
 );
@@ -23,7 +23,12 @@ export default function EscapeRoomPage() {
   const [spawnCoords, setSpawnCoords] = useState([5.5, 0.8, 5.5]);
   const [mapsLoading, setMapsLoading] = useState(true);
 
-  // Parse PNGs on mount
+  // Puzzle States
+  const [activePuzzle, setActivePuzzle] = useState(null);
+  const [solvedPuzzles, setSolvedPuzzles] = useState([]);
+  const [puzzleInput, setPuzzleInput] = useState('');
+  const [puzzleError, setPuzzleError] = useState('');
+
   useEffect(() => {
     const fetchMaps = async () => {
       try {
@@ -80,18 +85,56 @@ export default function EscapeRoomPage() {
     if (tileType === 15) pickupKey('BLUE KEYCARD');
     if (tileType === 25) pickupKey('YELLOW KEYCARD');
 
-    if (tileType === 4) triggerMessage("SYSTEM TERMINAL: SECURITY OVERRIDE ACTIVE");
+    // 🚨 TERMINAL PUZZLE LOGIC
+    if (tileType === 4) {
+      const puzzleKey = `${fIdx}_${x}_${z}`;
+      
+      if (solvedPuzzles.includes(puzzleKey)) {
+        triggerMessage("TERMINAL ALREADY OVERRIDDEN.");
+        return;
+      }
+
+      const puzzleData = TERMINAL_PUZZLES[puzzleKey];
+      
+      if (puzzleData) {
+        document.exitPointerLock();
+        setActivePuzzle({ ...puzzleData, key: puzzleKey });
+        setPuzzleInput('');
+        setPuzzleError('');
+      } else {
+        triggerMessage("TERMINAL OFFLINE. NO DATA FOUND.");
+      }
+    }
+
     if (tileType === 3) { triggerMessage("ELEVATOR DOORS OPENING"); openDoor(10); }
     if (tileType === 10) { document.exitPointerLock(); setShowElevatorMenu(true); }
   };
 
   const handleElevatorSelect = (targetFloorIndex) => {
-    // Drop player slightly inside the map to ensure they don't clip walls
     setTeleportCoords({ x: 2.5, y: targetFloorIndex * 4 + 0.8, z: 2.5 });
     setShowElevatorMenu(false);
     triggerMessage(`ELEVATOR TRANSIT: FLOOR E1M${targetFloorIndex + 1}`);
     const newGrids = grids.map(grid => grid.map(row => row.map(cell => cell === 10 ? 3 : cell)));
     setGrids(newGrids);
+  };
+
+  const handlePuzzleSubmit = (submittedAnswer) => {
+    // Standardize input by removing whitespace and converting to lowercase
+    const isCorrect = submittedAnswer.toString().toLowerCase().trim() === activePuzzle.answer.toString().toLowerCase().trim();
+    
+    if (isCorrect) {
+      const { reward } = activePuzzle;
+      const newGrids = [...grids];
+      newGrids[reward.fIdx] = grids[reward.fIdx].map((row, rIdx) =>
+        row.map((col, cIdx) => (rIdx === reward.z && cIdx === reward.x ? reward.newTile : col))
+      );
+      setGrids(newGrids);
+      setSolvedPuzzles([...solvedPuzzles, activePuzzle.key]);
+      triggerMessage(activePuzzle.successMessage);
+      setActivePuzzle(null);
+    } else {
+      setPuzzleError('INCORRECT CREDENTIALS OR ANSWER.');
+    }
   };
 
   return (
@@ -124,6 +167,53 @@ export default function EscapeRoomPage() {
             clearTeleport={() => setTeleportCoords(null)}
             onFloorChange={(f) => setCurrentFloor(f)}
           />
+
+          {/* 🚨 TERMINAL PUZZLE UI OVERLAY */}
+          {activePuzzle && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+              <div className="bg-stone-900 border-4 border-emerald-600 p-8 w-[600px] max-w-[90vw] shadow-2xl shadow-emerald-900/20">
+                <div className="flex justify-between items-center mb-6 border-b-2 border-stone-700 pb-4">
+                  <h2 className="text-emerald-500 text-xl font-black tracking-widest">{activePuzzle.title}</h2>
+                  <span className="text-stone-500 text-xs animate-pulse">AWAITING INPUT...</span>
+                </div>
+                
+                <p className="text-stone-200 text-lg mb-8 leading-relaxed">{activePuzzle.question}</p>
+                
+                {activePuzzle.type === 'multiple-choice' ? (
+                  <div className="flex flex-col gap-3">
+                    {activePuzzle.options.map((opt, i) => (
+                      <button key={i} onClick={() => handlePuzzleSubmit(opt)} className="bg-stone-800 hover:bg-emerald-600 hover:text-black text-emerald-500 border-2 border-stone-600 py-3 px-4 font-bold transition-colors text-left">
+                        &gt; {opt}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    <input 
+                      type="text" 
+                      value={puzzleInput}
+                      onChange={(e) => { setPuzzleInput(e.target.value); setPuzzleError(''); }}
+                      onKeyDown={(e) => e.key === 'Enter' && handlePuzzleSubmit(puzzleInput)}
+                      className="w-full bg-black border-2 border-stone-600 text-emerald-400 p-4 font-mono text-lg focus:border-emerald-500 outline-none"
+                      placeholder="ENTER RESPONSE..."
+                      autoFocus
+                    />
+                    <button onClick={() => handlePuzzleSubmit(puzzleInput)} className="bg-emerald-700 hover:bg-emerald-500 text-black py-3 font-extrabold uppercase w-full tracking-widest transition-colors">
+                      SUBMIT
+                    </button>
+                  </div>
+                )}
+
+                {puzzleError && <p className="text-red-500 text-sm mt-4 font-bold text-center">{puzzleError}</p>}
+                
+                <div className="mt-8 text-center">
+                  <button onClick={() => setActivePuzzle(null)} className="text-stone-500 text-xs hover:text-white transition-colors">
+                    [ ABORT CONNECTION ]
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {showElevatorMenu && (
             <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
