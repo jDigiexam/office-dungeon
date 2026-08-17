@@ -6,12 +6,12 @@ import { PointerLockControls, Instances, Instance } from '@react-three/drei';
 import * as THREE from 'three';
 
 // ----------------------------------------------------
-// 1. NATIVE TEXTURE LOADER (Bypasses React Suspense Deadlocks)
+// 1. NATIVE TEXTURE LOADER
 // ----------------------------------------------------
 let tWall, tFloor, tWindow, tHand;
 
 const initTextures = () => {
-  if (tWall) return; // Prevent reloading
+  if (tWall) return; 
   const loader = new THREE.TextureLoader();
   
   tWall = loader.load('/wall_stone.png');
@@ -59,16 +59,17 @@ function TerminalMesh({ position }) {
 
 function LitWindowMesh({ position, grid, gx, gz }) {
   let rotY = 0; let offsetX = 0; let offsetZ = 0;
-  if (gx > 0 && grid[gz][gx - 1] === 1) { offsetX = -0.49; rotY = Math.PI / 2; }
-  else if (gx < grid[0].length - 1 && grid[gz][gx + 1] === 1) { offsetX = 0.49; rotY = -Math.PI / 2; }
-  else if (gz > 0 && grid[gz - 1][gx] === 1) { offsetZ = -0.49; rotY = 0; }
-  else if (gz < grid.length - 1 && grid[gz + 1][gx] === 1) { offsetZ = 0.49; rotY = Math.PI; }
+  // Push window slightly OUTSIDE the wall surface (0.505) to prevent Z-fighting
+  if (gx > 0 && grid[gz][gx - 1] === 1) { offsetX = -0.505; rotY = Math.PI / 2; }
+  else if (gx < grid[0].length - 1 && grid[gz][gx + 1] === 1) { offsetX = 0.505; rotY = -Math.PI / 2; }
+  else if (gz > 0 && grid[gz - 1][gx] === 1) { offsetZ = -0.505; rotY = 0; }
+  else if (gz < grid.length - 1 && grid[gz + 1][gx] === 1) { offsetZ = 0.505; rotY = Math.PI; }
 
   return (
     <group position={[position[0] + offsetX, position[1], position[2] + offsetZ]} rotation={[0, rotY, 0]}>
       <mesh position={[0, 2.0, 0]}>
         <planeGeometry args={[0.8, 1.6]} />
-        <meshStandardMaterial map={tWindow} emissive="#f59e0b" emissiveIntensity={0.8} emissiveMap={tWindow} side={THREE.DoubleSide} transparent={true} />
+        <meshStandardMaterial map={tWindow} emissive="#f59e0b" emissiveIntensity={0.8} emissiveMap={tWindow} transparent={true} />
       </mesh>
     </group>
   );
@@ -125,15 +126,14 @@ function SpiralStaircase({ position }) {
 }
 
 // ----------------------------------------------------
-// 3. BULLETPROOF PHYSICS & CONTROLS
+// 3. SECURE PHYSICS & CONTROLS
 // ----------------------------------------------------
 function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   const controlsRef = useRef();
   const moveState = useRef({ forward: false, backward: false, left: false, right: false });
-  const lastFloor = useRef(0);
   const bobTime = useRef(0);
   const handRef = useRef();
-  const crosshairRef = useRef(); // Pure 3D Crosshair
+  const crosshairRef = useRef(); 
   
   const { camera } = useThree();
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
@@ -145,6 +145,9 @@ function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTel
       clearTeleport();
     }
   }, [teleportCoords, camera, clearTeleport]);
+
+  const floorChangeRef = useRef(onFloorChange);
+  useEffect(() => { floorChangeRef.current = onFloorChange; }, [onFloorChange]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -159,7 +162,7 @@ function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTel
         camera.getWorldDirection(dir);
         const targetX = Math.floor(camera.position.x + dir.x * 1.3);
         const targetZ = Math.floor(camera.position.z + dir.z * 1.3);
-        const fIdx = lastFloor.current;
+        const fIdx = Math.max(0, Math.min(2, Math.round(camera.position.y / 4)));
         if (targetZ >= 0 && targetZ < grids[fIdx].length && targetX >= 0 && targetX < grids[fIdx][0].length) {
           onInteract(grids[fIdx][targetZ][targetX], targetX, targetZ, fIdx);
         }
@@ -180,7 +183,6 @@ function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTel
   useFrame((state, delta) => {
     if (!controlsRef.current?.isLocked) return;
 
-    // Secure Delta against NaN stutters
     const safeDelta = Math.min(delta || 0.016, 0.1);
     const moveSpeed = 4.5 * safeDelta;
     const isMoving = moveState.current.forward || moveState.current.backward || moveState.current.left || moveState.current.right;
@@ -191,25 +193,27 @@ function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTel
 
     const px = camera.position.x;
     const pz = camera.position.z;
-    const inStairwell = px >= 14 && px <= 19 && pz >= 7 && pz <= 12;
     
-    let targetY = lastFloor.current * 4.0; 
+    // Bounds of the stairwell void
+    const inStairwell = px >= 13.5 && px <= 19.5 && pz >= 6.5 && pz <= 12.5;
+    
+    let targetY;
 
     if (inStairwell && stairsRef.current) {
       raycaster.set(new THREE.Vector3(px, camera.position.y + 1, pz), downVector);
       const hits = raycaster.intersectObject(stairsRef.current, true);
-      if (hits.length > 0) targetY = hits[0].point.y;
+      if (hits.length > 0) {
+        targetY = hits[0].point.y + 0.8;
+      } else {
+        targetY = Math.round(camera.position.y / 4) * 4 + 0.8;
+      }
+    } else {
+      // Fix for elevator fall: Anchor to the current height bracket when on flat ground
+      targetY = Math.round(camera.position.y / 4) * 4 + 0.8;
     }
 
-    camera.position.y = THREE.MathUtils.lerp(camera.position.y, targetY + 0.8 + bobOffset, 0.4);
+    camera.position.y = THREE.MathUtils.lerp(camera.position.y, targetY + bobOffset, 0.4);
 
-    const stableFloorIndex = Math.max(0, Math.min(2, Math.round(targetY / 4)));
-    if (stableFloorIndex !== lastFloor.current) {
-      lastFloor.current = stableFloorIndex;
-      onFloorChange(stableFloorIndex);
-    }
-
-    // Attach Hand Model
     if (handRef.current) {
       const handOffset = new THREE.Vector3(0.18, -0.15, -0.3);
       handOffset.applyQuaternion(camera.quaternion);
@@ -219,7 +223,6 @@ function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTel
       handRef.current.rotation.z += Math.cos(bobTime.current / 2) * 0.02; 
     }
 
-    // Attach 3D Crosshair directly to the exact center of camera
     if (crosshairRef.current) {
       const crossOffset = new THREE.Vector3(0, 0, -0.5);
       crossOffset.applyQuaternion(camera.quaternion);
@@ -227,7 +230,7 @@ function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTel
       crosshairRef.current.quaternion.copy(camera.quaternion);
     }
 
-    const currentFIdx = lastFloor.current;
+    const currentFIdx = Math.max(0, Math.min(2, Math.round(camera.position.y / 4)));
     const oldX = camera.position.x;
     const oldZ = camera.position.z;
 
@@ -261,13 +264,11 @@ function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTel
     <>
       <PointerLockControls makeDefault ref={controlsRef} minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI * 3 / 4} />
       
-      {/* Hand Sprite */}
       <mesh ref={handRef} renderOrder={999}>
         <planeGeometry args={[0.23, 0.23]} />
         <meshBasicMaterial map={tHand} transparent={true} depthTest={false} />
       </mesh>
 
-      {/* Pure 3D Crosshair - Replaces the HTML one! */}
       <mesh ref={crosshairRef} renderOrder={1000}>
         <ringGeometry args={[0.005, 0.008, 16]} />
         <meshBasicMaterial color="#dc2626" depthTest={false} transparent={true} opacity={0.8} />
@@ -296,6 +297,7 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
 
       <Instances limit={1500}>
         <planeGeometry args={[1, 1]} />
+        {/* Removed DoubleSide from Floor to relieve GPU */}
         <meshStandardMaterial map={tFloor} color="#ffffff" roughness={1.0} />
         {grids.map((grid, fIdx) => grid.map((row, z) => row.map((tile, x) => {
           if (tile !== 7 && tile !== 1 && tile !== 6) return <Instance key={`floor-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4, z + 0.5]} rotation={[-Math.PI / 2, 0, 0]} />;
@@ -305,9 +307,10 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
 
       <Instances limit={1500}>
         <planeGeometry args={[1, 1]} />
+        {/* Dropped ceiling to 3.98 to prevent GPU Z-Fighting with the floor above it */}
         <meshStandardMaterial color="#18181b" roughness={1.0} />
         {grids.map((grid, fIdx) => grid.map((row, z) => row.map((tile, x) => {
-          if (tile !== 7 && tile !== 1 && tile !== 6) return <Instance key={`ceil-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 4.0, z + 0.5]} rotation={[Math.PI / 2, 0, 0]} />;
+          if (tile !== 7 && tile !== 1 && tile !== 6) return <Instance key={`ceil-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 3.98, z + 0.5]} rotation={[Math.PI / 2, 0, 0]} />;
           return null;
         })))}
       </Instances>
@@ -339,13 +342,11 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
 }
 
 export default function DungeonEngine({ grids, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
-  // Fire the completely synchronous texture loader
   initTextures();
 
   return (
-    // 🚨 Notice: Removed the HTML '+' crosshair from down here!
     <div className="w-full h-screen bg-black relative">
-      <Canvas frameloop="always" camera={{ position: [2.5, 0.8, 2.5], fov: 80, near: 0.01, far: 50 }} gl={{ antialias: false }}>
+      <Canvas camera={{ position: [2.5, 0.8, 2.5], fov: 80, near: 0.01, far: 50 }} gl={{ antialias: false }}>
         <fog attach="fog" args={['#000000', 3, 16]} />
         <ambientLight intensity={0.6} color="#ffffff" />
         <DungeonScene grids={grids} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
