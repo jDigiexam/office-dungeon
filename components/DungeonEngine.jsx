@@ -11,7 +11,6 @@ import * as THREE from 'three';
 function KeycardMesh({ position, texture, color }) {
   const cardRef = useRef();
   
-  // Slowly spin the 2D plane to create a classic floating sprite effect
   useFrame((_, delta) => { 
     if (cardRef.current) cardRef.current.rotation.y += Math.min(delta, 0.1) * 2.0; 
   });
@@ -29,7 +28,6 @@ function KeycardMesh({ position, texture, color }) {
           alphaTest={0.5} 
         />
       </mesh>
-      {/* Tiny localized glow to draw the player's eye in dark rooms */}
       <pointLight position={[0, 0.4, 0]} intensity={1.5} distance={3} color={color} />
     </group>
   );
@@ -94,7 +92,6 @@ function ElevatorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTextu
       <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[1, 1]} /><meshStandardMaterial color="#3f3f46" /></mesh>
 
       <group position={[0, 0, 0.4]}>
-        {/* Added emissive settings to act as a gamma boost, making doors pop in dark areas */}
         <mesh ref={leftDoor} position={[-0.25, 1.0, 0]}>
           <boxGeometry args={[0.5, 2.0, 0.05]} />
           <meshStandardMaterial map={doorTexture} roughness={0.5} emissive="#ffffff" emissiveMap={doorTexture} emissiveIntensity={0.25} />
@@ -129,7 +126,6 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTexture }
     <group position={position} rotation={[0, rotY, 0]}>
       <mesh position={[0, 3.0, 0]}><boxGeometry args={[1, 2.0, 1]} /><meshStandardMaterial map={wallTexture} roughness={0.9} /></mesh>
       <group ref={groupRef}>
-        {/* Added emissive settings to act as a gamma boost, making doors pop in dark areas */}
         <mesh position={[0, 1.0, 0]}>
           <boxGeometry args={[1, 2.0, 0.15]} />
           <meshStandardMaterial 
@@ -291,6 +287,7 @@ function PlayerControls({ grids, stairsRef, handTexture, onInteract, teleportCoo
       const gx = Math.floor(x); const gz = Math.floor(z);
       if (gz < 0 || gz >= grids[currentFIdx].length || gx < 0 || gx >= grids[currentFIdx][0].length) return true;
       const tile = grids[currentFIdx][gz][gx];
+      // Excludes tile 6 (Ceiling Light) so you can walk perfectly underneath it!
       return tile === 1 || tile === 2 || tile === 3 || tile === 4;
     };
 
@@ -342,7 +339,6 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
     '/wall_stone.png'
   ]);
 
-  // Added the new red keycard texture
   const [tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed] = useTexture([
     '/floor_stone_pattern.png',
     '/floor_tiles_tan_large.png',
@@ -376,7 +372,8 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
           <meshStandardMaterial map={tex} color="#ffffff" roughness={0.9} />
           {grids.map((grid, fIdx) => fIdx < 2 && grid.map((row, z) => row.map((tile, x) => {
             if (getTextureIndex(x, z, fIdx, woodTexList.length) !== texIdx) return null;
-            if (tile === 1 || tile === 6) return <Instance key={`wwall-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 2.0, z + 0.5]} />;
+            // 🚨 Strict check: Only render actual solid walls (tile === 1). Lights (tile === 6) do NOT get a wall box.
+            if (tile === 1) return <Instance key={`wwall-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 2.0, z + 0.5]} />;
             if (tile === 2 || tile === 8) return <Instance key={`wlintel-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 3.0, z + 0.5]} scale={[1, 0.5, 1]} />;
             return null;
           })))}
@@ -389,7 +386,8 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
           <meshStandardMaterial map={tex} color="#ffffff" roughness={0.9} />
           {grids.map((grid, fIdx) => fIdx >= 2 && grid.map((row, z) => row.map((tile, x) => {
             if (getTextureIndex(x, z, fIdx, stoneTexList.length) !== texIdx) return null;
-            if (tile === 1 || tile === 6) return <Instance key={`swall-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 2.0, z + 0.5]} />;
+            // 🚨 Strict check: Only render actual solid walls (tile === 1). Lights (tile === 6) do NOT get a wall box.
+            if (tile === 1) return <Instance key={`swall-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 2.0, z + 0.5]} />;
             if (tile === 2 || tile === 8) return <Instance key={`slintel-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 3.0, z + 0.5]} scale={[1, 0.5, 1]} />;
             return null;
           })))}
@@ -435,7 +433,6 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
               if (tile === 2 || tile === 8) elements.push(<DoorMesh key="door" position={[x + 0.5, 0, z + 0.5]} grid={grid} gx={x} gz={z} isOpened={tile === 8} wallTexture={wTex} doorTexture={dTex} />);
               if (tile === 3 || tile === 10) elements.push(<ElevatorMesh key="elev" position={[x + 0.5, 0, z + 0.5]} grid={grid} gx={x} gz={z} isOpened={tile === 10} wallTexture={wTex} doorTexture={tDoorMetalFrame} litTexture={tWindow} />);
               if (tile === 4) elements.push(<TerminalMesh key="term" position={[x + 0.5, 0, z + 0.5]} />);
-              // 🚨 RENDER THE NEW PNG KEYCARD
               if (tile === 5) elements.push(<KeycardMesh key="key" position={[x + 0.5, 0, z + 0.5]} texture={tKeyRed} color="#dc2626" />);
               if (tile === 6) elements.push(<CeilingLightMesh key="window" position={[x + 0.5, 0, z + 0.5]} texture={tWindow} />);
               return <group key={`int-${x}-${z}`}>{elements}</group>;
