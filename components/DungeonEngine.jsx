@@ -326,16 +326,17 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
   );
 }
 
-export default function DungeonEngine({ grids, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
-  return (
-    <div className="w-full h-screen bg-black relative">
-      <Canvas camera={{ position: [6.5, 0.8, 38.5], fov: 80, near: 0.01, far: 50 }} gl={{ antialias: false }}>
-        <fog attach="fog" args={['#000000', 4, 18]} />
-        <ambientLight intensity={0.4} color="#ffffff" />
-        <Suspense fallback={null}>
-          <DungeonScene grids={grids} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
-        </Suspense>
-      </Canvas>
-    </div>
-  );
-}
+export default function DungeonEngine({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
+    return (
+      <div className="w-full h-screen bg-black relative">
+        {/* Set the Canvas camera position to dynamically use the passed initialSpawn */}
+        <Canvas camera={{ position: initialSpawn || [5.5, 0.8, 5.5], fov: 80, near: 0.01, far: 50 }} gl={{ antialias: false }}>
+          <fog attach="fog" args={['#000000', 4, 18]} />
+          <ambientLight intensity={0.4} color="#ffffff" />
+          <Suspense fallback={null}>
+            <DungeonScene grids={grids} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
+          </Suspense>
+        </Canvas>
+      </div>
+    );
+  }

@@ -1,10 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { FLOORS } from '@/lib/mapData';
+import { loadMapFromImage } from '@/lib/mapParser';
 
 const DungeonEngine = dynamic(() => import('@/components/DungeonEngine'), { ssr: false });
+
+// Fallback blank 10x10 room just in case an image is missing
+const FALLBACK_GRID = Array(10).fill(Array(10).fill(0)).map((row, z) => 
+  row.map((col, x) => (x === 0 || x === 9 || z === 0 || z === 9 ? 1 : 0))
+);
 
 export default function EscapeRoomPage() {
   const [currentFloor, setCurrentFloor] = useState(0);
@@ -14,7 +19,29 @@ export default function EscapeRoomPage() {
   const [showElevatorMenu, setShowElevatorMenu] = useState(false);
   const [teleportCoords, setTeleportCoords] = useState(null);
   
-  const [grids, setGrids] = useState([FLOORS[0].grid, FLOORS[1].grid, FLOORS[2].grid]);
+  const [grids, setGrids] = useState(null);
+  const [spawnCoords, setSpawnCoords] = useState([5.5, 0.8, 5.5]);
+  const [mapsLoading, setMapsLoading] = useState(true);
+
+  // Parse PNGs on mount
+  useEffect(() => {
+    const fetchMaps = async () => {
+      try {
+        const floor0 = await loadMapFromImage('/map_floor_0.png').catch(() => ({ grid: FALLBACK_GRID, spawnPoint: null }));
+        const floor1 = await loadMapFromImage('/map_floor_1.png').catch(() => ({ grid: FALLBACK_GRID, spawnPoint: null }));
+        const floor2 = await loadMapFromImage('/map_floor_2.png').catch(() => ({ grid: FALLBACK_GRID, spawnPoint: null }));
+
+        setGrids([floor0.grid, floor1.grid, floor2.grid]);
+        if (floor0.spawnPoint) setSpawnCoords(floor0.spawnPoint);
+        setMapsLoading(false);
+      } catch (err) {
+        console.error("Failed to load map images", err);
+        setGrids([FALLBACK_GRID, FALLBACK_GRID, FALLBACK_GRID]);
+        setMapsLoading(false);
+      }
+    };
+    fetchMaps();
+  }, []);
 
   const triggerMessage = (msg) => {
     setMessage(msg);
@@ -33,10 +60,9 @@ export default function EscapeRoomPage() {
     const pickupKey = (keyName) => {
       triggerMessage(`ACQUIRED ${keyName}`);
       setInventory([...inventory, keyName]);
-      openDoor(0); // Removes key from grid
+      openDoor(0); 
     };
 
-    // Doors
     if (tileType === 2) {
       if (inventory.includes('RED KEYCARD')) { triggerMessage("ACCESS GRANTED"); openDoor(8); }
       else triggerMessage("LOCKED - RED KEYCARD REQUIRED");
@@ -50,18 +76,17 @@ export default function EscapeRoomPage() {
       else triggerMessage("LOCKED - YELLOW KEYCARD REQUIRED");
     }
 
-    // Keys
     if (tileType === 5) pickupKey('RED KEYCARD');
     if (tileType === 15) pickupKey('BLUE KEYCARD');
     if (tileType === 25) pickupKey('YELLOW KEYCARD');
 
-    // Terminals / Elevator
     if (tileType === 4) triggerMessage("SYSTEM TERMINAL: SECURITY OVERRIDE ACTIVE");
     if (tileType === 3) { triggerMessage("ELEVATOR DOORS OPENING"); openDoor(10); }
     if (tileType === 10) { document.exitPointerLock(); setShowElevatorMenu(true); }
   };
 
   const handleElevatorSelect = (targetFloorIndex) => {
+    // Drop player slightly inside the map to ensure they don't clip walls
     setTeleportCoords({ x: 2.5, y: targetFloorIndex * 4 + 0.8, z: 2.5 });
     setShowElevatorMenu(false);
     triggerMessage(`ELEVATOR TRANSIT: FLOOR E1M${targetFloorIndex + 1}`);
@@ -76,15 +101,24 @@ export default function EscapeRoomPage() {
           <div className="border-4 border-stone-700 bg-stone-900 p-8 text-center max-w-md">
             <h1 className="text-4xl font-extrabold mb-1 tracking-widest text-red-600">OFFICE DUNGEON</h1>
             <p className="mb-8 text-stone-300 text-xs">Use WASD to run. Mouse to look. 'E' to interact.</p>
-            <button onClick={() => setGameStarted(true)} className="w-full py-3 bg-red-700 hover:bg-red-600 text-black font-extrabold">
-              START ESCAPE
-            </button>
+            
+            {mapsLoading ? (
+              <button disabled className="w-full py-3 bg-stone-700 text-stone-500 font-extrabold animate-pulse">
+                INITIALIZING SATELLITE LINK...
+              </button>
+            ) : (
+              <button onClick={() => setGameStarted(true)} className="w-full py-3 bg-red-700 hover:bg-red-600 text-black font-extrabold">
+                START ESCAPE
+              </button>
+            )}
+            
           </div>
         </div>
       ) : (
         <>
           <DungeonEngine
             grids={grids}
+            initialSpawn={spawnCoords}
             onInteract={handleInteract}
             teleportCoords={teleportCoords}
             clearTeleport={() => setTeleportCoords(null)}
@@ -98,7 +132,7 @@ export default function EscapeRoomPage() {
                 <div className="flex flex-col gap-4">
                   {[0, 1, 2].map((f) => (
                     <button key={f} onClick={() => handleElevatorSelect(f)} className="bg-stone-800 hover:bg-yellow-600 hover:text-black text-yellow-500 border-2 border-stone-600 py-3 font-bold uppercase transition-colors">
-                      E1M{f + 1} - {FLOORS[f]?.name.split('-')[1] || "Sector"}
+                      E1M{f + 1} - SECTOR DATA
                     </button>
                   ))}
                 </div>
@@ -123,7 +157,7 @@ export default function EscapeRoomPage() {
 
             <div className="hidden md:flex bg-stone-950 border-2 border-stone-700 px-6 py-2 flex-col items-center justify-center flex-1 mx-4">
               <span className="text-[10px] text-stone-500 font-bold">CURRENT SECTOR</span>
-              <span className="text-xs font-bold text-yellow-500 mt-0.5">{FLOORS[currentFloor]?.name || "Unknown"}</span>
+              <span className="text-xs font-bold text-yellow-500 mt-0.5">UNKNOWN AREA</span>
             </div>
 
             <div className="bg-stone-950 border-2 border-stone-700 px-4 py-1 flex flex-col items-center justify-center min-w-[180px]">
