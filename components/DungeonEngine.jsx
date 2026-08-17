@@ -40,38 +40,42 @@ function FastInstancedMesh({ geometryArgs, materialProps, coords }) {
 // 2. 3D INTERACTIVE OBJECTS
 // ----------------------------------------------------
 function KeycardMesh({ position, texture, color }) {
-  const cardRef = useRef();
-  useFrame((_, delta) => { if (cardRef.current) cardRef.current.rotation.y += Math.min(delta, 0.1) * 2.0; });
-  return (
-    <group position={position}>
-      <mesh ref={cardRef} position={[0, 0.4, 0]}>
-        <planeGeometry args={[0.5, 0.5]} />
-        <meshStandardMaterial map={texture} emissive={color} emissiveIntensity={0.2} transparent={true} side={THREE.DoubleSide} alphaTest={0.5} />
-      </mesh>
-      <pointLight position={[0, 0.4, 0]} intensity={1.5} distance={3} color={color} />
-    </group>
-  );
-}
+    const cardRef = useRef();
+    useFrame((_, delta) => { if (cardRef.current) cardRef.current.rotation.y += Math.min(delta, 0.1) * 2.0; });
+    return (
+      <group position={position}>
+        <mesh ref={cardRef} position={[0, 0.4, 0]}>
+          <planeGeometry args={[0.5, 0.5]} />
+          {/* The emissive property here keeps it glowing without needing a real light source */}
+          <meshStandardMaterial map={texture} emissive={color} emissiveIntensity={0.8} transparent={true} side={THREE.DoubleSide} alphaTest={0.5} />
+        </mesh>
+      </group>
+    );
+  }
+  
+  function TerminalMesh({ position }) {
+    return (
+      <group position={position}>
+        <mesh position={[0, 0.35, 0]}><boxGeometry args={[0.6, 0.7, 0.5]} /><meshStandardMaterial color="#18181b" /></mesh>
+        <mesh position={[0, 0.85, 0]}><boxGeometry args={[0.45, 0.35, 0.3]} /><meshStandardMaterial color="#09090b" /></mesh>
+        <mesh position={[0, 0.85, 0.16]}><planeGeometry args={[0.38, 0.28]} /><meshStandardMaterial color="#22c55e" emissive="#16a34a" emissiveIntensity={0.9} /></mesh>
+      </group>
+    );
+  }
+  
+  function CeilingLightMesh({ position, texture }) {
+    return (
+      <group position={[position[0], 3.98, position[2]]} rotation={[Math.PI / 2, 0, 0]}>
+        <mesh><planeGeometry args={[1, 1]} /><meshStandardMaterial color="#18181b" roughness={1.0} /></mesh>
+        <mesh position={[0, 0, 0.01]}>
+          <planeGeometry args={[0.6, 0.6]} />
+          {/* Emissive intensity bumped up slightly to compensate for the missing pointLight */}
+          <meshStandardMaterial map={texture} emissive="#f59e0b" emissiveIntensity={2.5} emissiveMap={texture} transparent={true} />
+        </mesh>
+      </group>
+    );
+  }
 
-function TerminalMesh({ position }) {
-  return (
-    <group position={position}>
-      <mesh position={[0, 0.35, 0]}><boxGeometry args={[0.6, 0.7, 0.5]} /><meshStandardMaterial color="#18181b" /></mesh>
-      <mesh position={[0, 0.85, 0]}><boxGeometry args={[0.45, 0.35, 0.3]} /><meshStandardMaterial color="#09090b" /></mesh>
-      <mesh position={[0, 0.85, 0.16]}><planeGeometry args={[0.38, 0.28]} /><meshStandardMaterial color="#22c55e" emissive="#16a34a" emissiveIntensity={0.9} /></mesh>
-    </group>
-  );
-}
-
-function CeilingLightMesh({ position, texture }) {
-  return (
-    <group position={[position[0], 3.98, position[2]]} rotation={[Math.PI / 2, 0, 0]}>
-      <mesh><planeGeometry args={[1, 1]} /><meshStandardMaterial color="#18181b" roughness={1.0} /></mesh>
-      <mesh position={[0, 0, 0.01]}><planeGeometry args={[0.6, 0.6]} /><meshStandardMaterial map={texture} emissive="#f59e0b" emissiveIntensity={1} emissiveMap={texture} transparent={true} /></mesh>
-      <pointLight position={[0, 0, 0.3]} intensity={3.5} distance={12} color="#fbbf24" />
-    </group>
-  );
-}
 
 function ElevatorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTexture, litTexture }) {
   const leftDoor = useRef();
@@ -427,15 +431,16 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
 }
 
 export default function DungeonEngine({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
-  return (
-    <div className="w-full h-screen bg-black relative">
-      <Canvas camera={{ position: initialSpawn || [5.5, 0.8, 5.5], fov: 80, near: 0.01, far: 50 }} gl={{ antialias: false }}>
-        <fog attach="fog" args={['#000000', 4, 18]} />
-        <ambientLight intensity={0.4} color="#ffffff" />
-        <Suspense fallback={null}>
-          <DungeonScene grids={grids} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
-        </Suspense>
-      </Canvas>
-    </div>
-  );
-}
+    return (
+      <div className="w-full h-screen bg-black relative">
+        <Canvas camera={{ position: initialSpawn || [5.5, 0.8, 5.5], fov: 80, near: 0.01, far: 50 }} gl={{ antialias: false }}>
+          <fog attach="fog" args={['#000000', 4, 18]} />
+          {/* 🚨 BUMPED INTENSITY TO 1.0 TO COMPENSATE FOR REMOVED POINT LIGHTS */}
+          <ambientLight intensity={1.0} color="#ffffff" />
+          <Suspense fallback={null}>
+            <DungeonScene grids={grids} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
+          </Suspense>
+        </Canvas>
+      </div>
+    );
+  }
