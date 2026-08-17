@@ -45,7 +45,7 @@ function LitWindowMesh({ position, grid, gx, gz, texture }) {
         <planeGeometry args={[0.6, 0.6]} />
         <meshStandardMaterial map={texture} emissive="#f59e0b" emissiveIntensity={1} emissiveMap={texture} transparent={true} />
       </mesh>
-      <pointLight position={[0, 2.0, 0.3]} intensity={2.5} distance={8} color="#fbbf24" />
+      <pointLight position={[0, 2.0, 0.3]} intensity={3.5} distance={12} color="#fbbf24" />
     </group>
   );
 }
@@ -131,12 +131,10 @@ function SpiralStaircase({ position, wallTexture, floorTexture }) {
         <cylinderGeometry args={[0.4, 0.4, 4, 16]} />
         <meshStandardMaterial map={wallTexture} roughness={0.9} />
       </mesh>
-      
       <mesh position={[0, 2.0, 0]} rotation={[0, Math.PI * 1.25, 0]}>
         <cylinderGeometry args={[2.5, 2.5, 4, 16, 1, true, 0, Math.PI * 1.5]} />
         <meshStandardMaterial map={wallTexture} roughness={0.9} side={THREE.DoubleSide} />
       </mesh>
-
       {Array.from({ length: steps }).map((_, i) => (
         <mesh key={i} position={[Math.cos(i * anglePerStep) * (stairRadius / 2), i * heightPerStep + 0.1, Math.sin(i * anglePerStep) * (stairRadius / 2)]} rotation={[0, -i * anglePerStep, 0]}>
           <boxGeometry args={[stairRadius, 0.2, 1.2]} />
@@ -427,9 +425,11 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
 export default function DungeonEngine({ grids, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   return (
     <div className="w-full h-screen bg-black relative">
-      <Canvas camera={{ position: [2.5, 0.8, 2.5], fov: 80, near: 0.01, far: 50 }} gl={{ antialias: false }}>
-        <fog attach="fog" args={['#000000', 1.5, 9]} />
-        <ambientLight intensity={0.15} color="#ffffff" />
+      {/* 🚨 THE FIX: Spawn position correctly set to the Southern cavern start */}
+      <Canvas camera={{ position: [5.5, 0.8, 27.5], fov: 80, near: 0.01, far: 50 }} gl={{ antialias: false }}>
+        {/* Fog pushed back, Ambient Light raised to fix extreme darkness */}
+        <fog attach="fog" args={['#000000', 4, 18]} />
+        <ambientLight intensity={0.4} color="#ffffff" />
         <Suspense fallback={null}>
           <DungeonScene grids={grids} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
         </Suspense>
