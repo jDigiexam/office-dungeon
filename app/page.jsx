@@ -23,12 +23,10 @@ export default function EscapeRoomPage() {
   };
 
   const handleInteract = (tileType, x, z, fIdx) => {
-    // 2 = Locked Door
     if (tileType === 2) {
       if (inventory.includes('RED KEYCARD')) {
         triggerMessage("ACCESS GRANTED - OPENING DOOR");
         const newGrids = [...grids];
-        // 🚨 Swap tile 2 (closed) to 8 (opened door state)
         newGrids[fIdx] = grids[fIdx].map((row, rIdx) =>
           row.map((col, cIdx) => (rIdx === z && cIdx === x ? 8 : col))
         );
@@ -37,7 +35,6 @@ export default function EscapeRoomPage() {
         triggerMessage("LOCKED - RED KEYCARD REQUIRED");
       }
     }
-    // 5 = Keycard Pickup
     else if (tileType === 5) {
       triggerMessage("ACQUIRED RED KEYCARD");
       setInventory([...inventory, 'RED KEYCARD']);
@@ -47,11 +44,9 @@ export default function EscapeRoomPage() {
       );
       setGrids(newGrids);
     }
-    // 4 = Terminal
     else if (tileType === 4) {
       triggerMessage("SYSTEM TERMINAL: SECURITY SYSTEM OVERRIDE ACTIVE");
     }
-    // 3 = Elevator Menu
     else if (tileType === 3) {
       document.exitPointerLock();
       setShowElevatorMenu(true);
@@ -59,7 +54,8 @@ export default function EscapeRoomPage() {
   };
 
   const handleElevatorSelect = (targetFloorIndex) => {
-    setTeleportCoords({ x: 2.5, y: targetFloorIndex * 3 + 0.8, z: 1.5 });
+    // 🚨 Target Floor Index is now multiplied by 4
+    setTeleportCoords({ x: 2.5, y: targetFloorIndex * 4 + 0.8, z: 2.5 });
     setShowElevatorMenu(false);
     triggerMessage(`ELEVATOR TRANSIT: FLOOR E1M${targetFloorIndex + 1}`);
   };
