@@ -38,8 +38,12 @@ function LitWindowMesh({ position, grid, gx, gz }) {
   else if (gz < grid.length - 1 && grid[gz + 1][gx] === 1) { offsetZ = 0.49; rotY = Math.PI; }
 
   const windowTexture = useTexture('/window_tall_rounded_lit.png');
-  windowTexture.magFilter = THREE.NearestFilter;
-  windowTexture.minFilter = THREE.NearestFilter;
+  
+  useEffect(() => {
+    windowTexture.magFilter = THREE.NearestFilter;
+    windowTexture.minFilter = THREE.NearestFilter;
+    windowTexture.needsUpdate = true;
+  }, [windowTexture]);
 
   return (
     <group position={[position[0] + offsetX, position[1], position[2] + offsetZ]} rotation={[0, rotY, 0]}>
@@ -104,7 +108,6 @@ function SpiralStaircase({ position }) {
             Math.sin(i * anglePerStep) * (stairRadius / 2)
           ]}
           rotation={[0, -i * anglePerStep, 0]}
-          userData={{ walkable: true }}
         >
           <boxGeometry args={[stairRadius, 0.2, 1.2]} />
           <meshStandardMaterial color="#52525b" roughness={0.9} />
@@ -114,20 +117,17 @@ function SpiralStaircase({ position }) {
   );
 }
 
-// ⚡ React State Flood Fix
-function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
+// ⚡ Procedural Player Controls (NO GLOBAL RAYCASTING)
+function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   const controlsRef = useRef();
   const moveState = useRef({ forward: false, backward: false, left: false, right: false });
   const lastFloor = useRef(0);
   const bobTime = useRef(0);
   const handRef = useRef();
   
-  const { camera, scene } = useThree();
+  const { camera } = useThree();
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const downVector = useMemo(() => new THREE.Vector3(0, -1, 0), []);
-  
-  const walkables = useRef([]);
-  const frameCount = useRef(0);
 
   const texture = useTexture('/hand.png');
   useEffect(() => {
@@ -156,7 +156,7 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
         camera.getWorldDirection(dir);
         const targetX = Math.floor(camera.position.x + dir.x * 1.3);
         const targetZ = Math.floor(camera.position.z + dir.z * 1.3);
-        const fIdx = lastFloor.current; // Safely use cached floor
+        const fIdx = lastFloor.current;
         if (targetZ >= 0 && targetZ < grids[fIdx].length && targetX >= 0 && targetX < grids[fIdx][0].length) {
           onInteract(grids[fIdx][targetZ][targetX], targetX, targetZ, fIdx);
         }
@@ -177,14 +177,6 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
   useFrame((state, delta) => {
     if (!controlsRef.current?.isLocked) return;
 
-    if (frameCount.current % 60 === 0) {
-      walkables.current = [];
-      scene.traverse((child) => {
-        if (child.userData?.walkable) walkables.current.push(child);
-      });
-    }
-    frameCount.current++;
-
     const moveSpeed = 4.5 * delta;
     const isMoving = moveState.current.forward || moveState.current.backward || moveState.current.left || moveState.current.right;
 
@@ -192,20 +184,33 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
     else bobTime.current = THREE.MathUtils.lerp(bobTime.current, 0, delta * 10);
     const bobOffset = Math.sin(bobTime.current) * 0.05; 
 
-    raycaster.set(new THREE.Vector3(camera.position.x, camera.position.y + 1, camera.position.z), downVector);
-    const intersects = raycaster.intersectObjects(walkables.current, false); 
-    const groundHit = intersects[0];
+    // ⚡ PROCEDURAL HEIGHT CALCULATION
+    const px = camera.position.x;
+    const pz = camera.position.z;
     
-    if (groundHit) {
-      camera.position.y = THREE.MathUtils.lerp(camera.position.y, groundHit.point.y + 0.8 + bobOffset, 0.4);
+    // Check if player is standing inside the 5x5 Stairwell Shaft (X: 14 to 19, Z: 7 to 12)
+    const inStairwell = px >= 14 && px <= 19 && pz >= 7 && pz <= 12;
+    
+    let targetY = lastFloor.current * 4.0; // Default flat ground height
 
-      // FIX: Calculate floor based on the static ground point, NOT the wobbly camera.
-      // This prevents the infinite React rendering loop that was freezing the browser!
-      const stableFloorIndex = Math.max(0, Math.min(2, Math.round(groundHit.point.y / 4)));
-      if (stableFloorIndex !== lastFloor.current) {
-        lastFloor.current = stableFloorIndex;
-        onFloorChange(stableFloorIndex);
+    // Only fire the raycaster if they are actively in the stairwell void
+    if (inStairwell && stairsRef.current) {
+      raycaster.set(new THREE.Vector3(px, camera.position.y + 1, pz), downVector);
+      // Raycast against the tiny local stair group instead of the whole world!
+      const hits = raycaster.intersectObject(stairsRef.current, true);
+      if (hits.length > 0) {
+        targetY = hits[0].point.y;
       }
+    }
+
+    // Apply the newly calculated height smoothly
+    camera.position.y = THREE.MathUtils.lerp(camera.position.y, targetY + 0.8 + bobOffset, 0.4);
+
+    // Sync Floor HUD securely
+    const stableFloorIndex = Math.max(0, Math.min(2, Math.round(targetY / 4)));
+    if (stableFloorIndex !== lastFloor.current) {
+      lastFloor.current = stableFloorIndex;
+      onFloorChange(stableFloorIndex);
     }
 
     if (handRef.current) {
@@ -261,17 +266,23 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
 function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   const wallTexture = useTexture('/wall_stone.png');
   const floorTexture = useTexture('/floor_stone_pattern.png');
+  const stairsRef = useRef();
 
-  wallTexture.magFilter = THREE.NearestFilter;
-  wallTexture.minFilter = THREE.NearestFilter;
-  wallTexture.wrapS = THREE.RepeatWrapping;
-  wallTexture.wrapT = THREE.RepeatWrapping;
-  wallTexture.repeat.set(1, 4); 
+  // Safely prep textures on mount
+  useEffect(() => {
+    wallTexture.magFilter = THREE.NearestFilter;
+    wallTexture.minFilter = THREE.NearestFilter;
+    wallTexture.wrapS = THREE.RepeatWrapping;
+    wallTexture.wrapT = THREE.RepeatWrapping;
+    wallTexture.repeat.set(1, 4); 
+    wallTexture.needsUpdate = true;
 
-  floorTexture.magFilter = THREE.NearestFilter;
-  floorTexture.minFilter = THREE.NearestFilter;
-  floorTexture.wrapS = THREE.RepeatWrapping;
-  floorTexture.wrapT = THREE.RepeatWrapping;
+    floorTexture.magFilter = THREE.NearestFilter;
+    floorTexture.minFilter = THREE.NearestFilter;
+    floorTexture.wrapS = THREE.RepeatWrapping;
+    floorTexture.wrapT = THREE.RepeatWrapping;
+    floorTexture.needsUpdate = true;
+  }, [wallTexture, floorTexture]);
 
   return (
     <>
@@ -289,7 +300,7 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
         })))}
       </Instances>
 
-      <Instances limit={1500} userData={{ walkable: true }}>
+      <Instances limit={1500}>
         <planeGeometry args={[1, 1]} />
         <meshStandardMaterial map={floorTexture} color="#ffffff" roughness={1.0} />
         {grids.map((grid, fIdx) => grid.map((row, z) => row.map((tile, x) => {
@@ -327,10 +338,13 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
         </group>
       ))}
 
-      <SpiralStaircase position={[16.5, 0, 9.5]} />
-      <SpiralStaircase position={[16.5, 4.0, 9.5]} />
+      {/* 🚨 This single group isolates the stairs for O(1) physics calculation */}
+      <group ref={stairsRef}>
+        <SpiralStaircase position={[16.5, 0, 9.5]} />
+        <SpiralStaircase position={[16.5, 4.0, 9.5]} />
+      </group>
 
-      <PlayerControls grids={grids} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
+      <PlayerControls grids={grids} stairsRef={stairsRef} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
     </>
   );
 }
