@@ -30,7 +30,6 @@ function TerminalMesh({ position }) {
   );
 }
 
-// 🪟 Optimized Lit Window Mesh
 function LitWindowMesh({ position, grid, gx, gz }) {
   let rotY = 0; let offsetX = 0; let offsetZ = 0;
   if (gx > 0 && grid[gz][gx - 1] === 1) { offsetX = -0.49; rotY = Math.PI / 2; }
@@ -46,23 +45,24 @@ function LitWindowMesh({ position, grid, gx, gz }) {
     <group position={[position[0] + offsetX, position[1], position[2] + offsetZ]} rotation={[0, rotY, 0]}>
       <mesh position={[0, 2.0, 0]}>
         <planeGeometry args={[0.8, 1.6]} />
-        <meshStandardMaterial map={windowTexture} emissive="#f59e0b" emissiveIntensity={0.8} emissiveMap={windowTexture} />
+        <meshStandardMaterial map={windowTexture} emissive="#f59e0b" emissiveIntensity={0.8} emissiveMap={windowTexture} side={THREE.DoubleSide} transparent={true} />
       </mesh>
       <pointLight position={[0, 2.0, 0.2]} intensity={4} distance={6} color="#fbbf24" />
     </group>
   );
 }
 
-function ElevatorMesh({ position }) {
+function ElevatorMesh({ position, wallTexture }) {
   return (
     <group position={position}>
+      <mesh position={[0, 2.8, 0]}><boxGeometry args={[1, 2.4, 1]} /><meshStandardMaterial map={wallTexture} roughness={0.9} /></mesh>
       <mesh position={[0, 0.8, 0]}><boxGeometry args={[0.95, 1.6, 0.1]} /><meshStandardMaterial color="#3f3f46" metalness={0.9} /></mesh>
       <mesh position={[0, 1.5, 0.08]}><boxGeometry args={[0.2, 0.1, 0.02]} /><meshStandardMaterial color="#f59e0b" emissive="#d97706" emissiveIntensity={1} /></mesh>
     </group>
   );
 }
 
-function DoorMesh({ position, grid, gx, gz, isOpened }) {
+function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture }) {
   const groupRef = useRef();
   useFrame((_, delta) => {
     if (isOpened && groupRef.current.position.y > -1.6) groupRef.current.position.y -= delta * 2;
@@ -73,6 +73,7 @@ function DoorMesh({ position, grid, gx, gz, isOpened }) {
   
   return (
     <group position={position} rotation={[0, rotY, 0]}>
+      <mesh position={[0, 2.8, 0]}><boxGeometry args={[1, 2.4, 1]} /><meshStandardMaterial map={wallTexture} roughness={0.9} /></mesh>
       <group ref={groupRef}>
         <mesh position={[0, 0.8, 0]}><boxGeometry args={[1, 1.6, 0.15]} /><meshStandardMaterial color="#7f1d1d" roughness={0.5} emissive="#450a0a" emissiveIntensity={0.5} /></mesh>
         <mesh position={[0.35, 0.8, 0.08]}><boxGeometry args={[0.1, 0.2, 0.02]} /><meshStandardMaterial color={isOpened ? "#22c55e" : "#ef4444"} emissive={isOpened ? "#16a34a" : "#dc2626"} emissiveIntensity={1} /></mesh>
@@ -113,7 +114,7 @@ function SpiralStaircase({ position }) {
   );
 }
 
-// ⚡ Optimized Player Controls
+// ⚡ React State Flood Fix
 function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   const controlsRef = useRef();
   const moveState = useRef({ forward: false, backward: false, left: false, right: false });
@@ -155,7 +156,7 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
         camera.getWorldDirection(dir);
         const targetX = Math.floor(camera.position.x + dir.x * 1.3);
         const targetZ = Math.floor(camera.position.z + dir.z * 1.3);
-        const fIdx = Math.max(0, Math.min(2, Math.round(camera.position.y / 4)));
+        const fIdx = lastFloor.current; // Safely use cached floor
         if (targetZ >= 0 && targetZ < grids[fIdx].length && targetX >= 0 && targetX < grids[fIdx][0].length) {
           onInteract(grids[fIdx][targetZ][targetX], targetX, targetZ, fIdx);
         }
@@ -197,6 +198,14 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
     
     if (groundHit) {
       camera.position.y = THREE.MathUtils.lerp(camera.position.y, groundHit.point.y + 0.8 + bobOffset, 0.4);
+
+      // FIX: Calculate floor based on the static ground point, NOT the wobbly camera.
+      // This prevents the infinite React rendering loop that was freezing the browser!
+      const stableFloorIndex = Math.max(0, Math.min(2, Math.round(groundHit.point.y / 4)));
+      if (stableFloorIndex !== lastFloor.current) {
+        lastFloor.current = stableFloorIndex;
+        onFloorChange(stableFloorIndex);
+      }
     }
 
     if (handRef.current) {
@@ -208,12 +217,7 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
       handRef.current.rotation.z += Math.cos(bobTime.current / 2) * 0.02; 
     }
 
-    const currentFIdx = Math.max(0, Math.min(2, Math.round(camera.position.y / 4)));
-    if (currentFIdx !== lastFloor.current) {
-      lastFloor.current = currentFIdx;
-      onFloorChange(currentFIdx);
-    }
-
+    const currentFIdx = lastFloor.current;
     const oldX = camera.position.x;
     const oldZ = camera.position.z;
 
@@ -254,7 +258,6 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
   );
 }
 
-// ⚡ Instanced Environment (Eliminates 2,500 Draw Calls)
 function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   const wallTexture = useTexture('/wall_stone.png');
   const floorTexture = useTexture('/floor_stone_pattern.png');
@@ -272,7 +275,6 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
 
   return (
     <>
-      {/* 1. INSTANCED WALLS (1 Draw Call for the entire game!) */}
       <Instances limit={1500}>
         <boxGeometry args={[1, 4, 1]} />
         <meshStandardMaterial map={wallTexture} color="#ffffff" roughness={0.9} />
@@ -281,14 +283,12 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
             return <Instance key={`wall-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 2.0, z + 0.5]} />;
           }
           if (tile === 2 || tile === 8 || tile === 3) {
-            // Lintel above doors/elevators
             return <Instance key={`lintel-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 2.8, z + 0.5]} scale={[1, 0.6, 1]} />;
           }
           return null;
         })))}
       </Instances>
 
-      {/* 2. INSTANCED FLOORS (1 Draw Call!) */}
       <Instances limit={1500} userData={{ walkable: true }}>
         <planeGeometry args={[1, 1]} />
         <meshStandardMaterial map={floorTexture} color="#ffffff" roughness={1.0} />
@@ -300,7 +300,6 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
         })))}
       </Instances>
 
-      {/* 3. INSTANCED CEILINGS (1 Draw Call!) */}
       <Instances limit={1500}>
         <planeGeometry args={[1, 1]} />
         <meshStandardMaterial color="#18181b" roughness={1.0} />
@@ -312,14 +311,13 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
         })))}
       </Instances>
 
-      {/* 4. DYNAMIC/INTERACTIVE OBJECTS */}
       {grids.map((grid, fIdx) => (
         <group key={`interactive-${fIdx}`} position={[0, fIdx * 4, 0]}>
           {grid.map((row, z) =>
             row.map((tile, x) => {
               const elements = [];
-              if (tile === 2 || tile === 8) elements.push(<DoorMesh key="door" position={[x + 0.5, 0, z + 0.5]} grid={grid} gx={x} gz={z} isOpened={tile === 8} />);
-              if (tile === 3) elements.push(<ElevatorMesh key="elev" position={[x + 0.5, 0, z + 0.5]} />);
+              if (tile === 2 || tile === 8) elements.push(<DoorMesh key="door" position={[x + 0.5, 0, z + 0.5]} grid={grid} gx={x} gz={z} isOpened={tile === 8} wallTexture={wallTexture} />);
+              if (tile === 3) elements.push(<ElevatorMesh key="elev" position={[x + 0.5, 0, z + 0.5]} wallTexture={wallTexture} />);
               if (tile === 4) elements.push(<TerminalMesh key="term" position={[x + 0.5, 0, z + 0.5]} />);
               if (tile === 5) elements.push(<KeycardMesh key="key" position={[x + 0.5, 0, z + 0.5]} />);
               if (tile === 6) elements.push(<LitWindowMesh key="window" position={[x + 0.5, 0, z + 0.5]} grid={grid} gx={x} gz={z} />);
@@ -343,15 +341,11 @@ export default function DungeonEngine({ grids, onInteract, teleportCoords, clear
       <Canvas camera={{ position: [2.5, 0.8, 2.5], fov: 80, near: 0.01, far: 50 }} gl={{ antialias: false }} style={{ imageRendering: 'pixelated' }}>
         <fog attach="fog" args={['#000000', 3, 16]} />
         <ambientLight intensity={0.6} color="#ffffff" />
-        
         <Suspense fallback={null}>
           <DungeonScene grids={grids} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
         </Suspense>
       </Canvas>
-
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-red-600 text-3xl font-bold select-none">
-        +
-      </div>
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-red-600 text-3xl font-bold select-none">+</div>
     </div>
   );
 }
