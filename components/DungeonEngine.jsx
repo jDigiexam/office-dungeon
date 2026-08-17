@@ -236,7 +236,7 @@ function PlayerControls({ grids, onInteract, teleportCoords, clearTeleport, onFl
       <PointerLockControls ref={controlsRef} minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI * 3 / 4} />
       
       <mesh ref={handRef} renderOrder={999}>
-        <planeGeometry args={[0.35, 0.35]} />
+        <planeGeometry args={[0.30, 0.30]} />
         <meshBasicMaterial 
           map={texture} 
           transparent={true} 
