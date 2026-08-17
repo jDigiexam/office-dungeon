@@ -54,7 +54,6 @@ export default function EscapeRoomPage() {
   };
 
   const handleElevatorSelect = (targetFloorIndex) => {
-    // 🚨 Target Floor Index is now multiplied by 4
     setTeleportCoords({ x: 2.5, y: targetFloorIndex * 4 + 0.8, z: 2.5 });
     setShowElevatorMenu(false);
     triggerMessage(`ELEVATOR TRANSIT: FLOOR E1M${targetFloorIndex + 1}`);
@@ -116,7 +115,8 @@ export default function EscapeRoomPage() {
             </div>
           )}
 
-          <div className="absolute bottom-0 left-0 right-0 z-40 bg-stone-900 border-t-4 border-stone-600 p-2 flex items-center justify-between text-stone-200 h-20">
+          {/* 🚨 ADDED pointer-events-none TO THE BOTTOM HUD TO FIX BROWSER FREEZE */}
+          <div className="absolute bottom-0 left-0 right-0 z-40 bg-stone-900 border-t-4 border-stone-600 p-2 flex items-center justify-between text-stone-200 h-20 pointer-events-none">
             <div className="bg-stone-950 border-2 border-stone-700 px-4 py-1 flex flex-col items-center justify-center min-w-[120px]">
               <span className="text-[10px] text-stone-500 font-bold">LEVEL</span>
               <span className="text-red-500 font-black mt-1">E1M{currentFloor + 1}</span>

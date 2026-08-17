@@ -1,21 +1,46 @@
 'use client';
 
-import React, { useRef, useEffect, useMemo, Suspense } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { PointerLockControls, useTexture, Instances, Instance } from '@react-three/drei';
+import { PointerLockControls } from '@react-three/drei';
 import * as THREE from 'three';
 
-// 1. Static 3D Objects
+// ----------------------------------------------------
+// 1. BULLETPROOF TEXTURE LOADER (Bypasses Suspense Freezes)
+// ----------------------------------------------------
+const useGameTextures = () => {
+  return useMemo(() => {
+    const loader = new THREE.TextureLoader();
+    
+    const wall = loader.load('/wall_stone.png');
+    wall.magFilter = wall.minFilter = THREE.NearestFilter;
+    wall.wrapS = wall.wrapT = THREE.RepeatWrapping;
+    wall.repeat.set(1, 4); // Stretch seamlessly across the 4-unit height
+
+    const floor = loader.load('/floor_stone_pattern.png');
+    floor.magFilter = floor.minFilter = THREE.NearestFilter;
+    floor.wrapS = floor.wrapT = THREE.RepeatWrapping;
+
+    const windowLit = loader.load('/window_tall_rounded_lit.png');
+    windowLit.magFilter = windowLit.minFilter = THREE.NearestFilter;
+
+    const hand = loader.load('/hand.png');
+    hand.magFilter = hand.minFilter = THREE.NearestFilter;
+
+    return { wall, floor, windowLit, hand };
+  }, []);
+};
+
+// ----------------------------------------------------
+// 2. 3D OBJECTS
+// ----------------------------------------------------
 function KeycardMesh({ position }) {
   const cardRef = useRef();
-  useFrame((_, delta) => { if (cardRef.current) cardRef.current.rotation.y += delta * 2.5; });
+  useFrame((_, delta) => { if (cardRef.current) cardRef.current.rotation.y += Math.min(delta || 0.016, 0.1) * 2.5; });
   return (
     <group position={position}>
       <mesh position={[0, 0.2, 0]}><cylinderGeometry args={[0.2, 0.25, 0.4, 8]} /><meshStandardMaterial color="#27272a" roughness={0.8} /></mesh>
-      <mesh ref={cardRef} position={[0, 0.65, 0]} rotation={[0.2, 0, 0]}>
-        <boxGeometry args={[0.35, 0.22, 0.03]} />
-        <meshStandardMaterial color="#dc2626" emissive="#ef4444" emissiveIntensity={0.8} />
-      </mesh>
+      <mesh ref={cardRef} position={[0, 0.65, 0]} rotation={[0.2, 0, 0]}><boxGeometry args={[0.35, 0.22, 0.03]} /><meshStandardMaterial color="#dc2626" emissive="#ef4444" emissiveIntensity={0.8} /></mesh>
     </group>
   );
 }
@@ -30,28 +55,20 @@ function TerminalMesh({ position }) {
   );
 }
 
-// 🪟 Optimized Lit Window Mesh (REMOVED pointLight to fix GPU Shader crash)
-function LitWindowMesh({ position, grid, gx, gz }) {
+function LitWindowMesh({ position, grid, gx, gz, texture }) {
   let rotY = 0; let offsetX = 0; let offsetZ = 0;
   if (gx > 0 && grid[gz][gx - 1] === 1) { offsetX = -0.49; rotY = Math.PI / 2; }
   else if (gx < grid[0].length - 1 && grid[gz][gx + 1] === 1) { offsetX = 0.49; rotY = -Math.PI / 2; }
   else if (gz > 0 && grid[gz - 1][gx] === 1) { offsetZ = -0.49; rotY = 0; }
   else if (gz < grid.length - 1 && grid[gz + 1][gx] === 1) { offsetZ = 0.49; rotY = Math.PI; }
 
-  const windowTexture = useTexture('/window_tall_rounded_lit.png');
-  
-  useEffect(() => {
-    windowTexture.magFilter = THREE.NearestFilter;
-    windowTexture.minFilter = THREE.NearestFilter;
-    windowTexture.needsUpdate = true;
-  }, [windowTexture]);
-
   return (
     <group position={[position[0] + offsetX, position[1], position[2] + offsetZ]} rotation={[0, rotY, 0]}>
       <mesh position={[0, 2.0, 0]}>
         <planeGeometry args={[0.8, 1.6]} />
-        <meshStandardMaterial map={windowTexture} emissive="#f59e0b" emissiveIntensity={0.8} emissiveMap={windowTexture} side={THREE.DoubleSide} transparent={true} />
+        <meshStandardMaterial map={texture} emissive="#f59e0b" emissiveIntensity={0.8} emissiveMap={texture} side={THREE.DoubleSide} transparent={true} />
       </mesh>
+      <pointLight position={[0, 2.0, 0.2]} intensity={4} distance={6} color="#fbbf24" />
     </group>
   );
 }
@@ -69,7 +86,7 @@ function ElevatorMesh({ position, wallTexture }) {
 function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture }) {
   const groupRef = useRef();
   useFrame((_, delta) => {
-    if (isOpened && groupRef.current.position.y > -1.6) groupRef.current.position.y -= Math.min(delta * 2, 0.1);
+    if (isOpened && groupRef.current.position.y > -1.6) groupRef.current.position.y -= Math.min(delta || 0.016, 0.1) * 2;
   });
   let rotY = 0;
   if (gx > 0 && gx < grid[0].length - 1 && grid[gz][gx - 1] === 1 && grid[gz][gx + 1] === 1) rotY = 0;
@@ -97,11 +114,7 @@ function SpiralStaircase({ position }) {
     <group position={position}>
       <mesh position={[0, 2.0, 0]}><cylinderGeometry args={[0.2, 0.2, 4, 8]} /><meshStandardMaterial color="#27272a" /></mesh>
       {Array.from({ length: steps }).map((_, i) => (
-        <mesh
-          key={i}
-          position={[Math.cos(i * anglePerStep) * (stairRadius / 2), i * heightPerStep + 0.1, Math.sin(i * anglePerStep) * (stairRadius / 2)]}
-          rotation={[0, -i * anglePerStep, 0]}
-        >
+        <mesh key={i} position={[Math.cos(i * anglePerStep) * (stairRadius / 2), i * heightPerStep + 0.1, Math.sin(i * anglePerStep) * (stairRadius / 2)]} rotation={[0, -i * anglePerStep, 0]}>
           <boxGeometry args={[stairRadius, 0.2, 1.2]} />
           <meshStandardMaterial color="#52525b" roughness={0.9} />
         </mesh>
@@ -110,8 +123,10 @@ function SpiralStaircase({ position }) {
   );
 }
 
-// ⚡ BUG-FREE Player Controls
-function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
+// ----------------------------------------------------
+// 3. BULLETPROOF PHYSICS & CONTROLS
+// ----------------------------------------------------
+function PlayerControls({ grids, stairsRef, textures, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   const controlsRef = useRef();
   const moveState = useRef({ forward: false, backward: false, left: false, right: false });
   const lastFloor = useRef(0);
@@ -122,34 +137,12 @@ function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTel
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const downVector = useMemo(() => new THREE.Vector3(0, -1, 0), []);
 
-  const texture = useTexture('/hand.png');
-  useEffect(() => {
-    texture.magFilter = THREE.NearestFilter;
-    texture.minFilter = THREE.NearestFilter;
-    texture.needsUpdate = true;
-  }, [texture]);
-
   useEffect(() => {
     if (teleportCoords) {
       camera.position.set(teleportCoords.x, teleportCoords.y, teleportCoords.z);
       clearTeleport();
     }
   }, [teleportCoords, camera, clearTeleport]);
-
-  // Decoupled Floor Check (Prevents React State floods freezing the browser)
-  const floorChangeRef = useRef(onFloorChange);
-  useEffect(() => { floorChangeRef.current = onFloorChange; }, [onFloorChange]);
-  
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const stableFloorIndex = Math.max(0, Math.min(2, Math.round(camera.position.y / 4)));
-      if (stableFloorIndex !== lastFloor.current) {
-        lastFloor.current = stableFloorIndex;
-        floorChangeRef.current(stableFloorIndex);
-      }
-    }, 500);
-    return () => clearInterval(interval);
-  }, [camera]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -164,7 +157,7 @@ function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTel
         camera.getWorldDirection(dir);
         const targetX = Math.floor(camera.position.x + dir.x * 1.3);
         const targetZ = Math.floor(camera.position.z + dir.z * 1.3);
-        const fIdx = lastFloor.current;
+        const fIdx = Math.max(0, Math.min(2, lastFloor.current));
         if (targetZ >= 0 && targetZ < grids[fIdx].length && targetX >= 0 && targetX < grids[fIdx][0].length) {
           onInteract(grids[fIdx][targetZ][targetX], targetX, targetZ, fIdx);
         }
@@ -185,12 +178,13 @@ function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTel
   useFrame((state, delta) => {
     if (!controlsRef.current?.isLocked) return;
 
-    // Cap delta to prevent phasing through walls on lag spikes
-    const moveSpeed = Math.min(4.5 * delta, 0.1);
+    // Secure Delta against NaN stutters
+    const safeDelta = Math.min(delta || 0.016, 0.1);
+    const moveSpeed = 4.5 * safeDelta;
     const isMoving = moveState.current.forward || moveState.current.backward || moveState.current.left || moveState.current.right;
 
-    if (isMoving) bobTime.current += delta * 12;
-    else bobTime.current = THREE.MathUtils.lerp(bobTime.current, 0, delta * 10);
+    if (isMoving) bobTime.current += safeDelta * 12;
+    else bobTime.current = THREE.MathUtils.lerp(bobTime.current, 0, safeDelta * 10);
     const bobOffset = Math.sin(bobTime.current) * 0.05; 
 
     const px = camera.position.x;
@@ -199,6 +193,7 @@ function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTel
     
     let targetY = lastFloor.current * 4.0; 
 
+    // Isolated Raycaster (ONLY runs when on the physical stairs)
     if (inStairwell && stairsRef.current) {
       raycaster.set(new THREE.Vector3(px, camera.position.y + 1, pz), downVector);
       const hits = raycaster.intersectObject(stairsRef.current, true);
@@ -206,6 +201,13 @@ function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTel
     }
 
     camera.position.y = THREE.MathUtils.lerp(camera.position.y, targetY + 0.8 + bobOffset, 0.4);
+
+    // Secure Floor Update
+    const stableFloorIndex = Math.max(0, Math.min(2, Math.round(targetY / 4)));
+    if (stableFloorIndex !== lastFloor.current) {
+      lastFloor.current = stableFloorIndex;
+      onFloorChange(stableFloorIndex);
+    }
 
     if (handRef.current) {
       const handOffset = new THREE.Vector3(0.18, -0.15, -0.3);
@@ -216,7 +218,7 @@ function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTel
       handRef.current.rotation.z += Math.cos(bobTime.current / 2) * 0.02; 
     }
 
-    const currentFIdx = lastFloor.current;
+    const currentFIdx = Math.max(0, Math.min(2, lastFloor.current));
     const oldX = camera.position.x;
     const oldZ = camera.position.z;
 
@@ -249,75 +251,76 @@ function PlayerControls({ grids, stairsRef, onInteract, teleportCoords, clearTel
   return (
     <>
       <PointerLockControls makeDefault ref={controlsRef} minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI * 3 / 4} />
+      
+      {/* Reduced 2/3rds size hand */}
       <mesh ref={handRef} renderOrder={999}>
         <planeGeometry args={[0.23, 0.23]} />
-        <meshBasicMaterial map={texture} transparent={true} depthTest={false} />
+        <meshBasicMaterial map={textures.hand} transparent={true} depthTest={false} />
+      </mesh>
+
+      {/* Pure 3D Crosshair replaces HTML crosshair to bypass Chrome Canvas Lock bug */}
+      <mesh position={[0, 0, -0.5]} renderOrder={1000}>
+        <ringGeometry args={[0.005, 0.008, 16]} />
+        <meshBasicMaterial color="#dc2626" depthTest={false} transparent={true} opacity={0.8} />
       </mesh>
     </>
   );
 }
 
+// ----------------------------------------------------
+// 4. MAIN SCENE RENDERING
+// ----------------------------------------------------
 function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
-  const wallTexture = useTexture('/wall_stone.png');
-  const floorTexture = useTexture('/floor_stone_pattern.png');
+  const textures = useGameTextures();
   const stairsRef = useRef();
-
-  useEffect(() => {
-    wallTexture.magFilter = THREE.NearestFilter;
-    wallTexture.minFilter = THREE.NearestFilter;
-    wallTexture.wrapS = THREE.RepeatWrapping;
-    wallTexture.wrapT = THREE.RepeatWrapping;
-    wallTexture.repeat.set(1, 4); 
-    wallTexture.needsUpdate = true;
-
-    floorTexture.magFilter = THREE.NearestFilter;
-    floorTexture.minFilter = THREE.NearestFilter;
-    floorTexture.wrapS = THREE.RepeatWrapping;
-    floorTexture.wrapT = THREE.RepeatWrapping;
-    floorTexture.needsUpdate = true;
-  }, [wallTexture, floorTexture]);
 
   return (
     <>
-      <Instances limit={1500}>
-        <boxGeometry args={[1, 4, 1]} />
-        <meshStandardMaterial map={wallTexture} color="#ffffff" roughness={0.9} />
-        {grids.map((grid, fIdx) => grid.map((row, z) => row.map((tile, x) => {
-          if (tile === 1 || tile === 6) return <Instance key={`wall-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 2.0, z + 0.5]} />;
-          if (tile === 2 || tile === 8 || tile === 3) return <Instance key={`lintel-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 2.8, z + 0.5]} scale={[1, 0.6, 1]} />;
-          return null;
-        })))}
-      </Instances>
-
-      <Instances limit={1500}>
-        <planeGeometry args={[1, 1]} />
-        <meshStandardMaterial map={floorTexture} color="#ffffff" roughness={1.0} />
-        {grids.map((grid, fIdx) => grid.map((row, z) => row.map((tile, x) => {
-          if (tile !== 7 && tile !== 1 && tile !== 6) return <Instance key={`floor-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4, z + 0.5]} rotation={[-Math.PI / 2, 0, 0]} />;
-          return null;
-        })))}
-      </Instances>
-
-      <Instances limit={1500}>
-        <planeGeometry args={[1, 1]} />
-        <meshStandardMaterial color="#18181b" roughness={1.0} />
-        {grids.map((grid, fIdx) => grid.map((row, z) => row.map((tile, x) => {
-          if (tile !== 7 && tile !== 1 && tile !== 6) return <Instance key={`ceil-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 4.0, z + 0.5]} rotation={[Math.PI / 2, 0, 0]} />;
-          return null;
-        })))}
-      </Instances>
-
       {grids.map((grid, fIdx) => (
-        <group key={`interactive-${fIdx}`} position={[0, fIdx * 4, 0]}>
+        <group key={`floor-group-${fIdx}`} position={[0, fIdx * 4, 0]}>
           {grid.map((row, z) =>
             row.map((tile, x) => {
               const elements = [];
-              if (tile === 2 || tile === 8) elements.push(<DoorMesh key="door" position={[x + 0.5, 0, z + 0.5]} grid={grid} gx={x} gz={z} isOpened={tile === 8} wallTexture={wallTexture} />);
-              if (tile === 3) elements.push(<ElevatorMesh key="elev" position={[x + 0.5, 0, z + 0.5]} wallTexture={wallTexture} />);
+              
+              if (tile === 1) {
+                elements.push(
+                  <mesh key="wall" position={[x + 0.5, 2.0, z + 0.5]}>
+                    <boxGeometry args={[1, 4, 1]} />
+                    <meshStandardMaterial map={textures.wall} color="#ffffff" roughness={0.9} />
+                  </mesh>
+                );
+              }
+              
+              if (tile === 2 || tile === 8) elements.push(<DoorMesh key="door" position={[x + 0.5, 0, z + 0.5]} grid={grid} gx={x} gz={z} isOpened={tile === 8} wallTexture={textures.wall} />);
+              if (tile === 3) elements.push(<ElevatorMesh key="elev" position={[x + 0.5, 0, z + 0.5]} wallTexture={textures.wall} />);
               if (tile === 4) elements.push(<TerminalMesh key="term" position={[x + 0.5, 0, z + 0.5]} />);
               if (tile === 5) elements.push(<KeycardMesh key="key" position={[x + 0.5, 0, z + 0.5]} />);
-              if (tile === 6) elements.push(<LitWindowMesh key="window" position={[x + 0.5, 0, z + 0.5]} grid={grid} gx={x} gz={z} />);
-              return <group key={`int-${x}-${z}`}>{elements}</group>;
+              
+              if (tile === 6) {
+                elements.push(
+                  <mesh key="window-wall" position={[x + 0.5, 2.0, z + 0.5]}>
+                    <boxGeometry args={[1, 4, 1]} />
+                    <meshStandardMaterial map={textures.wall} color="#ffffff" roughness={0.9} />
+                  </mesh>
+                );
+                elements.push(<LitWindowMesh key="window" position={[x + 0.5, 0, z + 0.5]} grid={grid} gx={x} gz={z} texture={textures.windowLit} />);
+              }
+
+              if (tile !== 7 && tile !== 1 && tile !== 6) {
+                elements.push(
+                  <mesh key="floor" position={[x + 0.5, 0, z + 0.5]} rotation={[-Math.PI / 2, 0, 0]} userData={{ walkable: true }}>
+                    <planeGeometry args={[1, 1]} />
+                    <meshStandardMaterial map={textures.floor} color="#ffffff" roughness={1.0} side={THREE.DoubleSide} />
+                  </mesh>
+                );
+                elements.push(
+                  <mesh key="ceiling" position={[x + 0.5, 4.0, z + 0.5]} rotation={[Math.PI / 2, 0, 0]}>
+                    <planeGeometry args={[1, 1]} />
+                    <meshStandardMaterial color="#18181b" roughness={1.0} side={THREE.DoubleSide} />
+                  </mesh>
+                );
+              }
+              return <group key={`${x}-${z}`}>{elements}</group>;
             })
           )}
         </group>
@@ -328,23 +331,19 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
         <SpiralStaircase position={[16.5, 4.0, 9.5]} />
       </group>
 
-      <PlayerControls grids={grids} stairsRef={stairsRef} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
+      <PlayerControls grids={grids} stairsRef={stairsRef} textures={textures} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
     </>
   );
 }
 
 export default function DungeonEngine({ grids, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   return (
-    // REMOVED CSS imageRendering: pixelated to fix Chromium pointer-lock crash
-    <div className="w-full h-screen bg-black relative cursor-crosshair">
+    <div className="w-full h-screen bg-black relative">
       <Canvas camera={{ position: [2.5, 0.8, 2.5], fov: 80, near: 0.01, far: 50 }} gl={{ antialias: false }}>
         <fog attach="fog" args={['#000000', 3, 16]} />
         <ambientLight intensity={0.6} color="#ffffff" />
-        <Suspense fallback={null}>
-          <DungeonScene grids={grids} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
-        </Suspense>
+        <DungeonScene grids={grids} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
       </Canvas>
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-red-600 text-3xl font-bold select-none">+</div>
     </div>
   );
 }
