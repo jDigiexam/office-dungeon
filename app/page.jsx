@@ -142,11 +142,25 @@ export default function EscapeRoomPage() {
 
             <div className="bg-stone-950 border-2 border-stone-700 px-4 py-1 flex flex-col items-center justify-center min-w-[180px]">
               <span className="text-[10px] text-stone-500 font-bold">INVENTORY</span>
-              <div className="flex gap-2 mt-1">
+              <div className="flex gap-3 mt-1">
                 {inventory.length === 0 ? <span className="text-xs text-stone-600">NONE</span> : 
-                  inventory.map((item, idx) => (
-                    <span key={idx} className="bg-red-950 border border-red-600 text-red-400 px-2 py-0.5 text-[10px] font-bold">{item}</span>
-                  ))}
+                  inventory.map((item, idx) => {
+                    let imgSrc = '';
+                    if (item === 'RED KEYCARD') imgSrc = '/red_keycard_mini.png';
+                    if (item === 'BLUE KEYCARD') imgSrc = '/blue_keycard_mini.png';
+                    if (item === 'YELLOW KEYCARD') imgSrc = '/yellow_keycard_mini.png';
+                    
+                    return (
+                      <img 
+                        key={idx} 
+                        src={imgSrc} 
+                        alt={item} 
+                        className="h-6 w-auto object-contain" 
+                        style={{ imageRendering: 'pixelated' }} 
+                      />
+                    );
+                  })
+                }
               </div>
             </div>
           </div>
