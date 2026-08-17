@@ -32,20 +32,21 @@ function TerminalMesh({ position }) {
   );
 }
 
-function LitWindowMesh({ position, grid, gx, gz, texture }) {
-  let rotY = 0; let offsetX = 0; let offsetZ = 0;
-  if (gx > 0 && grid[gz][gx - 1] === 0) { offsetX = -0.505; rotY = -Math.PI / 2; }
-  else if (gx < grid[0].length - 1 && grid[gz][gx + 1] === 0) { offsetX = 0.505; rotY = Math.PI / 2; }
-  else if (gz > 0 && grid[gz - 1][gx] === 0) { offsetZ = -0.505; rotY = Math.PI; }
-  else if (gz < grid.length - 1 && grid[gz + 1][gx] === 0) { offsetZ = 0.505; rotY = 0; }
-
+function CeilingLightMesh({ position, texture }) {
   return (
-    <group position={[position[0] + offsetX, position[1], position[2] + offsetZ]} rotation={[0, rotY, 0]}>
-      <mesh position={[0, 2.0, 0]}>
+    <group position={[position[0], 3.98, position[2]]} rotation={[Math.PI / 2, 0, 0]}>
+      {/* Dark Ceiling Tile Base */}
+      <mesh>
+        <planeGeometry args={[1, 1]} />
+        <meshStandardMaterial color="#18181b" roughness={1.0} />
+      </mesh>
+      {/* Glowing Panel offset downward slightly */}
+      <mesh position={[0, 0, 0.01]}>
         <planeGeometry args={[0.6, 0.6]} />
         <meshStandardMaterial map={texture} emissive="#f59e0b" emissiveIntensity={1} emissiveMap={texture} transparent={true} />
       </mesh>
-      <pointLight position={[0, 2.0, 0.3]} intensity={3.5} distance={12} color="#fbbf24" />
+      {/* Point light casting downward into the room */}
+      <pointLight position={[0, 0, 0.3]} intensity={3.5} distance={12} color="#fbbf24" />
     </group>
   );
 }
@@ -66,10 +67,10 @@ function ElevatorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTextu
   });
 
   let rotY = 0;
-  if (grid[gz + 1]?.[gx] === 0 || grid[gz + 1]?.[gx] === 2) rotY = 0;
-  else if (grid[gz - 1]?.[gx] === 0 || grid[gz - 1]?.[gx] === 2) rotY = Math.PI;
-  else if (grid[gz]?.[gx + 1] === 0 || grid[gz]?.[gx + 1] === 2) rotY = Math.PI / 2;
-  else if (grid[gz]?.[gx - 1] === 0 || grid[gz]?.[gx - 1] === 2) rotY = -Math.PI / 2;
+  if (grid[gz + 1]?.[gx] === 0 || grid[gz + 1]?.[gx] === 2 || grid[gz + 1]?.[gx] === 6) rotY = 0;
+  else if (grid[gz - 1]?.[gx] === 0 || grid[gz - 1]?.[gx] === 2 || grid[gz - 1]?.[gx] === 6) rotY = Math.PI;
+  else if (grid[gz]?.[gx + 1] === 0 || grid[gz]?.[gx + 1] === 2 || grid[gz]?.[gx + 1] === 6) rotY = Math.PI / 2;
+  else if (grid[gz]?.[gx - 1] === 0 || grid[gz]?.[gx - 1] === 2 || grid[gz]?.[gx - 1] === 6) rotY = -Math.PI / 2;
 
   return (
     <group position={position} rotation={[0, rotY, 0]}>
@@ -262,8 +263,9 @@ function PlayerControls({ grids, stairsRef, handTexture, onInteract, teleportCoo
       const gx = Math.floor(x); const gz = Math.floor(z);
       if (gz < 0 || gz >= grids[currentFIdx].length || gx < 0 || gx >= grids[currentFIdx][0].length) return true;
       const tile = grids[currentFIdx][gz][gx];
-      // 🚨 FIX: Added tile 6 (Window) and 4 (Terminal) so you can no longer walk through them!
-      return tile === 1 || tile === 2 || tile === 3 || tile === 4 || tile === 6;
+      // 🚨 FIX: Removed '6' from the list of Solid Tiles so you can walk underneath the ceiling lights!
+      // '4' remains solid so you can't walk through computer terminals.
+      return tile === 1 || tile === 2 || tile === 3 || tile === 4;
     };
 
     const collidesAt = (x, z) => (
@@ -346,7 +348,8 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
           <meshStandardMaterial map={tex} color="#ffffff" roughness={0.9} />
           {grids.map((grid, fIdx) => fIdx < 2 && grid.map((row, z) => row.map((tile, x) => {
             if (getTextureIndex(x, z, fIdx, woodTexList.length) !== texIdx) return null;
-            if (tile === 1 || tile === 6) return <Instance key={`wwall-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 2.0, z + 0.5]} />;
+            // 🚨 REMOVED tile === 6 FROM WALL RENDERER
+            if (tile === 1) return <Instance key={`wwall-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 2.0, z + 0.5]} />;
             if (tile === 2 || tile === 8) return <Instance key={`wlintel-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 3.0, z + 0.5]} scale={[1, 0.5, 1]} />;
             return null;
           })))}
@@ -359,7 +362,8 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
           <meshStandardMaterial map={tex} color="#ffffff" roughness={0.9} />
           {grids.map((grid, fIdx) => fIdx >= 2 && grid.map((row, z) => row.map((tile, x) => {
             if (getTextureIndex(x, z, fIdx, stoneTexList.length) !== texIdx) return null;
-            if (tile === 1 || tile === 6) return <Instance key={`swall-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 2.0, z + 0.5]} />;
+            // 🚨 REMOVED tile === 6 FROM WALL RENDERER
+            if (tile === 1) return <Instance key={`swall-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 2.0, z + 0.5]} />;
             if (tile === 2 || tile === 8) return <Instance key={`slintel-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 3.0, z + 0.5]} scale={[1, 0.5, 1]} />;
             return null;
           })))}
@@ -370,7 +374,8 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
         <planeGeometry args={[1, 1]} />
         <meshStandardMaterial map={tFloorWood} color="#ffffff" roughness={1.0} />
         {grids.map((grid, fIdx) => fIdx < 2 && grid.map((row, z) => row.map((tile, x) => {
-          if (tile !== 7 && tile !== 1 && tile !== 6 && tile !== 3 && tile !== 10) return <Instance key={`wfloor-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4, z + 0.5]} rotation={[-Math.PI / 2, 0, 0]} />;
+          // 🚨 REMOVED tile !== 6 FROM FLOOR EXCLUSIONS SO CEILING LIGHTS STILL GET A FLOOR TILE
+          if (tile !== 7 && tile !== 1 && tile !== 3 && tile !== 10) return <Instance key={`wfloor-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4, z + 0.5]} rotation={[-Math.PI / 2, 0, 0]} />;
           return null;
         })))}
       </Instances>
@@ -379,7 +384,7 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
         <planeGeometry args={[1, 1]} />
         <meshStandardMaterial map={tFloorStone} color="#ffffff" roughness={1.0} />
         {grids.map((grid, fIdx) => fIdx >= 2 && grid.map((row, z) => row.map((tile, x) => {
-          if (tile !== 7 && tile !== 1 && tile !== 6 && tile !== 3 && tile !== 10) return <Instance key={`sfloor-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4, z + 0.5]} rotation={[-Math.PI / 2, 0, 0]} />;
+          if (tile !== 7 && tile !== 1 && tile !== 3 && tile !== 10) return <Instance key={`sfloor-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4, z + 0.5]} rotation={[-Math.PI / 2, 0, 0]} />;
           return null;
         })))}
       </Instances>
@@ -388,6 +393,7 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
         <planeGeometry args={[1, 1]} />
         <meshStandardMaterial color="#18181b" roughness={1.0} />
         {grids.map((grid, fIdx) => grid.map((row, z) => row.map((tile, x) => {
+          // Keep tile 6 excluded from standard dark ceilings so our special glowing CeilingLightMesh can take its place!
           if (tile !== 7 && tile !== 1 && tile !== 6 && tile !== 3 && tile !== 10) return <Instance key={`ceil-${fIdx}-${x}-${z}`} position={[x + 0.5, fIdx * 4 + 3.98, z + 0.5]} rotation={[Math.PI / 2, 0, 0]} />;
           return null;
         })))}
@@ -406,7 +412,8 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
               if (tile === 3 || tile === 10) elements.push(<ElevatorMesh key="elev" position={[x + 0.5, 0, z + 0.5]} grid={grid} gx={x} gz={z} isOpened={tile === 10} wallTexture={wTex} doorTexture={tDoorMetalFrame} litTexture={tWindow} />);
               if (tile === 4) elements.push(<TerminalMesh key="term" position={[x + 0.5, 0, z + 0.5]} />);
               if (tile === 5) elements.push(<KeycardMesh key="key" position={[x + 0.5, 0, z + 0.5]} />);
-              if (tile === 6) elements.push(<LitWindowMesh key="window" position={[x + 0.5, 0, z + 0.5]} grid={grid} gx={x} gz={z} texture={tWindow} />);
+              // 🚨 RENDER THE NEW CEILING LIGHT MESH
+              if (tile === 6) elements.push(<CeilingLightMesh key="window" position={[x + 0.5, 0, z + 0.5]} texture={tWindow} />);
               return <group key={`int-${x}-${z}`}>{elements}</group>;
             })
           )}
