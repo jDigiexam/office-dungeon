@@ -47,7 +47,7 @@ function createBuffer() {
 }
 
 // ----------------------------------------------------
-// 2. 3D INTERACTIVE OBJECTS
+// 2. 3D INTERACTIVE OBJECTS (UPDATED FOR 2.5 HEIGHT)
 // ----------------------------------------------------
 function KeycardMesh({ position, texture, color }) {
   const cardRef = useRef();
@@ -74,7 +74,7 @@ function TerminalMesh({ position }) {
 
 function CeilingLightMesh({ position, texture }) {
   return (
-    <group position={[position[0], 3.98, position[2]]} rotation={[Math.PI / 2, 0, 0]}>
+    <group position={[position[0], position[1] + 2.47, position[2]]} rotation={[Math.PI / 2, 0, 0]}>
       <mesh><planeGeometry args={[1, 1]} /><meshStandardMaterial color="#18181b" roughness={1.0} /></mesh>
       <mesh position={[0, 0, 0.01]}><planeGeometry args={[0.6, 0.6]} /><meshStandardMaterial map={texture} emissive="#f59e0b" emissiveIntensity={2.5} emissiveMap={texture} transparent={true} /></mesh>
     </group>
@@ -104,11 +104,11 @@ function ElevatorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTextu
 
   return (
     <group position={position} rotation={[0, rotY, 0]}>
-      <mesh position={[0, 3.0, 0.4]}><boxGeometry args={[1, 2.0, 0.2]} /><meshStandardMaterial map={wallTexture} roughness={0.9} /></mesh>
-      <mesh position={[0, 2.0, -0.45]}><boxGeometry args={[1, 4.0, 0.1]} /><meshStandardMaterial color="#27272a" /></mesh>
-      <mesh position={[-0.45, 2.0, 0]}><boxGeometry args={[0.1, 4.0, 0.8]} /><meshStandardMaterial color="#27272a" /></mesh>
-      <mesh position={[0.45, 2.0, 0]}><boxGeometry args={[0.1, 4.0, 0.8]} /><meshStandardMaterial color="#27272a" /></mesh>
-      <mesh position={[0, 3.99, 0]} rotation={[Math.PI / 2, 0, 0]}><planeGeometry args={[1, 1]} /><meshStandardMaterial color="#18181b" /></mesh>
+      <mesh position={[0, 2.25, 0.4]}><boxGeometry args={[1, 0.5, 0.2]} /><meshStandardMaterial map={wallTexture} roughness={0.9} /></mesh>
+      <mesh position={[0, 1.0, -0.45]}><boxGeometry args={[1, 2.0, 0.1]} /><meshStandardMaterial color="#27272a" /></mesh>
+      <mesh position={[-0.45, 1.0, 0]}><boxGeometry args={[0.1, 2.0, 0.8]} /><meshStandardMaterial color="#27272a" /></mesh>
+      <mesh position={[0.45, 1.0, 0]}><boxGeometry args={[0.1, 2.0, 0.8]} /><meshStandardMaterial color="#27272a" /></mesh>
+      <mesh position={[0, 2.48, 0]} rotation={[Math.PI / 2, 0, 0]}><planeGeometry args={[1, 1]} /><meshStandardMaterial color="#18181b" /></mesh>
       <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[1, 1]} /><meshStandardMaterial color="#3f3f46" /></mesh>
       <group position={[0, 0, 0.4]}>
         <mesh ref={leftDoor} position={[-0.25, 1.0, 0]}><boxGeometry args={[0.5, 2.0, 0.05]} /><meshStandardMaterial map={doorTexture} roughness={0.5} emissive="#ffffff" emissiveMap={doorTexture} emissiveIntensity={0.25} /></mesh>
@@ -130,7 +130,8 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTexture, 
   
   return (
     <group position={position} rotation={[0, rotY, 0]}>
-      <mesh position={[0, 3.0, 0]}><boxGeometry args={[1, 2.0, 1]} /><meshStandardMaterial map={wallTexture} roughness={0.9} /></mesh>
+      {/* Lintel block sits right beneath the new lower ceiling */}
+      <mesh position={[0, 2.25, 0]}><boxGeometry args={[1, 0.5, 1]} /><meshStandardMaterial map={wallTexture} roughness={0.9} /></mesh>
       <group ref={groupRef}>
         <mesh position={[0, 1.0, 0]}><boxGeometry args={[1, 2.0, 0.15]} /><meshStandardMaterial map={doorTexture} color={isOpened ? "#a8a29e" : "#ffffff"} roughness={0.8} emissive="#ffffff" emissiveMap={doorTexture} emissiveIntensity={0.25} /></mesh>
         <mesh position={[0.35, 1.0, 0.08]}><boxGeometry args={[0.1, 0.2, 0.02]} /><meshStandardMaterial color={isOpened ? "#22c55e" : trimColor} emissive={isOpened ? "#16a34a" : trimColor} emissiveIntensity={1} /></mesh>
@@ -143,7 +144,7 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTexture, 
 // ----------------------------------------------------
 // 3. BULLETPROOF PHYSICS & CONTROLS
 // ----------------------------------------------------
-function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
+function PlayerControls({ grids, elevationMaps, handTexture, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   const controlsRef = useRef();
   const moveState = useRef({ forward: false, backward: false, left: false, right: false });
   const currentFloorRef = useRef(0);
@@ -158,18 +159,6 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
       clearTeleport();
     }
   }, [teleportCoords, camera, clearTeleport]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      let fIdx = Math.round(camera.position.y / 4);
-      fIdx = Math.max(0, Math.min(2, fIdx));
-      if (fIdx !== currentFloorRef.current) {
-        currentFloorRef.current = fIdx;
-        onFloorChange(fIdx);
-      }
-    }, 250);
-    return () => clearInterval(interval);
-  }, [camera, onFloorChange]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -213,7 +202,21 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
     else bobTime.current = THREE.MathUtils.lerp(bobTime.current, 0, safeDelta * 10);
     const bobOffset = Math.sin(bobTime.current) * 0.05; 
 
-    camera.position.y = THREE.MathUtils.lerp(camera.position.y, currentFloorRef.current * 4.0 + 0.8 + bobOffset, 0.4);
+    const currentFIdx = currentFloorRef.current;
+    
+    // 🚨 FETCH ELEVATION FOR CURRENT TILE
+    const currX = Math.floor(camera.position.x);
+    const currZ = Math.floor(camera.position.z);
+    let floorY = currentFIdx * 4.0;
+    
+    if (grids[currentFIdx] && currZ >= 0 && currZ < grids[currentFIdx].length && currX >= 0 && currX < grids[currentFIdx][0].length) {
+       const cols = grids[currentFIdx][0].length;
+       const elev = elevationMaps[currentFIdx]?.[currZ * cols + currX] ?? 0;
+       floorY = currentFIdx * 4.0 + (elev * 1.0);
+    }
+
+    // Faster 0.2 lerp ensures snappy stairs/ramp climbing
+    camera.position.y = THREE.MathUtils.lerp(camera.position.y, floorY + 0.8 + bobOffset, 0.2);
 
     if (handRef.current) {
       const handOffset = new THREE.Vector3(0.18, -0.15, -0.3);
@@ -224,7 +227,6 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
       handRef.current.rotation.z += Math.cos(bobTime.current / 2) * 0.02; 
     }
 
-    const currentFIdx = currentFloorRef.current;
     const oldX = camera.position.x;
     const oldZ = camera.position.z;
 
@@ -235,12 +237,13 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
 
     const newX = camera.position.x;
     const newZ = camera.position.z;
-
     const radius = 0.22;
+
     const isSolidTile = (x, z) => {
       const gx = Math.floor(x); const gz = Math.floor(z);
       if (gz < 0 || gz >= grids[currentFIdx].length || gx < 0 || gx >= grids[currentFIdx][0].length) return true;
       const tile = grids[currentFIdx][gz][gx];
+      // Notice 7 and 9 are missing here: The player can safely walk straight through them!
       return [1, 2, 12, 22, 3, 4].includes(tile);
     };
 
@@ -307,12 +310,88 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     const sFloorBuff = createBuffer();
     const ceilBuff = createBuffer();
     
+    // Step Buffers to visually connect height changes
+    const wStepBuff = createBuffer();
+    const sStepBuff = createBuffer();
+    const ceilStepBuff = createBuffer();
+    
     const interactives = [];
+    const heightMaps = [];
     let totalFloors = 0;
 
+    // 🚨 1. BLAZING FAST HEIGHT MAP BFS SCANNER
     for (let fIdx = 0; fIdx < grids.length; fIdx++) {
       const grid = grids[fIdx];
-      if (!grid) continue;
+      if (!grid) { heightMaps.push(null); continue; }
+      
+      const rows = grid.length;
+      const cols = grid[0].length;
+      const hMap = new Int16Array(rows * cols);
+      hMap.fill(-9999);
+      
+      const q = new Int32Array(rows * cols * 2);
+      let qHead = 0; let qTail = 0;
+      
+      for (let z = 0; z < rows; z++) {
+        for (let x = 0; x < cols; x++) {
+          const idx = z * cols + x;
+          if (grid[z][x] !== 1 && hMap[idx] === -9999) {
+            q[qTail++] = x; q[qTail++] = z;
+            hMap[idx] = 0;
+            
+            while (qHead < qTail) {
+              const cx = q[qHead++]; const cz = q[qHead++];
+              const cElev = hMap[cz * cols + cx];
+              const nx = [cx+1, cx-1, cx, cx]; const nz = [cz, cz, cz+1, cz-1];
+              
+              for (let i = 0; i < 4; i++) {
+                const xx = nx[i]; const zz = nz[i];
+                if (xx >= 0 && xx < cols && zz >= 0 && zz < rows) {
+                  const nIdx = zz * cols + xx;
+                  if (hMap[nIdx] === -9999) {
+                     const t = grid[zz][xx];
+                     if (t === 1) continue;
+                     let nElev = cElev;
+                     if (t === 7) nElev = cElev + 1; // Step Up
+                     if (t === 9) nElev = cElev - 1; // Step Down
+                     hMap[nIdx] = nElev;
+                     q[qTail++] = xx; q[qTail++] = zz;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      for (let z = 0; z < rows; z++) {
+        for (let x = 0; x < cols; x++) {
+          const idx = z * cols + x;
+          if (grid[z][x] === 1 || hMap[idx] === -9999) {
+             let maxE = 0; let hasN = false;
+             for(let dz = -1; dz <= 1; dz++) {
+               for(let dx = -1; dx <= 1; dx++) {
+                 const xx = x + dx; const zz = z + dz;
+                 if (xx >= 0 && xx < cols && zz >= 0 && zz < rows) {
+                   const nIdx = zz * cols + xx;
+                   if (grid[zz][xx] !== 1 && hMap[nIdx] !== -9999) {
+                     if (!hasN || hMap[nIdx] > maxE) { maxE = hMap[nIdx]; hasN = true; }
+                   }
+                 }
+               }
+             }
+             hMap[idx] = hasN ? maxE : 0;
+          }
+        }
+      }
+      heightMaps.push(hMap);
+    }
+
+    // 🚨 2. RENDER PASS WITH DYNAMIC Y OFFSETS
+    for (let fIdx = 0; fIdx < grids.length; fIdx++) {
+      const grid = grids[fIdx];
+      const hMap = heightMaps[fIdx];
+      if (!grid || !hMap) continue;
       
       const isWoodFloor = fIdx < 2;
       const wLen = woodTexList.length;
@@ -323,6 +402,8 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
       for (let z = 0; z < rows; z++) {
         for (let x = 0; x < cols; x++) {
           const tile = grid[z][x];
+          const elev = hMap[z * cols + x];
+          const baseY = fIdx * 4.0 + (elev * 1.0);
           
           if (tile === 1) {
             let isVisible = false;
@@ -333,7 +414,8 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
 
             if (isVisible) {
               const tIdx = (x * 7 + z * 13 + fIdx * 3) % (isWoodFloor ? wLen : sLen);
-              dummy.position.set(x + 0.5, fIdx * 4 + 2.0, z + 0.5);
+              // Wall goes from baseY - 0.75 to baseY + 3.25, ensuring it covers steps
+              dummy.position.set(x + 0.5, baseY + 1.25, z + 0.5);
               dummy.rotation.set(0, 0, 0);
               dummy.scale.set(1, 1, 1);
               if (isWoodFloor) wWallsBuffs[tIdx].add(dummy); else sWallsBuffs[tIdx].add(dummy);
@@ -341,43 +423,38 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
             continue; 
           }
 
-          // 🚨 FIX: Re-enable ceiling rendering for tile 7 and 9
           if (![3,10].includes(tile) && tile !== 6) {
-            dummy.position.set(x + 0.5, fIdx * 4 + 3.98, z + 0.5);
+            dummy.position.set(x + 0.5, baseY + 2.48, z + 0.5); // New Cozy Ceiling Height
             dummy.rotation.set(Math.PI / 2, 0, 0);
             dummy.scale.set(1, 1, 1);
             ceilBuff.add(dummy);
           }
 
-          // 🚨 FIX: Re-enable floor rendering for tile 7 and 9 to patch the black gaps
           if (![3,10].includes(tile)) {
             totalFloors++;
             if (totalFloors > 1500000) return { error: "TOO_MANY_FLOORS", count: totalFloors };
             
-            dummy.position.set(x + 0.5, fIdx * 4, z + 0.5);
+            dummy.position.set(x + 0.5, baseY, z + 0.5);
             dummy.rotation.set(-Math.PI / 2, 0, 0);
             dummy.scale.set(1, 1, 1);
             if (isWoodFloor) wFloorBuff.add(dummy); else sFloorBuff.add(dummy);
           }
 
-          // 🚨 NEW: Draw a physical raised step block for Tile 7 (Elevation UP)
-          if (tile === 7) {
-            dummy.position.set(x + 0.5, fIdx * 4 + 0.25, z + 0.5);
+          // 🚨 TILE 7 & 9 GAP SEALERS (Creates physical step boxes)
+          if (tile === 7 || tile === 9) {
+            dummy.position.set(x + 0.5, baseY - 0.5, z + 0.5);
             dummy.rotation.set(0, 0, 0);
-            dummy.scale.set(1, 0.5, 1);
-            if (isWoodFloor) wWallsBuffs[0].add(dummy); else sWallsBuffs[0].add(dummy);
-          }
-
-          if ([2,8,12,18,22,28].includes(tile)) {
-            const tIdx = (x * 7 + z * 13 + fIdx * 3) % (isWoodFloor ? wLen : sLen);
-            dummy.position.set(x + 0.5, fIdx * 4 + 3.0, z + 0.5);
+            dummy.scale.set(1, 1, 1);
+            if (isWoodFloor) wStepBuff.add(dummy); else sStepBuff.add(dummy);
+            
+            dummy.position.set(x + 0.5, baseY + 2.98, z + 0.5);
             dummy.rotation.set(0, 0, 0);
-            dummy.scale.set(1, 0.5, 1);
-            if (isWoodFloor) wWallsBuffs[tIdx].add(dummy); else sWallsBuffs[tIdx].add(dummy);
+            dummy.scale.set(1, 1, 1);
+            ceilStepBuff.add(dummy);
           }
 
           if ([2,8,12,18,22,28, 3,10, 4, 5,15,25, 6].includes(tile)) {
-            interactives.push({ tile, x, z, fIdx });
+            interactives.push({ tile, x, z, fIdx, baseY });
             if (interactives.length > 5000) return { error: "TOO_MANY_ENTITIES", count: interactives.length };
           }
         }
@@ -390,6 +467,10 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
       wFloorFinal: wFloorBuff.finalize(), 
       sFloorFinal: sFloorBuff.finalize(), 
       ceilFinal: ceilBuff.finalize(), 
+      wStepFinal: wStepBuff.finalize(),
+      sStepFinal: sStepBuff.finalize(),
+      ceilStepFinal: ceilStepBuff.finalize(),
+      elevationMaps: heightMaps,
       interactiveElements: interactives 
     };
   }, [grids, woodTexList.length, stoneTexList.length]);
@@ -405,7 +486,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     );
   }
 
-  const { wWallsFinal, sWallsFinal, wFloorFinal, sFloorFinal, ceilFinal, interactiveElements } = parsedData;
+  const { wWallsFinal, sWallsFinal, wFloorFinal, sFloorFinal, ceilFinal, wStepFinal, sStepFinal, ceilStepFinal, elevationMaps, interactiveElements } = parsedData;
 
   return (
     <>
@@ -421,12 +502,15 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
 
       <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorWood, color: "#ffffff", roughness: 1.0}} bufferData={wFloorFinal} />
       <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorStone, color: "#ffffff", roughness: 1.0}} bufferData={sFloorFinal} />
-      
-      {/* 🚨 FIX: Upgraded ceiling to use a textured DoubleSide plane so it properly reflects your flashlight */}
       <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorStone, color: "#71717a", roughness: 0.9, side: THREE.DoubleSide}} bufferData={ceilFinal} />
 
+      {/* 🚨 THE NEW ELEVATION CONNECTOR BLOCKS */}
+      <FastInstancedMesh geometryArgs={{type: 'box', args: [1, 1, 1]}} materialProps={{map: tFloorWood, color: "#ffffff", roughness: 1.0}} bufferData={wStepFinal} />
+      <FastInstancedMesh geometryArgs={{type: 'box', args: [1, 1, 1]}} materialProps={{map: tFloorStone, color: "#ffffff", roughness: 1.0}} bufferData={sStepFinal} />
+      <FastInstancedMesh geometryArgs={{type: 'box', args: [1, 1, 1]}} materialProps={{map: tFloorStone, color: "#71717a", roughness: 0.9}} bufferData={ceilStepFinal} />
+
       {interactiveElements.map((el, idx) => {
-        const { tile, x, z, fIdx } = el;
+        const { tile, x, z, fIdx, baseY } = el;
         const wTexList = fIdx < 2 ? woodTexList : stoneTexList;
         const wTex = wTexList[(x * 7 + z * 13 + fIdx * 3) % wTexList.length];
         const dTex = fIdx < 2 ? tDoorWood : tDoorMetal;
@@ -435,20 +519,20 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
           let trimColor = "#dc2626";
           if (tile === 12 || tile === 18) trimColor = "#2563eb";
           if (tile === 22 || tile === 28) trimColor = "#eab308";
-          return <DoorMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={[8,18,28].includes(tile)} wallTexture={wTex} doorTexture={dTex} trimColor={trimColor} />;
+          return <DoorMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={[8,18,28].includes(tile)} wallTexture={wTex} doorTexture={dTex} trimColor={trimColor} />;
         }
-        if (tile === 3 || tile === 10) return <ElevatorMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={tile === 10} wallTexture={wTex} doorTexture={tDoorMetalFrame} litTexture={tWindow} />;
-        if (tile === 4) return <TerminalMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} />;
+        if (tile === 3 || tile === 10) return <ElevatorMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={tile === 10} wallTexture={wTex} doorTexture={tDoorMetalFrame} litTexture={tWindow} />;
+        if (tile === 4) return <TerminalMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} />;
         
-        if (tile === 5) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} texture={tKeyRed} color="#8B0000" />;
-        if (tile === 15) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} texture={tKeyBlue} color="#00008B" />;
-        if (tile === 25) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} texture={tKeyYellow} color="#B8860B" />;
+        if (tile === 5) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tKeyRed} color="#8B0000" />;
+        if (tile === 15) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tKeyBlue} color="#00008B" />;
+        if (tile === 25) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tKeyYellow} color="#B8860B" />;
         
-        if (tile === 6) return <CeilingLightMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} texture={tWindow} />;
+        if (tile === 6) return <CeilingLightMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tWindow} />;
         return null;
       })}
       
-      <PlayerControls grids={grids} handTexture={tHand} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
+      <PlayerControls grids={grids} elevationMaps={elevationMaps} handTexture={tHand} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
     </>
   );
 }
