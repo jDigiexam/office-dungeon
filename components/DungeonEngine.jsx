@@ -8,7 +8,7 @@ import * as THREE from 'three';
 // ----------------------------------------------------
 // 1. CONSTANTS
 // ----------------------------------------------------
-const FLOOR_HT = 3.2; // A comfortable, breathable height (down from 4.0, up from 2.5)
+const FLOOR_HT = 3.2; 
 
 // ----------------------------------------------------
 // 2. RAW C-LEVEL MEMORY BUFFER
@@ -182,6 +182,9 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // 🚨 FIX: Ignore OS-level key repeats to prevent event loop flooding!
+      if (e.repeat) return; 
+
       const key = e.key.toLowerCase();
       if (key === 'w') moveState.current.forward = true;
       if (key === 's') moveState.current.backward = true;
@@ -199,6 +202,7 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
         }
       }
     };
+    
     const handleKeyUp = (e) => {
       const key = e.key.toLowerCase();
       if (key === 'w') moveState.current.forward = false;
@@ -206,6 +210,7 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
       if (key === 'a') moveState.current.left = false;
       if (key === 'd') moveState.current.right = false;
     };
+    
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     return () => { window.removeEventListener('keydown', handleKeyDown); window.removeEventListener('keyup', handleKeyUp); };
@@ -224,7 +229,6 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
 
     const currentFIdx = currentFloorRef.current;
     
-    // Snappy, flat terrain lerping with a 1.2 unit eye level
     camera.position.y = THREE.MathUtils.lerp(camera.position.y, currentFIdx * FLOOR_HT + 1.2 + bobOffset, 0.4);
 
     if (handRef.current) {
@@ -305,7 +309,6 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     [...woodTexList, ...stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow].forEach(t => {
       if(t) { t.magFilter = t.minFilter = THREE.NearestFilter; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.needsUpdate = true; }
     });
-    // Adjust repeat to match the new 3.2 wall height proportions
     woodTexList.forEach(t => t.repeat.set(1, 3.2));
     stoneTexList.forEach(t => t.repeat.set(1, 3.2));
   }, [woodTexList, stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow]);
@@ -376,7 +379,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
             const lintelHt = FLOOR_HT - 2.0;
             dummy.position.set(x + 0.5, baseY + 2.0 + (lintelHt/2), z + 0.5);
             dummy.rotation.set(0, 0, 0);
-            dummy.scale.set(1, lintelHt / FLOOR_HT, 1); // Scale dynamically relative to full wall height
+            dummy.scale.set(1, lintelHt / FLOOR_HT, 1); 
             if (isWoodFloor) wWallsBuffs[tIdx].add(dummy); else sWallsBuffs[tIdx].add(dummy);
           }
 
