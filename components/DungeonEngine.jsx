@@ -30,11 +30,10 @@ function FastInstancedMesh({ geometryArgs, materialProps, bufferData }) {
 
 // Helper to construct continuous memory arrays
 function createBuffer() {
-  let data = new Float32Array(1000 * 16); // Start with room for 1,000 blocks
+  let data = new Float32Array(1000 * 16); 
   let count = 0;
   return {
     add: (dummy) => {
-      // If the buffer is full, double its size to ensure no array overflow
       if (count * 16 >= data.length) {
         const newData = new Float32Array(data.length * 2);
         newData.set(data);
@@ -44,7 +43,7 @@ function createBuffer() {
       data.set(dummy.matrix.elements, count * 16);
       count++;
     },
-    finalize: () => ({ array: data.slice(0, count * 16), count }) // Trim to exact size
+    finalize: () => ({ array: data.slice(0, count * 16), count })
   };
 }
 
@@ -243,6 +242,7 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
       const gx = Math.floor(x); const gz = Math.floor(z);
       if (gz < 0 || gz >= grids[currentFIdx].length || gx < 0 || gx >= grids[currentFIdx][0].length) return true;
       const tile = grids[currentFIdx][gz][gx];
+      // 🚨 Ensure we use the new tile identifiers for our physics checks
       return [1, 2, 12, 22, 3, 4].includes(tile);
     };
 
@@ -270,7 +270,7 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
 // ----------------------------------------------------
 // 4. MAIN SCENE RENDERING
 // ----------------------------------------------------
-function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
+function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
   const woodTexList = useTexture([
     '/wall_timber_structure_cross.png', '/wall_timber_structure_diagonal.png',
     '/wall_timber_structure_vertical.png', '/wall_timber_structure.png'
@@ -296,7 +296,6 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
     stoneTexList.forEach(t => t.repeat.set(1, 4));
   }, [woodTexList, stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow]);
 
-  // Use pure Matrix Buffers to completely eliminate JS Array RAM spikes
   const parsedData = useMemo(() => {
     const dummy = new THREE.Object3D();
     
@@ -349,7 +348,8 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
 
           if (![7,3,10].includes(tile)) {
             totalFloors++;
-            if (totalFloors > 60000) return { error: "TOO_MANY_FLOORS", count: totalFloors };
+            // 🚨 MASSIVE LIMIT INCREASE: From 60,000 to 1,500,000 to support huge white maps
+            if (totalFloors > 1500000) return { error: "TOO_MANY_FLOORS", count: totalFloors };
             
             dummy.position.set(x + 0.5, fIdx * 4, z + 0.5);
             dummy.rotation.set(-Math.PI / 2, 0, 0);
@@ -361,14 +361,13 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
             const tIdx = (x * 7 + z * 13 + fIdx * 3) % (isWoodFloor ? wLen : sLen);
             dummy.position.set(x + 0.5, fIdx * 4 + 3.0, z + 0.5);
             dummy.rotation.set(0, 0, 0);
-            dummy.scale.set(1, 0.5, 1); // Lintels are half height
+            dummy.scale.set(1, 0.5, 1);
             if (isWoodFloor) wWallsBuffs[tIdx].add(dummy); else sWallsBuffs[tIdx].add(dummy);
           }
 
           if ([2,8,12,18,22,28, 3,10, 4, 5,15,25, 6].includes(tile)) {
             interactives.push({ tile, x, z, fIdx });
-            // Secondary Safety Killswitch if image static caused a million doors
-            if (interactives.length > 1500) return { error: "TOO_MANY_ENTITIES", count: interactives.length };
+            if (interactives.length > 5000) return { error: "TOO_MANY_ENTITIES", count: interactives.length };
           }
         }
       }
@@ -384,25 +383,12 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
     };
   }, [grids, woodTexList.length, stoneTexList.length]);
 
-  if (parsedData.error === "TOO_MANY_FLOORS") {
+  if (parsedData.error === "TOO_MANY_FLOORS" || parsedData.error === "TOO_MANY_ENTITIES") {
     return (
-      <Html center zIndexRange={[100, 0]}>
+      <Html center position={[initialSpawn[0], initialSpawn[1], initialSpawn[2] - 2]} zIndexRange={[100, 0]}>
         <div style={{ backgroundColor: '#18181b', color: '#f87171', border: '4px solid #dc2626', padding: '2rem', fontFamily: 'monospace', textAlign: 'center', width: '400px' }}>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: '0 0 1rem 0' }}>FATAL RENDER ERROR</h2>
-          <p style={{ margin: '0 0 1rem 0' }}>The engine attempted to build over <strong>{parsedData.count} floor tiles</strong> and safely aborted.</p>
-          <p style={{ color: '#d4d4d8', fontSize: '0.875rem' }}>Please use the Fill tool in the digitizer to paint the empty space outside your playable area with <strong>Solid Black (#000000)</strong>.</p>
-        </div>
-      </Html>
-    );
-  }
-
-  if (parsedData.error === "TOO_MANY_ENTITIES") {
-    return (
-      <Html center zIndexRange={[100, 0]}>
-        <div style={{ backgroundColor: '#18181b', color: '#f87171', border: '4px solid #dc2626', padding: '2rem', fontFamily: 'monospace', textAlign: 'center', width: '400px' }}>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: '0 0 1rem 0' }}>IMAGE COMPRESSION ERROR</h2>
-          <p style={{ margin: '0 0 1rem 0' }}>The engine detected over <strong>{parsedData.count} doors/items</strong> and safely aborted.</p>
-          <p style={{ color: '#d4d4d8', fontSize: '0.875rem' }}>Your PNG map image has static/blended colors. Ensure you are painting with a hard pencil and NOT a soft brush!</p>
+          <p style={{ margin: '0 0 1rem 0' }}>The engine safely aborted the render because it exceeded maximum memory allocation.</p>
         </div>
       </Html>
     );
@@ -441,9 +427,9 @@ function DungeonScene({ grids, onInteract, teleportCoords, clearTeleport, onFloo
         if (tile === 3 || tile === 10) return <ElevatorMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={tile === 10} wallTexture={wTex} doorTexture={tDoorMetalFrame} litTexture={tWindow} />;
         if (tile === 4) return <TerminalMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} />;
         
-        if (tile === 5) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} texture={tKeyRed} color="#dc2626" />;
-        if (tile === 15) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} texture={tKeyBlue} color="#2563eb" />;
-        if (tile === 25) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} texture={tKeyYellow} color="#eab308" />;
+        if (tile === 5) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} texture={tKeyRed} color="#8B0000" />;
+        if (tile === 15) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} texture={tKeyBlue} color="#00008B" />;
+        if (tile === 25) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} texture={tKeyYellow} color="#B8860B" />;
         
         if (tile === 6) return <CeilingLightMesh key={`int-${idx}`} position={[x + 0.5, 0, z + 0.5]} texture={tWindow} />;
         return null;
@@ -461,7 +447,7 @@ export default function DungeonEngine({ grids, initialSpawn, onInteract, telepor
         <fog attach="fog" args={['#000000', 4, 18]} />
         <ambientLight intensity={1.0} color="#ffffff" />
         <Suspense fallback={null}>
-          <DungeonScene grids={grids} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
+          <DungeonScene grids={grids} initialSpawn={initialSpawn} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
         </Suspense>
       </Canvas>
     </div>
