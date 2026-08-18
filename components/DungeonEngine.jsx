@@ -6,30 +6,28 @@ import { PointerLockControls, useTexture, Html } from '@react-three/drei';
 import * as THREE from 'three';
 
 // ----------------------------------------------------
-// 1. RAW C-LEVEL MEMORY BUFFER (NO RAM SPIKES!)
+// 1. RAW C-LEVEL MEMORY BUFFER
 // ----------------------------------------------------
 function FastInstancedMesh({ geometryArgs, materialProps, bufferData }) {
-    const meshRef = useRef();
-    
-    useEffect(() => {
-      if (meshRef.current && bufferData.count > 0) {
-        meshRef.current.instanceMatrix = new THREE.InstancedBufferAttribute(bufferData.array, 16);
-        meshRef.current.instanceMatrix.needsUpdate = true;
-      }
-    }, [bufferData]);
+  const meshRef = useRef();
   
-    if (bufferData.count === 0) return null;
-  
-    // The frustumCulled={false} prop stays, but the comment is removed to satisfy JSX rules!
-    return (
-      <instancedMesh ref={meshRef} args={[null, null, bufferData.count]} frustumCulled={false}>
-        {geometryArgs.type === 'box' ? <boxGeometry args={geometryArgs.args} /> : <planeGeometry args={geometryArgs.args} />}
-        <meshStandardMaterial {...materialProps} />
-      </instancedMesh>
-    );
-  }
+  useEffect(() => {
+    if (meshRef.current && bufferData.count > 0) {
+      meshRef.current.instanceMatrix = new THREE.InstancedBufferAttribute(bufferData.array, 16);
+      meshRef.current.instanceMatrix.needsUpdate = true;
+    }
+  }, [bufferData]);
 
-// Helper to construct continuous memory arrays
+  if (bufferData.count === 0) return null;
+
+  return (
+    <instancedMesh ref={meshRef} args={[null, null, bufferData.count]} frustumCulled={false}>
+      {geometryArgs.type === 'box' ? <boxGeometry args={geometryArgs.args} /> : <planeGeometry args={geometryArgs.args} />}
+      <meshStandardMaterial {...materialProps} />
+    </instancedMesh>
+  );
+}
+
 function createBuffer() {
   let data = new Float32Array(1000 * 16); 
   let count = 0;
@@ -265,7 +263,6 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
       <mesh ref={handRef} renderOrder={999}>
         <planeGeometry args={[0.23, 0.23]} />
         <meshBasicMaterial map={handTexture} transparent={true} depthTest={false} />
-        {/* 🔦 NEW FLASHLIGHT ATTACHED DIRECTLY TO THE PLAYER */}
         <pointLight intensity={2.0} distance={20} color="#fffbeb" decay={2} />
       </mesh>
     </>
@@ -344,14 +341,16 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
             continue; 
           }
 
-          if (![7,3,10].includes(tile) && tile !== 6) {
+          // 🚨 FIX: Re-enable ceiling rendering for tile 7 and 9
+          if (![3,10].includes(tile) && tile !== 6) {
             dummy.position.set(x + 0.5, fIdx * 4 + 3.98, z + 0.5);
             dummy.rotation.set(Math.PI / 2, 0, 0);
             dummy.scale.set(1, 1, 1);
             ceilBuff.add(dummy);
           }
 
-          if (![7,3,10].includes(tile)) {
+          // 🚨 FIX: Re-enable floor rendering for tile 7 and 9 to patch the black gaps
+          if (![3,10].includes(tile)) {
             totalFloors++;
             if (totalFloors > 1500000) return { error: "TOO_MANY_FLOORS", count: totalFloors };
             
@@ -359,6 +358,14 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
             dummy.rotation.set(-Math.PI / 2, 0, 0);
             dummy.scale.set(1, 1, 1);
             if (isWoodFloor) wFloorBuff.add(dummy); else sFloorBuff.add(dummy);
+          }
+
+          // 🚨 NEW: Draw a physical raised step block for Tile 7 (Elevation UP)
+          if (tile === 7) {
+            dummy.position.set(x + 0.5, fIdx * 4 + 0.25, z + 0.5);
+            dummy.rotation.set(0, 0, 0);
+            dummy.scale.set(1, 0.5, 1);
+            if (isWoodFloor) wWallsBuffs[0].add(dummy); else sWallsBuffs[0].add(dummy);
           }
 
           if ([2,8,12,18,22,28].includes(tile)) {
@@ -414,7 +421,9 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
 
       <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorWood, color: "#ffffff", roughness: 1.0}} bufferData={wFloorFinal} />
       <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorStone, color: "#ffffff", roughness: 1.0}} bufferData={sFloorFinal} />
-      <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{color: "#18181b", roughness: 1.0}} bufferData={ceilFinal} />
+      
+      {/* 🚨 FIX: Upgraded ceiling to use a textured DoubleSide plane so it properly reflects your flashlight */}
+      <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorStone, color: "#71717a", roughness: 0.9, side: THREE.DoubleSide}} bufferData={ceilFinal} />
 
       {interactiveElements.map((el, idx) => {
         const { tile, x, z, fIdx } = el;
