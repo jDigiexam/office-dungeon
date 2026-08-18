@@ -9,24 +9,25 @@ import * as THREE from 'three';
 // 1. RAW C-LEVEL MEMORY BUFFER (NO RAM SPIKES!)
 // ----------------------------------------------------
 function FastInstancedMesh({ geometryArgs, materialProps, bufferData }) {
-  const meshRef = useRef();
+    const meshRef = useRef();
+    
+    useEffect(() => {
+      if (meshRef.current && bufferData.count > 0) {
+        meshRef.current.instanceMatrix = new THREE.InstancedBufferAttribute(bufferData.array, 16);
+        meshRef.current.instanceMatrix.needsUpdate = true;
+      }
+    }, [bufferData]);
   
-  useEffect(() => {
-    if (meshRef.current && bufferData.count > 0) {
-      meshRef.current.instanceMatrix = new THREE.InstancedBufferAttribute(bufferData.array, 16);
-      meshRef.current.instanceMatrix.needsUpdate = true;
-    }
-  }, [bufferData]);
-
-  if (bufferData.count === 0) return null;
-
-  return (
-    <instancedMesh ref={meshRef} args={[null, null, bufferData.count]}>
-      {geometryArgs.type === 'box' ? <boxGeometry args={geometryArgs.args} /> : <planeGeometry args={geometryArgs.args} />}
-      <meshStandardMaterial {...materialProps} />
-    </instancedMesh>
-  );
-}
+    if (bufferData.count === 0) return null;
+  
+    // The frustumCulled={false} prop stays, but the comment is removed to satisfy JSX rules!
+    return (
+      <instancedMesh ref={meshRef} args={[null, null, bufferData.count]} frustumCulled={false}>
+        {geometryArgs.type === 'box' ? <boxGeometry args={geometryArgs.args} /> : <planeGeometry args={geometryArgs.args} />}
+        <meshStandardMaterial {...materialProps} />
+      </instancedMesh>
+    );
+  }
 
 // Helper to construct continuous memory arrays
 function createBuffer() {
@@ -242,7 +243,6 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
       const gx = Math.floor(x); const gz = Math.floor(z);
       if (gz < 0 || gz >= grids[currentFIdx].length || gx < 0 || gx >= grids[currentFIdx][0].length) return true;
       const tile = grids[currentFIdx][gz][gx];
-      // 🚨 Ensure we use the new tile identifiers for our physics checks
       return [1, 2, 12, 22, 3, 4].includes(tile);
     };
 
@@ -262,7 +262,12 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
   return (
     <>
       <PointerLockControls makeDefault ref={controlsRef} minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI * 3 / 4} />
-      <mesh ref={handRef} renderOrder={999}><planeGeometry args={[0.23, 0.23]} /><meshBasicMaterial map={handTexture} transparent={true} depthTest={false} /></mesh>
+      <mesh ref={handRef} renderOrder={999}>
+        <planeGeometry args={[0.23, 0.23]} />
+        <meshBasicMaterial map={handTexture} transparent={true} depthTest={false} />
+        {/* 🔦 NEW FLASHLIGHT ATTACHED DIRECTLY TO THE PLAYER */}
+        <pointLight intensity={2.0} distance={20} color="#fffbeb" decay={2} />
+      </mesh>
     </>
   );
 }
@@ -348,7 +353,6 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
 
           if (![7,3,10].includes(tile)) {
             totalFloors++;
-            // 🚨 MASSIVE LIMIT INCREASE: From 60,000 to 1,500,000 to support huge white maps
             if (totalFloors > 1500000) return { error: "TOO_MANY_FLOORS", count: totalFloors };
             
             dummy.position.set(x + 0.5, fIdx * 4, z + 0.5);
