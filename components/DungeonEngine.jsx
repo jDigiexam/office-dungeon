@@ -310,7 +310,6 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     const sFloorBuff = createBuffer();
     const ceilBuff = createBuffer();
     
-    // Step Buffers to visually connect height changes
     const wStepBuff = createBuffer();
     const sStepBuff = createBuffer();
     const ceilStepBuff = createBuffer();
@@ -319,7 +318,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     const heightMaps = [];
     let totalFloors = 0;
 
-    // 🚨 1. BLAZING FAST HEIGHT MAP BFS SCANNER
+    // 🚨 1. STABILIZED REGION-BASED HEIGHT MAPPER
     for (let fIdx = 0; fIdx < grids.length; fIdx++) {
       const grid = grids[fIdx];
       if (!grid) { heightMaps.push(null); continue; }
@@ -332,38 +331,47 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
       const q = new Int32Array(rows * cols * 2);
       let qHead = 0; let qTail = 0;
       
-      for (let z = 0; z < rows; z++) {
-        for (let x = 0; x < cols; x++) {
-          const idx = z * cols + x;
-          if (grid[z][x] !== 1 && hMap[idx] === -9999) {
+      // Start mapping from the first walkable floor we find
+      let startFound = false;
+      for (let z = 0; z < rows && !startFound; z++) {
+        for (let x = 0; x < cols && !startFound; x++) {
+          if (grid[z][x] === 0 || grid[z][x] === -1) {
             q[qTail++] = x; q[qTail++] = z;
-            hMap[idx] = 0;
+            hMap[z * cols + x] = 0;
+            startFound = true;
+          }
+        }
+      }
+      
+      // Safe Flood-Fill: Only changes elevation when stepping *onto* a gray/purple tile from a floor
+      while (qHead < qTail) {
+        const cx = q[qHead++]; const cz = q[qHead++];
+        const cElev = hMap[cz * cols + cx];
+        const cTile = grid[cz][cx];
+        
+        const nx = [cx+1, cx-1, cx, cx]; const nz = [cz, cz, cz+1, cz-1];
+        
+        for (let i = 0; i < 4; i++) {
+          const xx = nx[i]; const zz = nz[i];
+          if (xx >= 0 && xx < cols && zz >= 0 && zz < rows) {
+            const nIdx = zz * cols + xx;
+            const nTile = grid[zz][xx];
             
-            while (qHead < qTail) {
-              const cx = q[qHead++]; const cz = q[qHead++];
-              const cElev = hMap[cz * cols + cx];
-              const nx = [cx+1, cx-1, cx, cx]; const nz = [cz, cz, cz+1, cz-1];
-              
-              for (let i = 0; i < 4; i++) {
-                const xx = nx[i]; const zz = nz[i];
-                if (xx >= 0 && xx < cols && zz >= 0 && zz < rows) {
-                  const nIdx = zz * cols + xx;
-                  if (hMap[nIdx] === -9999) {
-                     const t = grid[zz][xx];
-                     if (t === 1) continue;
-                     let nElev = cElev;
-                     if (t === 7) nElev = cElev + 1; // Step Up
-                     if (t === 9) nElev = cElev - 1; // Step Down
-                     hMap[nIdx] = nElev;
-                     q[qTail++] = xx; q[qTail++] = zz;
-                  }
-                }
-              }
+            if (nTile !== 1 && hMap[nIdx] === -9999) {
+               let nElev = cElev;
+               // Only step UP if we are moving from a non-gray tile INTO a gray tile
+               if (nTile === 7 && cTile !== 7) nElev = cElev + 1;
+               // Only step DOWN if we are moving from a non-purple tile INTO a purple tile
+               if (nTile === 9 && cTile !== 9) nElev = cElev - 1;
+               
+               hMap[nIdx] = nElev;
+               q[qTail++] = xx; q[qTail++] = zz;
             }
           }
         }
       }
       
+      // Bridge the walls to the highest neighboring floor
       for (let z = 0; z < rows; z++) {
         for (let x = 0; x < cols; x++) {
           const idx = z * cols + x;
@@ -387,7 +395,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
       heightMaps.push(hMap);
     }
 
-    // 🚨 2. RENDER PASS WITH DYNAMIC Y OFFSETS
+    // 🚨 2. RENDER PASS (Fixed Floating Walls)
     for (let fIdx = 0; fIdx < grids.length; fIdx++) {
       const grid = grids[fIdx];
       const hMap = heightMaps[fIdx];
@@ -403,7 +411,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         for (let x = 0; x < cols; x++) {
           const tile = grid[z][x];
           const elev = hMap[z * cols + x];
-          const baseY = fIdx * 4.0 + (elev * 1.0);
+          const baseY = fIdx * 4.0 + (elev * 1.0); // 1.0 units per elevation step
           
           if (tile === 1) {
             let isVisible = false;
@@ -414,17 +422,18 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
 
             if (isVisible) {
               const tIdx = (x * 7 + z * 13 + fIdx * 3) % (isWoodFloor ? wLen : sLen);
-              // Wall goes from baseY - 0.75 to baseY + 3.25, ensuring it covers steps
-              dummy.position.set(x + 0.5, baseY + 1.25, z + 0.5);
+              // Stretch the wall down extra far so it covers massive elevation drops
+              dummy.position.set(x + 0.5, baseY + 1.25 - (elev > 0 ? elev : 0), z + 0.5);
               dummy.rotation.set(0, 0, 0);
-              dummy.scale.set(1, 1, 1);
+              // Scale the wall's Y axis to cover the height difference
+              dummy.scale.set(1, 1 + Math.abs(elev) * 0.25, 1);
               if (isWoodFloor) wWallsBuffs[tIdx].add(dummy); else sWallsBuffs[tIdx].add(dummy);
             }
             continue; 
           }
 
           if (![3,10].includes(tile) && tile !== 6) {
-            dummy.position.set(x + 0.5, baseY + 2.48, z + 0.5); // New Cozy Ceiling Height
+            dummy.position.set(x + 0.5, baseY + 2.48, z + 0.5);
             dummy.rotation.set(Math.PI / 2, 0, 0);
             dummy.scale.set(1, 1, 1);
             ceilBuff.add(dummy);
@@ -440,7 +449,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
             if (isWoodFloor) wFloorBuff.add(dummy); else sFloorBuff.add(dummy);
           }
 
-          // 🚨 TILE 7 & 9 GAP SEALERS (Creates physical step boxes)
+          // Elevation Steps (Gray/Purple)
           if (tile === 7 || tile === 9) {
             dummy.position.set(x + 0.5, baseY - 0.5, z + 0.5);
             dummy.rotation.set(0, 0, 0);
@@ -453,9 +462,16 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
             ceilStepBuff.add(dummy);
           }
 
+          if ([2,8,12,18,22,28].includes(tile)) {
+            const tIdx = (x * 7 + z * 13 + fIdx * 3) % (isWoodFloor ? wLen : sLen);
+            dummy.position.set(x + 0.5, baseY + 2.25, z + 0.5); // Lintel
+            dummy.rotation.set(0, 0, 0);
+            dummy.scale.set(1, 0.5, 1);
+            if (isWoodFloor) wWallsBuffs[tIdx].add(dummy); else sWallsBuffs[tIdx].add(dummy);
+          }
+
           if ([2,8,12,18,22,28, 3,10, 4, 5,15,25, 6].includes(tile)) {
             interactives.push({ tile, x, z, fIdx, baseY });
-            if (interactives.length > 5000) return { error: "TOO_MANY_ENTITIES", count: interactives.length };
           }
         }
       }
