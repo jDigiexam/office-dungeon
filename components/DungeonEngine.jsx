@@ -153,136 +153,147 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTexture, 
 // 4. BULLETPROOF PHYSICS & CONTROLS
 // ----------------------------------------------------
 function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
-  const controlsRef = useRef();
-  const moveState = useRef({ forward: false, backward: false, left: false, right: false });
-  const currentFloorRef = useRef(0);
-  const bobTime = useRef(0);
-  const handRef = useRef();
+    const controlsRef = useRef();
+    const moveState = useRef({ forward: false, backward: false, left: false, right: false });
+    const currentFloorRef = useRef(0);
+    
+    // 🚨 FIX: Separate the timer from the intensity (amplitude) of the bounce
+    const bobTime = useRef(0);
+    const bobAmp = useRef(0); 
+    const handRef = useRef();
+    
+    const { camera } = useThree();
   
-  const { camera } = useThree();
-
-  useEffect(() => {
-    if (teleportCoords) {
-      camera.position.set(teleportCoords.x, teleportCoords.y, teleportCoords.z);
-      clearTeleport();
-    }
-  }, [teleportCoords, camera, clearTeleport]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      let fIdx = Math.round(camera.position.y / FLOOR_HT);
-      fIdx = Math.max(0, Math.min(2, fIdx));
-      if (fIdx !== currentFloorRef.current) {
-        currentFloorRef.current = fIdx;
-        onFloorChange(fIdx);
+    useEffect(() => {
+      if (teleportCoords) {
+        camera.position.set(teleportCoords.x, teleportCoords.y, teleportCoords.z);
+        clearTeleport();
       }
-    }, 250);
-    return () => clearInterval(interval);
-  }, [camera, onFloorChange]);
-
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      // 🚨 FIX: Ignore OS-level key repeats to prevent event loop flooding!
-      if (e.repeat) return; 
-
-      const key = e.key.toLowerCase();
-      if (key === 'w') moveState.current.forward = true;
-      if (key === 's') moveState.current.backward = true;
-      if (key === 'a') moveState.current.left = true;
-      if (key === 'd') moveState.current.right = true;
-
-      if (key === 'e') {
-        const dir = new THREE.Vector3();
-        camera.getWorldDirection(dir);
-        const targetX = Math.floor(camera.position.x + dir.x * 1.3);
-        const targetZ = Math.floor(camera.position.z + dir.z * 1.3);
-        const fIdx = currentFloorRef.current;
-        if (targetZ >= 0 && targetZ < grids[fIdx].length && targetX >= 0 && targetX < grids[fIdx][0].length) {
-          onInteract(grids[fIdx][targetZ][targetX], targetX, targetZ, fIdx);
+    }, [teleportCoords, camera, clearTeleport]);
+  
+    useEffect(() => {
+      const interval = setInterval(() => {
+        let fIdx = Math.round(camera.position.y / FLOOR_HT);
+        fIdx = Math.max(0, Math.min(2, fIdx));
+        if (fIdx !== currentFloorRef.current) {
+          currentFloorRef.current = fIdx;
+          onFloorChange(fIdx);
         }
+      }, 250);
+      return () => clearInterval(interval);
+    }, [camera, onFloorChange]);
+  
+    useEffect(() => {
+      const handleKeyDown = (e) => {
+        if (e.repeat) return; 
+  
+        const key = e.key.toLowerCase();
+        if (key === 'w') moveState.current.forward = true;
+        if (key === 's') moveState.current.backward = true;
+        if (key === 'a') moveState.current.left = true;
+        if (key === 'd') moveState.current.right = true;
+  
+        if (key === 'e') {
+          const dir = new THREE.Vector3();
+          camera.getWorldDirection(dir);
+          const targetX = Math.floor(camera.position.x + dir.x * 1.3);
+          const targetZ = Math.floor(camera.position.z + dir.z * 1.3);
+          const fIdx = currentFloorRef.current;
+          if (targetZ >= 0 && targetZ < grids[fIdx].length && targetX >= 0 && targetX < grids[fIdx][0].length) {
+            onInteract(grids[fIdx][targetZ][targetX], targetX, targetZ, fIdx);
+          }
+        }
+      };
+      
+      const handleKeyUp = (e) => {
+        const key = e.key.toLowerCase();
+        if (key === 'w') moveState.current.forward = false;
+        if (key === 's') moveState.current.backward = false;
+        if (key === 'a') moveState.current.left = false;
+        if (key === 'd') moveState.current.right = false;
+      };
+      
+      window.addEventListener('keydown', handleKeyDown);
+      window.addEventListener('keyup', handleKeyUp);
+      return () => { window.removeEventListener('keydown', handleKeyDown); window.removeEventListener('keyup', handleKeyUp); };
+    }, [camera, grids, onInteract]);
+  
+    useFrame((state, delta) => {
+      if (!controlsRef.current?.isLocked) return;
+  
+      const safeDelta = Math.min(delta, 0.1);
+      const moveSpeed = 4.0 * safeDelta; 
+      const isMoving = moveState.current.forward || moveState.current.backward || moveState.current.left || moveState.current.right;
+  
+      // 🚨 FIX: If moving, increase time and fade amplitude up to 1. If stopped, just fade amplitude to 0.
+      if (isMoving) {
+        bobTime.current += safeDelta * 8; 
+        bobAmp.current = THREE.MathUtils.lerp(bobAmp.current, 1, safeDelta * 10);
+      } else {
+        bobAmp.current = THREE.MathUtils.lerp(bobAmp.current, 0, safeDelta * 10);
       }
-    };
-    
-    const handleKeyUp = (e) => {
-      const key = e.key.toLowerCase();
-      if (key === 'w') moveState.current.forward = false;
-      if (key === 's') moveState.current.backward = false;
-      if (key === 'a') moveState.current.left = false;
-      if (key === 'd') moveState.current.right = false;
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => { window.removeEventListener('keydown', handleKeyDown); window.removeEventListener('keyup', handleKeyUp); };
-  }, [camera, grids, onInteract]);
-
-  useFrame((state, delta) => {
-    if (!controlsRef.current?.isLocked) return;
-
-    const safeDelta = Math.min(delta, 0.1);
-    const moveSpeed = 4.0 * safeDelta; 
-    const isMoving = moveState.current.forward || moveState.current.backward || moveState.current.left || moveState.current.right;
-
-    if (isMoving) bobTime.current += safeDelta * 8; 
-    else bobTime.current = THREE.MathUtils.lerp(bobTime.current, 0, safeDelta * 10);
-    const bobOffset = Math.sin(bobTime.current) * 0.05; 
-
-    const currentFIdx = currentFloorRef.current;
-    
-    camera.position.y = THREE.MathUtils.lerp(camera.position.y, currentFIdx * FLOOR_HT + 1.2 + bobOffset, 0.4);
-
-    if (handRef.current) {
-      const handOffset = new THREE.Vector3(0.18, -0.15, -0.3);
-      handOffset.applyQuaternion(camera.quaternion);
-      handRef.current.position.copy(camera.position).add(handOffset);
-      handRef.current.quaternion.copy(camera.quaternion);
-      handRef.current.position.y += Math.abs(Math.sin(bobTime.current)) * 0.02;
-      handRef.current.rotation.z += Math.cos(bobTime.current / 2) * 0.02; 
-    }
-
-    const oldX = camera.position.x;
-    const oldZ = camera.position.z;
-
-    if (moveState.current.forward) controlsRef.current.moveForward(moveSpeed);
-    if (moveState.current.backward) controlsRef.current.moveForward(-moveSpeed);
-    if (moveState.current.right) controlsRef.current.moveRight(moveSpeed);
-    if (moveState.current.left) controlsRef.current.moveRight(-moveSpeed);
-
-    const newX = camera.position.x;
-    const newZ = camera.position.z;
-    const radius = 0.22;
-
-    const isSolidTile = (x, z) => {
-      const gx = Math.floor(x); const gz = Math.floor(z);
-      if (gz < 0 || gz >= grids[currentFIdx].length || gx < 0 || gx >= grids[currentFIdx][0].length) return true;
-      const tile = grids[currentFIdx][gz][gx];
-      return [1, 2, 12, 22, 3, 4].includes(tile);
-    };
-
-    const collidesAt = (x, z) => (
-      isSolidTile(x - radius, z - radius) || isSolidTile(x + radius, z - radius) ||
-      isSolidTile(x - radius, z + radius) || isSolidTile(x + radius, z + radius)
+      
+      // Apply the amplitude to the sine wave math
+      const bobOffset = Math.sin(bobTime.current) * 0.05 * bobAmp.current; 
+  
+      const currentFIdx = currentFloorRef.current;
+      
+      camera.position.y = THREE.MathUtils.lerp(camera.position.y, currentFIdx * FLOOR_HT + 1.2 + bobOffset, 0.4);
+  
+      if (handRef.current) {
+        const handOffset = new THREE.Vector3(0.18, -0.15, -0.3);
+        handOffset.applyQuaternion(camera.quaternion);
+        handRef.current.position.copy(camera.position).add(handOffset);
+        handRef.current.quaternion.copy(camera.quaternion);
+        
+        // Apply the amplitude fade to the hand graphics as well
+        handRef.current.position.y += Math.abs(Math.sin(bobTime.current)) * 0.02 * bobAmp.current;
+        handRef.current.rotation.z += Math.cos(bobTime.current / 2) * 0.02 * bobAmp.current; 
+      }
+  
+      const oldX = camera.position.x;
+      const oldZ = camera.position.z;
+  
+      if (moveState.current.forward) controlsRef.current.moveForward(moveSpeed);
+      if (moveState.current.backward) controlsRef.current.moveForward(-moveSpeed);
+      if (moveState.current.right) controlsRef.current.moveRight(moveSpeed);
+      if (moveState.current.left) controlsRef.current.moveRight(-moveSpeed);
+  
+      const newX = camera.position.x;
+      const newZ = camera.position.z;
+      const radius = 0.22;
+  
+      const isSolidTile = (x, z) => {
+        const gx = Math.floor(x); const gz = Math.floor(z);
+        if (gz < 0 || gz >= grids[currentFIdx].length || gx < 0 || gx >= grids[currentFIdx][0].length) return true;
+        const tile = grids[currentFIdx][gz][gx];
+        return [1, 2, 12, 22, 3, 4].includes(tile);
+      };
+  
+      const collidesAt = (x, z) => (
+        isSolidTile(x - radius, z - radius) || isSolidTile(x + radius, z - radius) ||
+        isSolidTile(x - radius, z + radius) || isSolidTile(x + radius, z + radius)
+      );
+  
+      camera.position.x = newX;
+      camera.position.z = oldZ;
+      if (collidesAt(camera.position.x, camera.position.z)) camera.position.x = oldX;
+  
+      camera.position.z = newZ;
+      if (collidesAt(camera.position.x, camera.position.z)) camera.position.z = oldZ;
+    });
+  
+    return (
+      <>
+        <PointerLockControls makeDefault ref={controlsRef} minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI * 3 / 4} />
+        <mesh ref={handRef} renderOrder={999}>
+          <planeGeometry args={[0.23, 0.23]} />
+          <meshBasicMaterial map={handTexture} transparent={true} depthTest={false} />
+          <pointLight intensity={2.0} distance={20} color="#fffbeb" decay={2} />
+        </mesh>
+      </>
     );
-
-    camera.position.x = newX;
-    camera.position.z = oldZ;
-    if (collidesAt(camera.position.x, camera.position.z)) camera.position.x = oldX;
-
-    camera.position.z = newZ;
-    if (collidesAt(camera.position.x, camera.position.z)) camera.position.z = oldZ;
-  });
-
-  return (
-    <>
-      <PointerLockControls makeDefault ref={controlsRef} minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI * 3 / 4} />
-      <mesh ref={handRef} renderOrder={999}>
-        <planeGeometry args={[0.23, 0.23]} />
-        <meshBasicMaterial map={handTexture} transparent={true} depthTest={false} />
-        <pointLight intensity={2.0} distance={20} color="#fffbeb" decay={2} />
-      </mesh>
-    </>
-  );
-}
+  }
 
 // ----------------------------------------------------
 // 5. MAIN SCENE RENDERING
