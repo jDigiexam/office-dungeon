@@ -66,8 +66,11 @@ export default function EscapeRoomPage() {
       openDoor(0); 
     };
 
-    // 🚨 NEW: Standard door logic (Gray) opens instantly without a keycard
-    if (tileType === 7) { triggerMessage("DOOR OPENED"); openDoor(17); }
+  // Gray Terminal Door (Requires puzzle)
+  if (tileType === 7) { triggerMessage("LOCKED - TERMINAL OVERRIDE REQUIRED"); }
+    
+  // 🚨 NEW: Light Gray Manual Door (Opens freely)
+  if (tileType === 32) { triggerMessage("DOOR OPENED"); openDoor(38); }
 
     if (tileType === 2) {
       if (inventory.includes('RED KEYCARD')) { triggerMessage("ACCESS GRANTED"); openDoor(8); }

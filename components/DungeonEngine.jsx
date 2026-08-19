@@ -55,17 +55,45 @@ function createBuffer() {
 // 3. 3D INTERACTIVE OBJECTS
 // ----------------------------------------------------
 function KeycardMesh({ position, texture, color }) {
-  const cardRef = useRef();
-  useFrame((_, delta) => { if (cardRef.current) cardRef.current.rotation.y += Math.min(delta, 0.1) * 2.0; });
-  return (
-    <group position={position}>
-      <mesh ref={cardRef} position={[0, 0.4, 0]}>
-        <planeGeometry args={[0.5, 0.5]} />
-        <meshStandardMaterial map={texture} emissive={color} emissiveIntensity={0.8} transparent={true} side={THREE.DoubleSide} alphaTest={0.5} />
-      </mesh>
-    </group>
-  );
-}
+    const cardRef = useRef();
+    
+    useFrame((_, delta) => { 
+      if (cardRef.current) {
+        const safeDelta = Math.min(delta, 0.1);
+        
+        // 1. Keep the classic rotation
+        cardRef.current.rotation.y += safeDelta * 2.0; 
+        
+        // 2. 🚨 NEW: Animate rising out of the ground
+        if (cardRef.current.position.y < 0.4) {
+          // Smoothly lerp the card upwards
+          cardRef.current.position.y = THREE.MathUtils.lerp(cardRef.current.position.y, 0.45, safeDelta * 4.0);
+          
+          // Snap it to exactly 0.4 once it gets close enough to stop the math calculations
+          if (cardRef.current.position.y >= 0.4) {
+            cardRef.current.position.y = 0.4;
+          }
+        }
+      } 
+    });
+    
+    return (
+      <group position={position}>
+        {/* 🚨 NEW: We start the Y position at -1.0 (completely under the floor) */}
+        <mesh ref={cardRef} position={[0, -1.0, 0]}>
+          <planeGeometry args={[0.5, 0.5]} />
+          <meshStandardMaterial 
+            map={texture} 
+            emissive={color} 
+            emissiveIntensity={0.8} 
+            transparent={true} 
+            side={THREE.DoubleSide} 
+            alphaTest={0.5} 
+          />
+        </mesh>
+      </group>
+    );
+  }
 
 function TerminalMesh({ position, texture }) {
     const crtRef = useRef();
@@ -288,8 +316,8 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
       const gx = Math.floor(x); const gz = Math.floor(z);
       if (gz < 0 || gz >= grids[currentFIdx].length || gx < 0 || gx >= grids[currentFIdx][0].length) return true;
       const tile = grids[currentFIdx][gz][gx];
-      // 🚨 NEW: Added tile 7 to the solid collision array! (17 is open and walkable)
-      return [1, 2, 12, 22, 7, 3, 4].includes(tile);
+      // added 32 to the array to handle light gray manually opened door
+      return [1, 2, 12, 22, 7, 3, 4, 32].includes(tile);
     };
 
     const collidesAt = (x, z) => (
