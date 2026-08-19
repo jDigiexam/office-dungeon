@@ -67,15 +67,35 @@ function KeycardMesh({ position, texture, color }) {
   );
 }
 
-function TerminalMesh({ position }) {
-  return (
-    <group position={position}>
-      <mesh position={[0, 0.35, 0]}><boxGeometry args={[0.6, 0.7, 0.5]} /><meshStandardMaterial color="#18181b" /></mesh>
-      <mesh position={[0, 0.85, 0]}><boxGeometry args={[0.45, 0.35, 0.3]} /><meshStandardMaterial color="#09090b" /></mesh>
-      <mesh position={[0, 0.85, 0.16]}><planeGeometry args={[0.38, 0.28]} /><meshStandardMaterial color="#22c55e" emissive="#16a34a" emissiveIntensity={0.9} /></mesh>
-    </group>
-  );
-}
+function TerminalMesh({ position, texture }) {
+    const crtRef = useRef();
+    // Slowly rotate the CRT sprite so it always catches the player's eye
+    useFrame((_, delta) => { if (crtRef.current) crtRef.current.rotation.y += Math.min(delta, 0.1) * 1.5; });
+    
+    return (
+      <group position={position}>
+        {/* The Gray Pedestal */}
+        <mesh position={[0, 0.4, 0]}>
+          <boxGeometry args={[0.5, 0.8, 0.5]} />
+          <meshStandardMaterial color="#808080" roughness={0.9} />
+        </mesh>
+        
+        {/* The CRT Monitor Sprite */}
+        <mesh ref={crtRef} position={[0, 1.1, 0]}>
+          <planeGeometry args={[0.7, 0.7]} />
+          <meshStandardMaterial 
+            map={texture} 
+            emissive="#ffffff" 
+            emissiveMap={texture} 
+            emissiveIntensity={0.6} 
+            transparent={true} 
+            side={THREE.DoubleSide} 
+            alphaTest={0.5} 
+          />
+        </mesh>
+      </group>
+    );
+  }
 
 function CeilingLightMesh({ position, texture }) {
   return (
@@ -152,153 +172,158 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTexture, 
 // ----------------------------------------------------
 // 4. BULLETPROOF PHYSICS & CONTROLS
 // ----------------------------------------------------
-function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
-    const controlsRef = useRef();
-    const moveState = useRef({ forward: false, backward: false, left: false, right: false });
-    const currentFloorRef = useRef(0);
-    
-    // 🚨 FIX: Separate the timer from the intensity (amplitude) of the bounce
-    const bobTime = useRef(0);
-    const bobAmp = useRef(0); 
-    const handRef = useRef();
-    
-    const { camera } = useThree();
+function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator }) {
+  const controlsRef = useRef();
+  const moveState = useRef({ forward: false, backward: false, left: false, right: false });
+  const currentFloorRef = useRef(0);
+  const elevatorDebounce = useRef(false);
   
-    useEffect(() => {
-      if (teleportCoords) {
-        camera.position.set(teleportCoords.x, teleportCoords.y, teleportCoords.z);
-        clearTeleport();
+  const bobTime = useRef(0);
+  const bobAmp = useRef(0); 
+  const handRef = useRef();
+  
+  const { camera } = useThree();
+
+  useEffect(() => {
+    if (teleportCoords) {
+      camera.position.set(teleportCoords.x, teleportCoords.y, teleportCoords.z);
+      clearTeleport();
+    }
+  }, [teleportCoords, camera, clearTeleport]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      let fIdx = Math.round(camera.position.y / FLOOR_HT);
+      fIdx = Math.max(0, Math.min(2, fIdx));
+      if (fIdx !== currentFloorRef.current) {
+        currentFloorRef.current = fIdx;
+        onFloorChange(fIdx);
       }
-    }, [teleportCoords, camera, clearTeleport]);
-  
-    useEffect(() => {
-      const interval = setInterval(() => {
-        let fIdx = Math.round(camera.position.y / FLOOR_HT);
-        fIdx = Math.max(0, Math.min(2, fIdx));
-        if (fIdx !== currentFloorRef.current) {
-          currentFloorRef.current = fIdx;
-          onFloorChange(fIdx);
+    }, 250);
+    return () => clearInterval(interval);
+  }, [camera, onFloorChange]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.repeat) return; 
+
+      const key = e.key.toLowerCase();
+      if (key === 'w') moveState.current.forward = true;
+      if (key === 's') moveState.current.backward = true;
+      if (key === 'a') moveState.current.left = true;
+      if (key === 'd') moveState.current.right = true;
+
+      if (key === 'e') {
+        const dir = new THREE.Vector3();
+        camera.getWorldDirection(dir);
+        const targetX = Math.floor(camera.position.x + dir.x * 1.3);
+        const targetZ = Math.floor(camera.position.z + dir.z * 1.3);
+        const fIdx = currentFloorRef.current;
+        if (targetZ >= 0 && targetZ < grids[fIdx].length && targetX >= 0 && targetX < grids[fIdx][0].length) {
+          onInteract(grids[fIdx][targetZ][targetX], targetX, targetZ, fIdx);
         }
-      }, 250);
-      return () => clearInterval(interval);
-    }, [camera, onFloorChange]);
-  
-    useEffect(() => {
-      const handleKeyDown = (e) => {
-        if (e.repeat) return; 
-  
-        const key = e.key.toLowerCase();
-        if (key === 'w') moveState.current.forward = true;
-        if (key === 's') moveState.current.backward = true;
-        if (key === 'a') moveState.current.left = true;
-        if (key === 'd') moveState.current.right = true;
-  
-        if (key === 'e') {
-          const dir = new THREE.Vector3();
-          camera.getWorldDirection(dir);
-          const targetX = Math.floor(camera.position.x + dir.x * 1.3);
-          const targetZ = Math.floor(camera.position.z + dir.z * 1.3);
-          const fIdx = currentFloorRef.current;
-          if (targetZ >= 0 && targetZ < grids[fIdx].length && targetX >= 0 && targetX < grids[fIdx][0].length) {
-            onInteract(grids[fIdx][targetZ][targetX], targetX, targetZ, fIdx);
-          }
-        }
-      };
-      
-      const handleKeyUp = (e) => {
-        const key = e.key.toLowerCase();
-        if (key === 'w') moveState.current.forward = false;
-        if (key === 's') moveState.current.backward = false;
-        if (key === 'a') moveState.current.left = false;
-        if (key === 'd') moveState.current.right = false;
-      };
-      
-      window.addEventListener('keydown', handleKeyDown);
-      window.addEventListener('keyup', handleKeyUp);
-      return () => { window.removeEventListener('keydown', handleKeyDown); window.removeEventListener('keyup', handleKeyUp); };
-    }, [camera, grids, onInteract]);
-  
-    useFrame((state, delta) => {
-      if (!controlsRef.current?.isLocked) return;
-  
-      const safeDelta = Math.min(delta, 0.1);
-      const moveSpeed = 4.0 * safeDelta; 
-      const isMoving = moveState.current.forward || moveState.current.backward || moveState.current.left || moveState.current.right;
-  
-      // 🚨 FIX: If moving, increase time and fade amplitude up to 1. If stopped, just fade amplitude to 0.
-      if (isMoving) {
-        bobTime.current += safeDelta * 8; 
-        bobAmp.current = THREE.MathUtils.lerp(bobAmp.current, 1, safeDelta * 10);
-      } else {
-        bobAmp.current = THREE.MathUtils.lerp(bobAmp.current, 0, safeDelta * 10);
       }
+    };
+    
+    const handleKeyUp = (e) => {
+      const key = e.key.toLowerCase();
+      if (key === 'w') moveState.current.forward = false;
+      if (key === 's') moveState.current.backward = false;
+      if (key === 'a') moveState.current.left = false;
+      if (key === 'd') moveState.current.right = false;
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => { window.removeEventListener('keydown', handleKeyDown); window.removeEventListener('keyup', handleKeyUp); };
+  }, [camera, grids, onInteract]);
+
+  useFrame((state, delta) => {
+    if (!controlsRef.current?.isLocked) return;
+
+    const safeDelta = Math.min(delta, 0.1);
+    const moveSpeed = 4.0 * safeDelta; 
+    const isMoving = moveState.current.forward || moveState.current.backward || moveState.current.left || moveState.current.right;
+
+    if (isMoving) {
+      bobTime.current += safeDelta * 8; 
+      bobAmp.current = THREE.MathUtils.lerp(bobAmp.current, 1, safeDelta * 10);
+    } else {
+      bobAmp.current = THREE.MathUtils.lerp(bobAmp.current, 0, safeDelta * 10);
+    }
+    
+    const bobOffset = Math.sin(bobTime.current) * 0.05 * bobAmp.current; 
+    const currentFIdx = currentFloorRef.current;
+    
+    camera.position.y = THREE.MathUtils.lerp(camera.position.y, currentFIdx * FLOOR_HT + 1.2 + bobOffset, 0.4);
+
+    if (handRef.current) {
+      const handOffset = new THREE.Vector3(0.18, -0.15, -0.3);
+      handOffset.applyQuaternion(camera.quaternion);
+      handRef.current.position.copy(camera.position).add(handOffset);
+      handRef.current.quaternion.copy(camera.quaternion);
       
-      // Apply the amplitude to the sine wave math
-      const bobOffset = Math.sin(bobTime.current) * 0.05 * bobAmp.current; 
-  
-      const currentFIdx = currentFloorRef.current;
-      
-      camera.position.y = THREE.MathUtils.lerp(camera.position.y, currentFIdx * FLOOR_HT + 1.2 + bobOffset, 0.4);
-  
-      if (handRef.current) {
-        const handOffset = new THREE.Vector3(0.18, -0.15, -0.3);
-        handOffset.applyQuaternion(camera.quaternion);
-        handRef.current.position.copy(camera.position).add(handOffset);
-        handRef.current.quaternion.copy(camera.quaternion);
-        
-        // Apply the amplitude fade to the hand graphics as well
-        handRef.current.position.y += Math.abs(Math.sin(bobTime.current)) * 0.02 * bobAmp.current;
-        handRef.current.rotation.z += Math.cos(bobTime.current / 2) * 0.02 * bobAmp.current; 
-      }
-  
-      const oldX = camera.position.x;
-      const oldZ = camera.position.z;
-  
-      if (moveState.current.forward) controlsRef.current.moveForward(moveSpeed);
-      if (moveState.current.backward) controlsRef.current.moveForward(-moveSpeed);
-      if (moveState.current.right) controlsRef.current.moveRight(moveSpeed);
-      if (moveState.current.left) controlsRef.current.moveRight(-moveSpeed);
-  
-      const newX = camera.position.x;
-      const newZ = camera.position.z;
-      const radius = 0.22;
-  
-      const isSolidTile = (x, z) => {
-        const gx = Math.floor(x); const gz = Math.floor(z);
-        if (gz < 0 || gz >= grids[currentFIdx].length || gx < 0 || gx >= grids[currentFIdx][0].length) return true;
-        const tile = grids[currentFIdx][gz][gx];
-        return [1, 2, 12, 22, 3, 4].includes(tile);
-      };
-  
-      const collidesAt = (x, z) => (
-        isSolidTile(x - radius, z - radius) || isSolidTile(x + radius, z - radius) ||
-        isSolidTile(x - radius, z + radius) || isSolidTile(x + radius, z + radius)
-      );
-  
-      camera.position.x = newX;
-      camera.position.z = oldZ;
-      if (collidesAt(camera.position.x, camera.position.z)) camera.position.x = oldX;
-  
-      camera.position.z = newZ;
-      if (collidesAt(camera.position.x, camera.position.z)) camera.position.z = oldZ;
-    });
-  
-    return (
-      <>
-        <PointerLockControls makeDefault ref={controlsRef} minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI * 3 / 4} />
-        <mesh ref={handRef} renderOrder={999}>
-          <planeGeometry args={[0.23, 0.23]} />
-          <meshBasicMaterial map={handTexture} transparent={true} depthTest={false} />
-          <pointLight intensity={2.0} distance={20} color="#fffbeb" decay={2} />
-        </mesh>
-      </>
+      handRef.current.position.y += Math.abs(Math.sin(bobTime.current)) * 0.02 * bobAmp.current;
+      handRef.current.rotation.z += Math.cos(bobTime.current / 2) * 0.02 * bobAmp.current; 
+    }
+
+    const oldX = camera.position.x;
+    const oldZ = camera.position.z;
+
+    if (moveState.current.forward) controlsRef.current.moveForward(moveSpeed);
+    if (moveState.current.backward) controlsRef.current.moveForward(-moveSpeed);
+    if (moveState.current.right) controlsRef.current.moveRight(moveSpeed);
+    if (moveState.current.left) controlsRef.current.moveRight(-moveSpeed);
+
+    const newX = camera.position.x;
+    const newZ = camera.position.z;
+    const radius = 0.22;
+
+    const isSolidTile = (x, z) => {
+      const gx = Math.floor(x); const gz = Math.floor(z);
+      if (gz < 0 || gz >= grids[currentFIdx].length || gx < 0 || gx >= grids[currentFIdx][0].length) return true;
+      const tile = grids[currentFIdx][gz][gx];
+      // 🚨 NEW: Added tile 7 to the solid collision array! (17 is open and walkable)
+      return [1, 2, 12, 22, 7, 3, 4].includes(tile);
+    };
+
+    const collidesAt = (x, z) => (
+      isSolidTile(x - radius, z - radius) || isSolidTile(x + radius, z - radius) ||
+      isSolidTile(x - radius, z + radius) || isSolidTile(x + radius, z + radius)
     );
-  }
+
+    camera.position.x = newX;
+    camera.position.z = oldZ;
+    if (collidesAt(camera.position.x, camera.position.z)) camera.position.x = oldX;
+
+    camera.position.z = newZ;
+    if (collidesAt(camera.position.x, camera.position.z)) camera.position.z = oldZ;
+
+    // 🚨 NEW: Elevator Proximity Trigger (If you walk into an open elevator tile (10), you teleport)
+    const currentMapTile = grids[currentFIdx]?.[Math.floor(camera.position.z)]?.[Math.floor(camera.position.x)];
+    if (currentMapTile === 10 && !elevatorDebounce.current) {
+      elevatorDebounce.current = true;
+      onEnterElevator(currentFIdx);
+      setTimeout(() => { elevatorDebounce.current = false; }, 2000);
+    }
+  });
+
+  return (
+    <>
+      <PointerLockControls makeDefault ref={controlsRef} minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI * 3 / 4} />
+      <mesh ref={handRef} renderOrder={999}>
+        <planeGeometry args={[0.23, 0.23]} />
+        <meshBasicMaterial map={handTexture} transparent={true} depthTest={false} />
+        <pointLight intensity={2.0} distance={20} color="#fffbeb" decay={2} />
+      </mesh>
+    </>
+  );
+}
 
 // ----------------------------------------------------
 // 5. MAIN SCENE RENDERING
 // ----------------------------------------------------
-function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
+function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator }) {
   const woodTexList = useTexture([
     '/wall_timber_structure_cross.png', '/wall_timber_structure_diagonal.png',
     '/wall_timber_structure_vertical.png', '/wall_timber_structure.png'
@@ -310,20 +335,21 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     '/wall_stone_depth.png', '/wall_stone.png'
   ]);
 
-  const [tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow] = useTexture([
+  const [tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt] = useTexture([
     '/floor_stone_pattern.png', '/floor_tiles_tan_large.png', '/door_wood.png', '/door_metal_gate.png',
     '/door_metal_frame.png', '/window_round_pane_lit.png', '/hand.png',
-    '/red_keycard.png', '/blue_keycard.png', '/yellow_keycard.png'
+    '/red_keycard.png', '/blue_keycard.png', '/yellow_keycard.png', '/right_handed_crt.png'
   ]);
 
   useEffect(() => {
-    [...woodTexList, ...stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow].forEach(t => {
+    // Make sure you add tCrt to the array being filtered here so it stays pixelated!
+    [...woodTexList, ...stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt].forEach(t => {
       if(t) { t.magFilter = t.minFilter = THREE.NearestFilter; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.needsUpdate = true; }
     });
     woodTexList.forEach(t => t.repeat.set(1, 3.2));
     stoneTexList.forEach(t => t.repeat.set(1, 3.2));
-  }, [woodTexList, stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow]);
-
+  }, [woodTexList, stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt]);
+  
   const parsedData = useMemo(() => {
     const dummy = new THREE.Object3D();
     
@@ -385,7 +411,8 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
             if (isWoodFloor) wFloorBuff.add(dummy); else sFloorBuff.add(dummy);
           }
 
-          if ([2,8,12,18,22,28].includes(tile)) {
+          // 🚨 NEW: Added 7 and 17 to the interactive door array mapping
+          if ([2,8,12,18,22,28,7,17].includes(tile)) {
             const tIdx = (x * 7 + z * 13 + fIdx * 3) % (isWoodFloor ? wLen : sLen);
             const lintelHt = FLOOR_HT - 2.0;
             dummy.position.set(x + 0.5, baseY + 2.0 + (lintelHt/2), z + 0.5);
@@ -394,7 +421,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
             if (isWoodFloor) wWallsBuffs[tIdx].add(dummy); else sWallsBuffs[tIdx].add(dummy);
           }
 
-          if ([2,8,12,18,22,28, 3,10, 4, 5,15,25, 6].includes(tile)) {
+          if ([2,8,12,18,22,28,7,17, 3,10, 4, 5,15,25, 6].includes(tile)) {
             interactives.push({ tile, x, z, fIdx, baseY });
             if (interactives.length > 5000) return { error: "TOO_MANY_ENTITIES", count: interactives.length };
           }
@@ -447,15 +474,19 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         const wTex = wTexList[(x * 7 + z * 13 + fIdx * 3) % wTexList.length];
         const dTex = fIdx < 2 ? tDoorWood : tDoorMetal;
         
-        if ([2,8,12,18,22,28].includes(tile)) {
+        if ([2,8,12,18,22,28,7,17].includes(tile)) {
           let trimColor = "#dc2626";
           if (tile === 12 || tile === 18) trimColor = "#2563eb";
           if (tile === 22 || tile === 28) trimColor = "#eab308";
-          return <DoorMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={[8,18,28].includes(tile)} wallTexture={wTex} doorTexture={dTex} trimColor={trimColor} />;
+          // 🚨 NEW: Standard unlocked doors get a clean, neutral trim
+          if (tile === 7 || tile === 17) trimColor = "#a1a1aa"; 
+          
+          return <DoorMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={[8,18,28,17].includes(tile)} wallTexture={wTex} doorTexture={dTex} trimColor={trimColor} />;
         }
         if (tile === 3 || tile === 10) return <ElevatorMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={tile === 10} wallTexture={wTex} doorTexture={tDoorMetalFrame} litTexture={tWindow} />;
-        if (tile === 4) return <TerminalMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} />;
-        
+       // Replace the old Terminal line with this one:
+       if (tile === 4) return <TerminalMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tCrt} />;
+
         if (tile === 5) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tKeyRed} color="#8B0000" />;
         if (tile === 15) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tKeyBlue} color="#00008B" />;
         if (tile === 25) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tKeyYellow} color="#B8860B" />;
@@ -464,19 +495,19 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         return null;
       })}
       
-      <PlayerControls grids={grids} handTexture={tHand} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
+      <PlayerControls grids={grids} handTexture={tHand} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} />
     </>
   );
 }
 
-export default function DungeonEngine({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange }) {
+export default function DungeonEngine({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator }) {
   return (
     <div className="w-full h-screen bg-black relative">
       <Canvas camera={{ position: initialSpawn || [5.5, 0.8, 5.5], fov: 80, near: 0.01, far: 50 }} gl={{ antialias: false }}>
         <fog attach="fog" args={['#000000', 4, 18]} />
         <ambientLight intensity={1.0} color="#ffffff" />
         <Suspense fallback={null}>
-          <DungeonScene grids={grids} initialSpawn={initialSpawn} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} />
+          <DungeonScene grids={grids} initialSpawn={initialSpawn} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} />
         </Suspense>
       </Canvas>
     </div>

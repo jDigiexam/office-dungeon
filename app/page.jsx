@@ -16,14 +16,12 @@ export default function EscapeRoomPage() {
   const [inventory, setInventory] = useState([]);
   const [gameStarted, setGameStarted] = useState(false);
   const [message, setMessage] = useState('');
-  const [showElevatorMenu, setShowElevatorMenu] = useState(false);
   const [teleportCoords, setTeleportCoords] = useState(null);
   
   const [grids, setGrids] = useState(null);
   const [spawnCoords, setSpawnCoords] = useState([5.5, 0.8, 5.5]);
   const [mapsLoading, setMapsLoading] = useState(true);
 
-  // Puzzle States
   const [activePuzzle, setActivePuzzle] = useState(null);
   const [solvedPuzzles, setSolvedPuzzles] = useState([]);
   const [puzzleInput, setPuzzleInput] = useState('');
@@ -68,6 +66,9 @@ export default function EscapeRoomPage() {
       openDoor(0); 
     };
 
+    // 🚨 NEW: Standard door logic (Gray) opens instantly without a keycard
+    if (tileType === 7) { triggerMessage("DOOR OPENED"); openDoor(17); }
+
     if (tileType === 2) {
       if (inventory.includes('RED KEYCARD')) { triggerMessage("ACCESS GRANTED"); openDoor(8); }
       else triggerMessage("LOCKED - RED KEYCARD REQUIRED");
@@ -85,43 +86,55 @@ export default function EscapeRoomPage() {
     if (tileType === 15) pickupKey('BLUE KEYCARD');
     if (tileType === 25) pickupKey('YELLOW KEYCARD');
 
-    // 🚨 TERMINAL PUZZLE LOGIC
     if (tileType === 4) {
       const puzzleKey = `${fIdx}_${x}_${z}`;
-      
-      if (solvedPuzzles.includes(puzzleKey)) {
-        triggerMessage("TERMINAL ALREADY OVERRIDDEN.");
-        return;
-      }
+      if (solvedPuzzles.includes(puzzleKey)) { triggerMessage("TERMINAL ALREADY OVERRIDDEN."); return; }
 
       const puzzleData = TERMINAL_PUZZLES[puzzleKey];
-      
       if (puzzleData) {
         document.exitPointerLock();
         setActivePuzzle({ ...puzzleData, key: puzzleKey });
-        setPuzzleInput('');
-        setPuzzleError('');
+        setPuzzleInput(''); setPuzzleError('');
       } else {
         triggerMessage("TERMINAL OFFLINE. NO DATA FOUND.");
       }
     }
 
     if (tileType === 3) { triggerMessage("ELEVATOR DOORS OPENING"); openDoor(10); }
-    if (tileType === 10) { document.exitPointerLock(); setShowElevatorMenu(true); }
   };
 
-  const handleElevatorSelect = (targetFloorIndex) => {
-    setTeleportCoords({ x: 2.5, y: targetFloorIndex * 4 + 0.8, z: 2.5 });
-    setShowElevatorMenu(false);
-    triggerMessage(`ELEVATOR TRANSIT: FLOOR E1M${targetFloorIndex + 1}`);
-    const newGrids = grids.map(grid => grid.map(row => row.map(cell => cell === 10 ? 3 : cell)));
+  // 🚨 NEW: Automatic Elevator Teleport Function
+  const handleEnterElevator = (fIdx) => {
+    const targetFloor = fIdx + 1;
+    if (targetFloor >= grids.length || !grids[targetFloor]) {
+      triggerMessage("MAXIMUM FLOOR REACHED");
+      return;
+    }
+    
+    // Safely drop the player on the first Walkable Floor (0) found on the next level
+    let safeTransit = { x: 2.5, y: targetFloor * 3.2 + 0.8, z: 2.5 };
+    let found = false;
+    for (let z = 0; z < grids[targetFloor].length; z++) {
+      for (let x = 0; x < grids[targetFloor][z].length; x++) {
+        if (grids[targetFloor][z][x] === 0) {
+          safeTransit = { x: x + 0.5, y: targetFloor * 3.2 + 0.8, z: z + 0.5 };
+          found = true; break;
+        }
+      }
+      if (found) break;
+    }
+
+    setTeleportCoords(safeTransit);
+    triggerMessage(`ELEVATOR TRANSIT: FLOOR E1M${targetFloor + 1}`);
+    
+    // Auto-close the elevator doors on the old floor behind the player
+    const newGrids = [...grids];
+    newGrids[fIdx] = grids[fIdx].map(row => row.map(cell => cell === 10 ? 3 : cell));
     setGrids(newGrids);
   };
 
   const handlePuzzleSubmit = (submittedAnswer) => {
-    // Standardize input by removing whitespace and converting to lowercase
     const isCorrect = submittedAnswer.toString().toLowerCase().trim() === activePuzzle.answer.toString().toLowerCase().trim();
-    
     if (isCorrect) {
       const { reward } = activePuzzle;
       const newGrids = [...grids];
@@ -144,7 +157,6 @@ export default function EscapeRoomPage() {
           <div className="border-4 border-stone-700 bg-stone-900 p-8 text-center max-w-md">
             <h1 className="text-4xl font-extrabold mb-1 tracking-widest text-red-600">OFFICE DUNGEON</h1>
             <p className="mb-8 text-stone-300 text-xs">Use WASD to run. Mouse to look. 'E' to interact.</p>
-            
             {mapsLoading ? (
               <button disabled className="w-full py-3 bg-stone-700 text-stone-500 font-extrabold animate-pulse">
                 INITIALIZING SATELLITE LINK...
@@ -154,7 +166,6 @@ export default function EscapeRoomPage() {
                 START ESCAPE
               </button>
             )}
-            
           </div>
         </div>
       ) : (
@@ -166,9 +177,9 @@ export default function EscapeRoomPage() {
             teleportCoords={teleportCoords}
             clearTeleport={() => setTeleportCoords(null)}
             onFloorChange={(f) => setCurrentFloor(f)}
+            onEnterElevator={handleEnterElevator}
           />
 
-          {/* 🚨 TERMINAL PUZZLE UI OVERLAY */}
           {activePuzzle && (
             <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
               <div className="bg-stone-900 border-4 border-emerald-600 p-8 w-[600px] max-w-[90vw] shadow-2xl shadow-emerald-900/20">
@@ -176,9 +187,7 @@ export default function EscapeRoomPage() {
                   <h2 className="text-emerald-500 text-xl font-black tracking-widest">{activePuzzle.title}</h2>
                   <span className="text-stone-500 text-xs animate-pulse">AWAITING INPUT...</span>
                 </div>
-                
                 <p className="text-stone-200 text-lg mb-8 leading-relaxed">{activePuzzle.question}</p>
-                
                 {activePuzzle.type === 'multiple-choice' ? (
                   <div className="flex flex-col gap-3">
                     {activePuzzle.options.map((opt, i) => (
@@ -203,32 +212,12 @@ export default function EscapeRoomPage() {
                     </button>
                   </div>
                 )}
-
                 {puzzleError && <p className="text-red-500 text-sm mt-4 font-bold text-center">{puzzleError}</p>}
-                
                 <div className="mt-8 text-center">
                   <button onClick={() => setActivePuzzle(null)} className="text-stone-500 text-xs hover:text-white transition-colors">
                     [ ABORT CONNECTION ]
                   </button>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {showElevatorMenu && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-              <div className="bg-stone-900 border-4 border-yellow-600 p-8 w-96 text-center">
-                <h2 className="text-yellow-500 text-2xl font-black mb-6 tracking-widest">ELEVATOR SYSTEM</h2>
-                <div className="flex flex-col gap-4">
-                  {[0, 1, 2].map((f) => (
-                    <button key={f} onClick={() => handleElevatorSelect(f)} className="bg-stone-800 hover:bg-yellow-600 hover:text-black text-yellow-500 border-2 border-stone-600 py-3 font-bold uppercase transition-colors">
-                      E1M{f + 1} - SECTOR DATA
-                    </button>
-                  ))}
-                </div>
-                <button onClick={() => setShowElevatorMenu(false)} className="mt-6 text-stone-400 text-xs hover:text-white">
-                  [ CANCEL ]
-                </button>
               </div>
             </div>
           )}
@@ -244,12 +233,10 @@ export default function EscapeRoomPage() {
               <span className="text-[10px] text-stone-500 font-bold">LEVEL</span>
               <span className="text-red-500 font-black mt-1">E1M{currentFloor + 1}</span>
             </div>
-
             <div className="hidden md:flex bg-stone-950 border-2 border-stone-700 px-6 py-2 flex-col items-center justify-center flex-1 mx-4">
               <span className="text-[10px] text-stone-500 font-bold">CURRENT SECTOR</span>
               <span className="text-xs font-bold text-yellow-500 mt-0.5">UNKNOWN AREA</span>
             </div>
-
             <div className="bg-stone-950 border-2 border-stone-700 px-4 py-1 flex flex-col items-center justify-center min-w-[180px]">
               <span className="text-[10px] text-stone-500 font-bold">INVENTORY</span>
               <div className="flex gap-3 mt-1">
