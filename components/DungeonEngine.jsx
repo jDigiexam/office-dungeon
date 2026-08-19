@@ -444,8 +444,8 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
             if (isWoodFloor) wFloorBuff.add(dummy); else sFloorBuff.add(dummy);
           }
 
-          // 🚨 NEW: Added 7 and 17 to the interactive door array mapping
-          if ([2,8,12,18,22,28,7,17].includes(tile)) {
+          // Added 32 and 38 to generate door meshes
+          if ([2, 8, 12, 18, 22, 28, 7, 17, 32, 38].includes(tile)) {
             const tIdx = (x * 7 + z * 13 + fIdx * 3) % (isWoodFloor ? wLen : sLen);
             const lintelHt = FLOOR_HT - 2.0;
             dummy.position.set(x + 0.5, baseY + 2.0 + (lintelHt/2), z + 0.5);
@@ -454,7 +454,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
             if (isWoodFloor) wWallsBuffs[tIdx].add(dummy); else sWallsBuffs[tIdx].add(dummy);
           }
 
-          if ([2,8,12,18,22,28,7,17, 3,10, 4, 5,15,25, 6].includes(tile)) {
+          if ([2, 8, 12, 18, 22, 28, 7, 17, 3, 10, 4, 5, 15, 25, 6, 32, 38].includes(tile)) {
             interactives.push({ tile, x, z, fIdx, baseY });
             if (interactives.length > 5000) return { error: "TOO_MANY_ENTITIES", count: interactives.length };
           }
@@ -507,15 +507,19 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         const wTex = wTexList[(x * 7 + z * 13 + fIdx * 3) % wTexList.length];
         const dTex = fIdx < 2 ? tDoorWood : tDoorMetal;
         
-        if ([2,8,12,18,22,28,7,17].includes(tile)) {
+        // Add 32 and 38 to the inclusion check
+        if ([2,8,12,18,22,28,7,17,32,38].includes(tile)) {
           let trimColor = "#dc2626";
           if (tile === 12 || tile === 18) trimColor = "#2563eb";
           if (tile === 22 || tile === 28) trimColor = "#eab308";
-          // 🚨 NEW: Standard unlocked doors get a clean, neutral trim
-          if (tile === 7 || tile === 17) trimColor = "#a1a1aa"; 
           
-          return <DoorMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={[8,18,28,17].includes(tile)} wallTexture={wTex} doorTexture={dTex} trimColor={trimColor} />;
+          // Apply the neutral trim to BOTH Gray and Light Gray doors
+          if (tile === 7 || tile === 17 || tile === 32 || tile === 38) trimColor = "#a1a1aa"; 
+          
+          // Pass 38 into the isOpened array!
+          return <DoorMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={[8,18,28,17,38].includes(tile)} wallTexture={wTex} doorTexture={dTex} trimColor={trimColor} />;
         }
+        
         if (tile === 3 || tile === 10) return <ElevatorMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={tile === 10} wallTexture={wTex} doorTexture={tDoorMetalFrame} litTexture={tWindow} />;
        // Replace the old Terminal line with this one:
        if (tile === 4) return <TerminalMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tCrt} />;
