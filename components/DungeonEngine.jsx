@@ -69,18 +69,23 @@ function KeycardMesh({ position, texture, color }) {
 
 function TerminalMesh({ position, texture }) {
     const crtRef = useRef();
-    // Slowly rotate the CRT sprite so it always catches the player's eye
-    useFrame((_, delta) => { if (crtRef.current) crtRef.current.rotation.y += Math.min(delta, 0.1) * 1.5; });
+    
+    // 🚨 FIX: "Billboarding" - The CRT monitor always rotates to face the player's camera
+    useFrame(({ camera }) => { 
+      if (crtRef.current) {
+        crtRef.current.lookAt(camera.position); 
+      }
+    });
     
     return (
       <group position={position}>
-        {/* The Gray Pedestal */}
+        {/* The Solid Gray Pedestal (Does not rotate) */}
         <mesh position={[0, 0.4, 0]}>
           <boxGeometry args={[0.5, 0.8, 0.5]} />
           <meshStandardMaterial color="#808080" roughness={0.9} />
         </mesh>
         
-        {/* The CRT Monitor Sprite */}
+        {/* The CRT Monitor Sprite (Rotates to face the player) */}
         <mesh ref={crtRef} position={[0, 1.1, 0]}>
           <planeGeometry args={[0.7, 0.7]} />
           <meshStandardMaterial 
@@ -349,7 +354,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     woodTexList.forEach(t => t.repeat.set(1, 3.2));
     stoneTexList.forEach(t => t.repeat.set(1, 3.2));
   }, [woodTexList, stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt]);
-  
+
   const parsedData = useMemo(() => {
     const dummy = new THREE.Object3D();
     
