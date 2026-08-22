@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { loadMapFromImage } from '@/lib/mapParser';
-import { TERMINAL_PUZZLES } from '@/lib/puzzleData';
+import { TERMINAL_DIRECTORY, RIDDLE_BANK } from '@/lib/puzzleData';
 
 const DungeonEngine = dynamic(() => import('@/components/DungeonEngine'), { ssr: false });
 
@@ -27,6 +27,8 @@ export default function EscapeRoomPage() {
   // 🚨 NEW: Track which riddles have been drawn, and which terminal they belong to
   const [assignedRiddles, setAssignedRiddles] = useState({}); 
   const [usedRiddleIndices, setUsedRiddleIndices] = useState([]);
+  // 🚨 NEW: Tracks the current state of the Lights Out grid
+  const [puzzleGrid, setPuzzleGrid] = useState([]);
   const [puzzleInput, setPuzzleInput] = useState('');
   const [puzzleError, setPuzzleError] = useState('');
 
@@ -68,6 +70,56 @@ export default function EscapeRoomPage() {
       setInventory([...inventory, keyName]);
       openDoor(0); 
     };
+
+    // 🚨 NEW: Reusable success trigger
+  const handlePuzzleSuccess = (puzzle) => {
+    const { reward } = puzzle;
+    const newGrids = [...grids];
+    newGrids[reward.fIdx] = grids[reward.fIdx].map((row, rIdx) =>
+      row.map((col, cIdx) => (rIdx === reward.z && cIdx === reward.x ? reward.newTile : col))
+    );
+    setGrids(newGrids);
+    setSolvedPuzzles([...solvedPuzzles, puzzle.key]);
+    triggerMessage(puzzle.successMessage);
+    setActivePuzzle(null);
+  };
+
+  const handlePuzzleSubmit = (submittedAnswer) => {
+    const isCorrect = submittedAnswer.toString().toLowerCase().trim() === activePuzzle.answer.toString().toLowerCase().trim();
+    if (isCorrect) {
+      handlePuzzleSuccess(activePuzzle);
+    } else {
+      setPuzzleError('INCORRECT CREDENTIALS OR ANSWER.');
+    }
+  };
+
+  // 🚨 NEW: Logic for clicking a Lights Out node
+  const handleNodeClick = (index) => {
+    const size = activePuzzle.gridSize;
+    const newGrid = [...puzzleGrid];
+    const r = Math.floor(index / size);
+    const c = index % size;
+
+    const toggle = (row, col) => {
+      if (row >= 0 && row < size && col >= 0 && col < size) {
+        const idx = row * size + col;
+        newGrid[idx] = newGrid[idx] === 1 ? 0 : 1;
+      }
+    };
+
+    toggle(r, c);       // Center
+    toggle(r - 1, c);   // Top
+    toggle(r + 1, c);   // Bottom
+    toggle(r, c - 1);   // Left
+    toggle(r, c + 1);   // Right
+
+    setPuzzleGrid(newGrid);
+
+    // Check Win Condition (All nodes are 1)
+    if (newGrid.every(cell => cell === 1)) {
+      setTimeout(() => handlePuzzleSuccess(activePuzzle), 300);
+    }
+  };
 
   // Gray Terminal Door (Requires puzzle)
   if (tileType === 7) { triggerMessage("LOCKED - TERMINAL OVERRIDE REQUIRED"); }
@@ -120,6 +172,10 @@ export default function EscapeRoomPage() {
             
             puzzleDataToUse = { ...terminalData, ...RIDDLE_BANK[chosenIndex], type: "text-input" };
           }
+        }
+        // 🚨 NEW: Load the initial grid into state
+        if (terminalData.type === 'lights-out') {
+          setPuzzleGrid([...terminalData.initialGrid]);
         }
 
         setActivePuzzle({ ...puzzleDataToUse, key: puzzleKey });
@@ -217,7 +273,27 @@ export default function EscapeRoomPage() {
                   <span className="text-stone-500 text-xs animate-pulse">AWAITING INPUT...</span>
                 </div>
                 <p className="text-stone-200 text-lg mb-8 leading-relaxed">{activePuzzle.question}</p>
-                {activePuzzle.type === 'multiple-choice' ? (
+                {activePuzzle.type === 'lights-out' ? (
+                  <div 
+                    className="grid gap-2 mx-auto" 
+                    style={{ 
+                      gridTemplateColumns: `repeat(${activePuzzle.gridSize}, minmax(0, 1fr))`,
+                      width: `${activePuzzle.gridSize * 80}px` 
+                    }}
+                  >
+                    {puzzleGrid.map((nodeState, idx) => (
+                      <button 
+                        key={idx} 
+                        onClick={() => handleNodeClick(idx)} 
+                        className={`h-20 w-20 border-4 transition-colors ${
+                          nodeState === 1 
+                            ? 'bg-emerald-500 border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.8)]' 
+                            : 'bg-stone-900 border-stone-700 hover:border-emerald-900'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                ) : activePuzzle.type === 'multiple-choice' ? (
                   <div className="flex flex-col gap-3">
                     {activePuzzle.options.map((opt, i) => (
                       <button key={i} onClick={() => handlePuzzleSubmit(opt)} className="bg-stone-800 hover:bg-emerald-600 hover:text-black text-emerald-500 border-2 border-stone-600 py-3 px-4 font-bold transition-colors text-left">
