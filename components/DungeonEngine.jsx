@@ -240,7 +240,7 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
     const handleKeyDown = (e) => {
       if (e.repeat) return; 
       
-      // 🚨 FIX 1: If the mouse is not locked (e.g., a puzzle is open), completely ignore game inputs!
+      // Ignore NEW key presses if a puzzle menu is open
       if (!document.pointerLockElement) return;
 
       const key = e.key.toLowerCase();
@@ -250,7 +250,6 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
       if (key === 'd') moveState.current.right = true;
 
       if (key === 'e') {
-        // 🚨 FIX 2: Prevent the browser from passing this "e" into the auto-focused text box
         e.preventDefault(); 
         
         const dir = new THREE.Vector3();
@@ -265,9 +264,7 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
     };
     
     const handleKeyUp = (e) => {
-      // Also ignore key releases if the menu is open
-      if (!document.pointerLockElement) return;
-
+      // 🚨 FIX: ALWAYS process key releases so the engine knows you let go of the keys!
       const key = e.key.toLowerCase();
       if (key === 'w') moveState.current.forward = false;
       if (key === 's') moveState.current.backward = false;
