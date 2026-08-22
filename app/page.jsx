@@ -24,6 +24,9 @@ export default function EscapeRoomPage() {
 
   const [activePuzzle, setActivePuzzle] = useState(null);
   const [solvedPuzzles, setSolvedPuzzles] = useState([]);
+  // 🚨 NEW: Track which riddles have been drawn, and which terminal they belong to
+  const [assignedRiddles, setAssignedRiddles] = useState({}); 
+  const [usedRiddleIndices, setUsedRiddleIndices] = useState([]);
   const [puzzleInput, setPuzzleInput] = useState('');
   const [puzzleError, setPuzzleError] = useState('');
 
@@ -93,10 +96,33 @@ export default function EscapeRoomPage() {
       const puzzleKey = `${fIdx}_${x}_${z}`;
       if (solvedPuzzles.includes(puzzleKey)) { triggerMessage("TERMINAL ALREADY OVERRIDDEN."); return; }
 
-      const puzzleData = TERMINAL_PUZZLES[puzzleKey];
-      if (puzzleData) {
+      const terminalData = TERMINAL_DIRECTORY[puzzleKey];
+      if (terminalData) {
         document.exitPointerLock();
-        setActivePuzzle({ ...puzzleData, key: puzzleKey });
+        let puzzleDataToUse = terminalData;
+
+        // 🚨 NEW: Dynamically pull a non-repeating riddle
+        if (terminalData.type === 'random-riddle') {
+          if (assignedRiddles[puzzleKey]) {
+            // If we already assigned a riddle to this terminal, load it
+            puzzleDataToUse = { ...terminalData, ...assignedRiddles[puzzleKey] };
+          } else {
+            // Filter out any riddles we have already used
+            const availableRiddles = RIDDLE_BANK.filter((_, idx) => !usedRiddleIndices.includes(idx));
+            if (availableRiddles.length === 0) { triggerMessage("NO MORE DATA."); return; }
+            
+            // Pick a random unused riddle
+            const chosenIndex = RIDDLE_BANK.indexOf(availableRiddles[Math.floor(Math.random() * availableRiddles.length)]);
+            
+            // Save it to state so it doesn't reroll if the player walks away
+            setUsedRiddleIndices([...usedRiddleIndices, chosenIndex]);
+            setAssignedRiddles({ ...assignedRiddles, [puzzleKey]: RIDDLE_BANK[chosenIndex] });
+            
+            puzzleDataToUse = { ...terminalData, ...RIDDLE_BANK[chosenIndex], type: "text-input" };
+          }
+        }
+
+        setActivePuzzle({ ...puzzleDataToUse, key: puzzleKey });
         setPuzzleInput(''); setPuzzleError('');
       } else {
         triggerMessage("TERMINAL OFFLINE. NO DATA FOUND.");
