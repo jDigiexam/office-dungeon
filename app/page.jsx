@@ -22,15 +22,23 @@ export default function EscapeRoomPage() {
   const [spawnCoords, setSpawnCoords] = useState([5.5, 0.8, 5.5]);
   const [mapsLoading, setMapsLoading] = useState(true);
 
+  // Core Puzzle States
   const [activePuzzle, setActivePuzzle] = useState(null);
   const [solvedPuzzles, setSolvedPuzzles] = useState([]);
-  // 🚨 NEW: Track which riddles have been drawn, and which terminal they belong to
-  const [assignedRiddles, setAssignedRiddles] = useState({}); 
-  const [usedRiddleIndices, setUsedRiddleIndices] = useState([]);
-  // 🚨 NEW: Tracks the current state of the Lights Out grid
-  const [puzzleGrid, setPuzzleGrid] = useState([]);
   const [puzzleInput, setPuzzleInput] = useState('');
   const [puzzleError, setPuzzleError] = useState('');
+
+  // Random Riddle States
+  const [assignedRiddles, setAssignedRiddles] = useState({}); 
+  const [usedRiddleIndices, setUsedRiddleIndices] = useState([]);
+  
+  // Grid Mini-Game States
+  const [puzzleGrid, setPuzzleGrid] = useState([]);
+  
+  // Memory Match Mini-Game States
+  const [memoryIndex, setMemoryIndex] = useState(0);
+  const [isPlayingMemory, setIsPlayingMemory] = useState(false);
+  const [flashNode, setFlashNode] = useState(null);
 
   useEffect(() => {
     const fetchMaps = async () => {
@@ -56,22 +64,9 @@ export default function EscapeRoomPage() {
     setTimeout(() => setMessage(''), 3000);
   };
 
-  const handleInteract = (tileType, x, z, fIdx) => {
-    const openDoor = (targetType) => {
-      const newGrids = [...grids];
-      newGrids[fIdx] = grids[fIdx].map((row, rIdx) =>
-        row.map((col, cIdx) => (rIdx === z && cIdx === x ? targetType : col))
-      );
-      setGrids(newGrids);
-    };
-
-    const pickupKey = (keyName) => {
-      triggerMessage(`ACQUIRED ${keyName}`);
-      setInventory([...inventory, keyName]);
-      openDoor(0); 
-    };
-
-    // 🚨 NEW: Reusable success trigger
+  // ------------------------------------------------------------------
+  // PUZZLE LOGIC & HANDLERS
+  // ------------------------------------------------------------------
   const handlePuzzleSuccess = (puzzle) => {
     const { reward } = puzzle;
     const newGrids = [...grids];
@@ -93,7 +88,6 @@ export default function EscapeRoomPage() {
     }
   };
 
-  // 🚨 NEW: Logic for clicking a Lights Out node
   const handleNodeClick = (index) => {
     const size = activePuzzle.gridSize;
     const newGrid = [...puzzleGrid];
@@ -107,25 +101,103 @@ export default function EscapeRoomPage() {
       }
     };
 
-    toggle(r, c);       // Center
-    toggle(r - 1, c);   // Top
-    toggle(r + 1, c);   // Bottom
-    toggle(r, c - 1);   // Left
-    toggle(r, c + 1);   // Right
+    toggle(r, c);       
+    toggle(r - 1, c);   
+    toggle(r + 1, c);   
+    toggle(r, c - 1);   
+    toggle(r, c + 1);   
 
     setPuzzleGrid(newGrid);
 
-    // Check Win Condition (All nodes are 1)
     if (newGrid.every(cell => cell === 1)) {
       setTimeout(() => handlePuzzleSuccess(activePuzzle), 300);
     }
   };
 
-  // Gray Terminal Door (Requires puzzle)
-  if (tileType === 7) { triggerMessage("LOCKED - TERMINAL OVERRIDE REQUIRED"); }
+  const handleSlideClick = (index) => {
+    const size = activePuzzle.gridSize;
+    const newGrid = [...puzzleGrid];
+    const emptyIdx = newGrid.indexOf(0);
     
-  // 🚨 NEW: Light Gray Manual Door (Opens freely)
-  if (tileType === 32) { triggerMessage("DOOR OPENED"); openDoor(38); }
+    const row = Math.floor(index / size);
+    const col = index % size;
+    const emptyRow = Math.floor(emptyIdx / size);
+    const emptyCol = emptyIdx % size;
+    
+    const isAdjacent = Math.abs(row - emptyRow) + Math.abs(col - emptyCol) === 1;
+    
+    if (isAdjacent) {
+      newGrid[emptyIdx] = newGrid[index];
+      newGrid[index] = 0;
+      setPuzzleGrid(newGrid);
+      
+      const winState = Array.from({length: size * size - 1}, (_, i) => i + 1).concat(0).join(',');
+      
+      if (newGrid.join(',') === winState) {
+        setTimeout(() => handlePuzzleSuccess(activePuzzle), 300);
+      }
+    }
+  };
+
+  const playMemorySequence = async (seq) => {
+    setIsPlayingMemory(true);
+    setPuzzleError('');
+    await new Promise(r => setTimeout(r, 800)); 
+    
+    for (let i = 0; i < seq.length; i++) {
+      setFlashNode(seq[i]);
+      await new Promise(r => setTimeout(r, 500)); 
+      setFlashNode(null);
+      await new Promise(r => setTimeout(r, 250)); 
+    }
+    setIsPlayingMemory(false);
+  };
+
+  const handleMemoryClick = (node) => {
+    if (isPlayingMemory) return;
+    
+    const seq = activePuzzle.sequence;
+    if (node === seq[memoryIndex]) {
+      const nextIdx = memoryIndex + 1;
+      setMemoryIndex(nextIdx);
+      
+      setFlashNode(node);
+      setTimeout(() => setFlashNode(null), 200);
+
+      if (nextIdx === seq.length) {
+        setTimeout(() => handlePuzzleSuccess(activePuzzle), 400);
+      }
+    } else {
+      setPuzzleError('SEQUENCE FAILED. REBOOTING...');
+      setMemoryIndex(0);
+      setIsPlayingMemory(true); 
+      
+      setTimeout(() => {
+        playMemorySequence(seq);
+      }, 1500);
+    }
+  };
+
+  // ------------------------------------------------------------------
+  // WORLD INTERACTION
+  // ------------------------------------------------------------------
+  const handleInteract = (tileType, x, z, fIdx) => {
+    const openDoor = (targetType) => {
+      const newGrids = [...grids];
+      newGrids[fIdx] = grids[fIdx].map((row, rIdx) =>
+        row.map((col, cIdx) => (rIdx === z && cIdx === x ? targetType : col))
+      );
+      setGrids(newGrids);
+    };
+
+    const pickupKey = (keyName) => {
+      triggerMessage(`ACQUIRED ${keyName}`);
+      setInventory([...inventory, keyName]);
+      openDoor(0); 
+    };
+
+    if (tileType === 7) { triggerMessage("LOCKED - TERMINAL OVERRIDE REQUIRED"); }
+    if (tileType === 32) { triggerMessage("DOOR OPENED"); openDoor(38); }
 
     if (tileType === 2) {
       if (inventory.includes('RED KEYCARD')) { triggerMessage("ACCESS GRANTED"); openDoor(8); }
@@ -153,42 +225,41 @@ export default function EscapeRoomPage() {
         document.exitPointerLock();
         let puzzleDataToUse = terminalData;
 
-        // 🚨 NEW: Dynamically pull a non-repeating riddle
         if (terminalData.type === 'random-riddle') {
           if (assignedRiddles[puzzleKey]) {
-            // If we already assigned a riddle to this terminal, load it
             puzzleDataToUse = { ...terminalData, ...assignedRiddles[puzzleKey] };
           } else {
-            // Filter out any riddles we have already used
             const availableRiddles = RIDDLE_BANK.filter((_, idx) => !usedRiddleIndices.includes(idx));
             if (availableRiddles.length === 0) { triggerMessage("NO MORE DATA."); return; }
             
-            // Pick a random unused riddle
             const chosenIndex = RIDDLE_BANK.indexOf(availableRiddles[Math.floor(Math.random() * availableRiddles.length)]);
             
-            // Save it to state so it doesn't reroll if the player walks away
             setUsedRiddleIndices([...usedRiddleIndices, chosenIndex]);
             setAssignedRiddles({ ...assignedRiddles, [puzzleKey]: RIDDLE_BANK[chosenIndex] });
             
             puzzleDataToUse = { ...terminalData, ...RIDDLE_BANK[chosenIndex], type: "text-input" };
           }
         }
-        // 🚨 NEW: Load the initial grid into state
-        if (terminalData.type === 'lights-out') {
+
+        if (terminalData.type === 'lights-out' || terminalData.type === 'sliding-puzzle') {
           setPuzzleGrid([...terminalData.initialGrid]);
+        }
+        
+        if (terminalData.type === 'memory-match') {
+          setMemoryIndex(0);
+          playMemorySequence(terminalData.sequence);
         }
 
         setActivePuzzle({ ...puzzleDataToUse, key: puzzleKey });
         setPuzzleInput(''); setPuzzleError('');
       } else {
-        triggerMessage("TERMINAL OFFLINE. NO DATA FOUND.");
+        triggerMessage(`OFFLINE. ADD KEY "${puzzleKey}" TO DIRECTORY.`);
       }
     }
 
     if (tileType === 3) { triggerMessage("ELEVATOR DOORS OPENING"); openDoor(10); }
   };
 
-  // 🚨 NEW: Automatic Elevator Teleport Function
   const handleEnterElevator = (fIdx) => {
     const targetFloor = fIdx + 1;
     if (targetFloor >= grids.length || !grids[targetFloor]) {
@@ -196,7 +267,6 @@ export default function EscapeRoomPage() {
       return;
     }
     
-    // Safely drop the player on the first Walkable Floor (0) found on the next level
     let safeTransit = { x: 2.5, y: targetFloor * 3.2 + 0.8, z: 2.5 };
     let found = false;
     for (let z = 0; z < grids[targetFloor].length; z++) {
@@ -212,27 +282,9 @@ export default function EscapeRoomPage() {
     setTeleportCoords(safeTransit);
     triggerMessage(`ELEVATOR TRANSIT: FLOOR E1M${targetFloor + 1}`);
     
-    // Auto-close the elevator doors on the old floor behind the player
     const newGrids = [...grids];
     newGrids[fIdx] = grids[fIdx].map(row => row.map(cell => cell === 10 ? 3 : cell));
     setGrids(newGrids);
-  };
-
-  const handlePuzzleSubmit = (submittedAnswer) => {
-    const isCorrect = submittedAnswer.toString().toLowerCase().trim() === activePuzzle.answer.toString().toLowerCase().trim();
-    if (isCorrect) {
-      const { reward } = activePuzzle;
-      const newGrids = [...grids];
-      newGrids[reward.fIdx] = grids[reward.fIdx].map((row, rIdx) =>
-        row.map((col, cIdx) => (rIdx === reward.z && cIdx === reward.x ? reward.newTile : col))
-      );
-      setGrids(newGrids);
-      setSolvedPuzzles([...solvedPuzzles, activePuzzle.key]);
-      triggerMessage(activePuzzle.successMessage);
-      setActivePuzzle(null);
-    } else {
-      setPuzzleError('INCORRECT CREDENTIALS OR ANSWER.');
-    }
   };
 
   return (
@@ -273,7 +325,53 @@ export default function EscapeRoomPage() {
                   <span className="text-stone-500 text-xs animate-pulse">AWAITING INPUT...</span>
                 </div>
                 <p className="text-stone-200 text-lg mb-8 leading-relaxed">{activePuzzle.question}</p>
-                {activePuzzle.type === 'lights-out' ? (
+                
+                {activePuzzle.type === 'memory-match' ? (
+                  <div className="grid grid-cols-2 gap-4 mx-auto w-64">
+                    {[0, 1, 2, 3].map((node) => {
+                      const colors = ['bg-red-700', 'bg-blue-700', 'bg-emerald-700', 'bg-yellow-600'];
+                      const activeColors = [
+                        'bg-red-400 shadow-[0_0_25px_rgba(248,113,113,1)] scale-105', 
+                        'bg-blue-400 shadow-[0_0_25px_rgba(96,165,250,1)] scale-105', 
+                        'bg-emerald-400 shadow-[0_0_25px_rgba(52,211,153,1)] scale-105', 
+                        'bg-yellow-300 shadow-[0_0_25px_rgba(253,224,71,1)] scale-105'
+                      ];
+                      
+                      return (
+                        <button 
+                          key={node} 
+                          onClick={() => handleMemoryClick(node)} 
+                          disabled={isPlayingMemory}
+                          className={`h-28 w-28 border-4 border-stone-800 transition-all duration-100 ${
+                            flashNode === node ? activeColors[node] : colors[node] + ' opacity-40'
+                          } ${!isPlayingMemory ? 'hover:opacity-80' : ''}`}
+                        />
+                      );
+                    })}
+                  </div>
+                ) : activePuzzle.type === 'sliding-puzzle' ? (
+                  <div 
+                    className="grid gap-2 mx-auto" 
+                    style={{ 
+                      gridTemplateColumns: `repeat(${activePuzzle.gridSize}, minmax(0, 1fr))`,
+                      width: `${activePuzzle.gridSize * 80}px` 
+                    }}
+                  >
+                    {puzzleGrid.map((tile, idx) => (
+                      <button 
+                        key={idx} 
+                        onClick={() => tile !== 0 && handleSlideClick(idx)} 
+                        className={`h-20 w-20 border-4 transition-all flex items-center justify-center text-2xl font-black ${
+                          tile === 0 
+                            ? 'bg-transparent border-transparent cursor-default' 
+                            : 'bg-stone-900 border-stone-600 hover:border-emerald-500 text-emerald-400 hover:text-emerald-300'
+                        }`}
+                      >
+                        {tile !== 0 ? tile : ''}
+                      </button>
+                    ))}
+                  </div>
+                ) : activePuzzle.type === 'lights-out' ? (
                   <div 
                     className="grid gap-2 mx-auto" 
                     style={{ 
@@ -317,7 +415,9 @@ export default function EscapeRoomPage() {
                     </button>
                   </div>
                 )}
+                
                 {puzzleError && <p className="text-red-500 text-sm mt-4 font-bold text-center">{puzzleError}</p>}
+                
                 <div className="mt-8 text-center">
                   <button onClick={() => setActivePuzzle(null)} className="text-stone-500 text-xs hover:text-white transition-colors">
                     [ ABORT CONNECTION ]
