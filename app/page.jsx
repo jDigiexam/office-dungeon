@@ -12,6 +12,8 @@ const FALLBACK_GRID = Array(10).fill(Array(10).fill(0)).map((row, z) =>
 );
 
 export default function EscapeRoomPage() {
+  // Damage State
+  const [screenFlash, setScreenFlash] = useState('');
   const [currentFloor, setCurrentFloor] = useState(0);
   const [inventory, setInventory] = useState([]);
   const [gameStarted, setGameStarted] = useState(false);
@@ -86,6 +88,16 @@ export default function EscapeRoomPage() {
       }
       return next;
     });
+  };
+
+  const handleEnemyEradicated = () => {
+    triggerMessage("SHADOW ENTITY ERADICATED.");
+  };
+
+  const handlePlayerHit = () => {
+    triggerMessage("CRITICAL WARNING: ENTITY CONTACT.");
+    setScreenFlash('bg-red-600/60');
+    setTimeout(() => setScreenFlash(''), 300);
   };
 
   // ------------------------------------------------------------------
@@ -395,8 +407,13 @@ export default function EscapeRoomPage() {
             clearTeleport={() => setTeleportCoords(null)}
             onFloorChange={(f) => setCurrentFloor(f)}
             onEnterElevator={handleEnterElevator}
-            onPlayerMove={handlePlayerMove} 
+            onPlayerMove={handlePlayerMove}
+            onEradicate={handleEnemyEradicated} // 🚨 NEW
+            onPlayerHit={handlePlayerHit}       // 🚨 NEW
           />
+
+          {/* 🚨 NEW: Damage Flash Overlay */}
+          <div className={`absolute inset-0 z-40 pointer-events-none transition-colors duration-100 ${screenFlash}`} />
 
           <div className="absolute top-4 right-4 z-40 bg-stone-900/90 border-2 border-stone-600 p-2 pointer-events-none shadow-2xl backdrop-blur-sm">
             <div className="text-[10px] text-emerald-500 font-black mb-2 text-center tracking-widest">SECTOR SCANNER</div>
