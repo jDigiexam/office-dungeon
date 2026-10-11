@@ -12,8 +12,6 @@ const FALLBACK_GRID = Array(10).fill(Array(10).fill(0)).map((row, z) =>
 );
 
 export default function EscapeRoomPage() {
-  // Damage State
-  const [screenFlash, setScreenFlash] = useState('');
   const [currentFloor, setCurrentFloor] = useState(0);
   const [inventory, setInventory] = useState([]);
   const [gameStarted, setGameStarted] = useState(false);
@@ -50,6 +48,9 @@ export default function EscapeRoomPage() {
   // Fog of War States
   const [playerGridPos, setPlayerGridPos] = useState({ x: 5, z: 5 });
   const [exploredTiles, setExploredTiles] = useState(new Set());
+
+  // Damage State
+  const [screenFlash, setScreenFlash] = useState('');
 
   useEffect(() => {
     const fetchMaps = async () => {
@@ -399,20 +400,21 @@ export default function EscapeRoomPage() {
         </div>
       ) : (
         <>
-          <DungeonEngine
-            grids={grids}
-            initialSpawn={spawnCoords}
-            onInteract={handleInteract}
-            teleportCoords={teleportCoords}
-            clearTeleport={() => setTeleportCoords(null)}
-            onFloorChange={(f) => setCurrentFloor(f)}
-            onEnterElevator={handleEnterElevator}
-            onPlayerMove={handlePlayerMove}
-            onEradicate={handleEnemyEradicated} // 🚨 NEW
-            onPlayerHit={handlePlayerHit}       // 🚨 NEW
-          />
+          <div className={`absolute inset-0 ${activePuzzle ? 'pointer-events-none' : 'pointer-events-auto'}`}>
+            <DungeonEngine
+              grids={grids}
+              initialSpawn={spawnCoords}
+              onInteract={handleInteract}
+              teleportCoords={teleportCoords}
+              clearTeleport={() => setTeleportCoords(null)}
+              onFloorChange={(f) => setCurrentFloor(f)}
+              onEnterElevator={handleEnterElevator}
+              onPlayerMove={handlePlayerMove} 
+              onEradicate={handleEnemyEradicated}
+              onPlayerHit={handlePlayerHit}
+            />
+          </div>
 
-          {/* 🚨 NEW: Damage Flash Overlay */}
           <div className={`absolute inset-0 z-40 pointer-events-none transition-colors duration-100 ${screenFlash}`} />
 
           <div className="absolute top-4 right-4 z-40 bg-stone-900/90 border-2 border-stone-600 p-2 pointer-events-none shadow-2xl backdrop-blur-sm">
@@ -439,6 +441,7 @@ export default function EscapeRoomPage() {
                   else if ([2,5,12,15,22,25].includes(type)) tileClass = "w-3 h-3 bg-yellow-500"; 
                   else if ([7,32,38,17].includes(type)) tileClass = "w-3 h-3 bg-stone-500"; 
                   else if (type === 3 || type === 10) tileClass = "w-3 h-3 bg-cyan-500"; 
+                  else if (type === 9) tileClass = "w-3 h-3 bg-purple-500 animate-pulse";
                   else tileClass = "w-3 h-3 bg-stone-900"; 
                 }
                 
@@ -448,7 +451,11 @@ export default function EscapeRoomPage() {
           </div>
 
           {activePuzzle && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+            <div 
+              className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm pointer-events-auto"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="bg-stone-900 border-4 border-emerald-600 p-8 w-[600px] max-w-[90vw] shadow-2xl shadow-emerald-900/20">
                 <div className="flex justify-between items-center mb-6 border-b-2 border-stone-700 pb-4">
                   <h2 className="text-emerald-500 text-xl font-black tracking-widest">{activePuzzle.title}</h2>

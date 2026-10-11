@@ -200,40 +200,103 @@ function LightOrb({ projObj, startPos, dir, projectilesRef }) {
   );
 }
 
-function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlayerHit }) {
+function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlayerHit, grid }) {
   const groupRef = useRef();
+  const leftArm = useRef();
+  const rightArm = useRef();
+  const leftLeg = useRef();
+  const rightLeg = useRef();
   const isDead = useRef(false);
+  const isChasing = useRef(false);
+
+  // Digital Differential Analyzer (DDA) for Line of Sight
+  const checkLoS = (startX, startZ, endX, endZ) => {
+    let x0 = Math.floor(startX);
+    let z0 = Math.floor(startZ);
+    const x1 = Math.floor(endX);
+    const z1 = Math.floor(endZ);
+    const dx = Math.abs(x1 - x0);
+    const dz = -Math.abs(z1 - z0);
+    let sx = x0 < x1 ? 1 : -1;
+    let sz = z0 < z1 ? 1 : -1;
+    let err = dx + dz;
+
+    while (true) {
+      // If the ray hits a wall, door, or terminal, Line of Sight is broken
+      if ([1, 2, 12, 22, 7, 3, 4, 32].includes(grid[z0]?.[x0])) return false;
+      if (x0 === x1 && z0 === z1) break;
+      const e2 = 2 * err;
+      if (e2 >= dz) { err += dz; x0 += sx; }
+      if (e2 <= dx) { err += dx; z0 += sz; }
+    }
+    return true;
+  };
 
   useFrame((state, delta) => {
     if (isDead.current || !groupRef.current) return;
     
-    // 1. EARLY EXIT: Only calculate math if the player is on the same floor
     const yDist = Math.abs(groupRef.current.position.y - playerCamera.position.y);
     if (yDist > 2.0) return;
 
-    // 2. EARLY EXIT: Cheap distance check. If player is > 15 units away, go to sleep.
     const dx = groupRef.current.position.x - playerCamera.position.x;
     const dz = groupRef.current.position.z - playerCamera.position.z;
     const sqDist = dx * dx + dz * dz;
     
-    if (sqDist > 225) return; // 15^2 = 225
+    // 🚨 1. SHORTER RANGE: Sleep if > 8 units away (8 squared = 64)
+    if (sqDist > 64) {
+      isChasing.current = false;
+    } else {
+      // 🚨 2. LINE OF SIGHT: Only chase if they can actually see the player
+      const hasLoS = checkLoS(groupRef.current.position.x, groupRef.current.position.z, playerCamera.position.x, playerCamera.position.z);
+      if (hasLoS) isChasing.current = true;
+    }
 
-    // 3. WAKE UP: Precise chase mechanics
     const safeDelta = Math.min(delta, 0.1);
     const dist = Math.sqrt(sqDist);
     
-    if (dist < 12 && dist > 0.6) {
-      groupRef.current.lookAt(playerCamera.position.x, groupRef.current.position.y, playerCamera.position.z);
-      const dir = new THREE.Vector3().subVectors(playerCamera.position, groupRef.current.position).normalize();
-      dir.y = 0; 
-      groupRef.current.position.add(dir.multiplyScalar(2.5 * safeDelta)); 
-    } else if (dist <= 0.6) {
-      isDead.current = true;
-      groupRef.current.visible = false;
-      onPlayerHit();
+    if (isChasing.current) {
+      if (dist > 0.6) {
+        groupRef.current.lookAt(playerCamera.position.x, groupRef.current.position.y, playerCamera.position.z);
+        const dir = new THREE.Vector3().subVectors(playerCamera.position, groupRef.current.position).normalize();
+        dir.y = 0; 
+
+        // 🚨 3. WALL COLLISION: Check geometry before stepping forward
+        const speed = 2.5 * safeDelta;
+        const nextX = groupRef.current.position.x + dir.x * speed;
+        const nextZ = groupRef.current.position.z + dir.z * speed;
+        const radius = 0.25;
+
+        const isSolid = (x, z) => [1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(z)]?.[Math.floor(x)]);
+
+        // Wall sliding logic
+        if (!isSolid(nextX, groupRef.current.position.z) && !isSolid(nextX + (dir.x > 0 ? radius : -radius), groupRef.current.position.z)) {
+          groupRef.current.position.x = nextX;
+        }
+        if (!isSolid(groupRef.current.position.x, nextZ) && !isSolid(groupRef.current.position.x, nextZ + (dir.z > 0 ? radius : -radius))) {
+          groupRef.current.position.z = nextZ;
+        }
+
+        // 🚨 4. PROCEDURAL ANIMATION: Swing arms and legs while moving
+        const t = state.clock.elapsedTime * 10;
+        if (leftArm.current) leftArm.current.rotation.x = Math.sin(t) * 0.6;
+        if (rightArm.current) rightArm.current.rotation.x = -Math.sin(t) * 0.6;
+        if (leftLeg.current) leftLeg.current.rotation.x = -Math.sin(t) * 0.6;
+        if (rightLeg.current) rightLeg.current.rotation.x = Math.sin(t) * 0.6;
+
+      } else if (dist <= 0.6) {
+        isDead.current = true;
+        groupRef.current.visible = false;
+        onPlayerHit();
+      }
+    } else {
+       // Return to idle resting stance if player is out of sight/range
+       if (leftArm.current) leftArm.current.rotation.x = 0;
+       if (rightArm.current) rightArm.current.rotation.x = 0;
+       if (leftLeg.current) leftLeg.current.rotation.x = 0;
+       if (rightLeg.current) rightLeg.current.rotation.x = 0;
     }
 
-    // 4. HIT DETECTION
+    // Projectile Hit Detection
     projectilesRef.current.forEach(proj => {
       if (proj.active && proj.mesh?.current) {
         if (groupRef.current.position.distanceTo(proj.mesh.current.position) < 0.8) {
@@ -249,24 +312,64 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
 
   return (
     <group ref={groupRef} position={initialPos}>
-      <mesh position={[0, 0, 0]}>
-        <capsuleGeometry args={[0.25, 0.8, 4, 8]} />
-        <meshBasicMaterial color="#000000" transparent opacity={0.8} />
+      {/* Head */}
+      <mesh position={[0, 0.55, 0]}>
+        <boxGeometry args={[0.25, 0.25, 0.25]} />
+        <meshBasicMaterial color="#000000" transparent opacity={0.9} />
       </mesh>
-      {/* Optimized Eyes: Switched to standard material with high emissive glow, removed pointLight */}
-      <mesh position={[0.1, 0.3, 0.22]}>
-        <sphereGeometry args={[0.04]} />
-        <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={2} />
+      
+      {/* Glowing Red Eyes */}
+      <mesh position={[0.06, 0.58, 0.13]}>
+        <sphereGeometry args={[0.025]} />
+        <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={3} />
       </mesh>
-      <mesh position={[-0.1, 0.3, 0.22]}>
-        <sphereGeometry args={[0.04]} />
-        <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={2} />
+      <mesh position={[-0.06, 0.58, 0.13]}>
+        <sphereGeometry args={[0.025]} />
+        <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={3} />
       </mesh>
+
+      {/* Torso */}
+      <mesh position={[0, 0.15, 0]}>
+        <boxGeometry args={[0.35, 0.55, 0.2]} />
+        <meshBasicMaterial color="#000000" transparent opacity={0.9} />
+      </mesh>
+
+      {/* Left Arm (Pivot at shoulder) */}
+      <group ref={leftArm} position={[-0.25, 0.35, 0]}>
+        <mesh position={[0, -0.25, 0]}>
+          <boxGeometry args={[0.12, 0.5, 0.12]} />
+          <meshBasicMaterial color="#000000" transparent opacity={0.9} />
+        </mesh>
+      </group>
+
+      {/* Right Arm (Pivot at shoulder) */}
+      <group ref={rightArm} position={[0.25, 0.35, 0]}>
+        <mesh position={[0, -0.25, 0]}>
+          <boxGeometry args={[0.12, 0.5, 0.12]} />
+          <meshBasicMaterial color="#000000" transparent opacity={0.9} />
+        </mesh>
+      </group>
+
+      {/* Left Leg (Pivot at hips) */}
+      <group ref={leftLeg} position={[-0.1, -0.15, 0]}>
+        <mesh position={[0, -0.25, 0]}>
+          <boxGeometry args={[0.12, 0.5, 0.12]} />
+          <meshBasicMaterial color="#000000" transparent opacity={0.9} />
+        </mesh>
+      </group>
+
+      {/* Right Leg (Pivot at hips) */}
+      <group ref={rightLeg} position={[0.1, -0.15, 0]}>
+        <mesh position={[0, -0.25, 0]}>
+          <boxGeometry args={[0.12, 0.5, 0.12]} />
+          <meshBasicMaterial color="#000000" transparent opacity={0.9} />
+        </mesh>
+      </group>
     </group>
   );
 }
 
-function CombatManager({ enemiesData, onEradicate, onPlayerHit }) {
+function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids }) {
   const { camera } = useThree();
   const projectilesRef = useRef([]);
   const [projectiles, setProjectiles] = useState([]);
@@ -302,7 +405,15 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit }) {
         <LightOrb key={p.id} projObj={p} startPos={p.startPos} dir={p.dir} projectilesRef={projectilesRef} />
       ))}
       {enemiesData.map((e, idx) => (
-        <ShadowNPC key={`enemy-${idx}`} initialPos={e.pos} playerCamera={camera} projectilesRef={projectilesRef} onEradicate={onEradicate} onPlayerHit={onPlayerHit} />
+        <ShadowNPC 
+          key={`enemy-${idx}`} 
+          initialPos={e.pos} 
+          playerCamera={camera} 
+          projectilesRef={projectilesRef} 
+          onEradicate={onEradicate} 
+          onPlayerHit={onPlayerHit} 
+          grid={grids[e.fIdx]} // 🚨 NEW: Passing the floor grid down
+        />
       ))}
     </>
   );
@@ -615,7 +726,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
   const enemiesData = useMemo(() => {
     return interactiveElements
       .filter(el => el.tile === 9)
-      .map(el => ({ pos: [el.x + 0.5, el.baseY + 1.0, el.z + 0.5] }));
+      .map(el => ({ pos: [el.x + 0.5, el.baseY + 0.5, el.z + 0.5], fIdx: el.fIdx }));
   }, [interactiveElements]);
 
   return (
