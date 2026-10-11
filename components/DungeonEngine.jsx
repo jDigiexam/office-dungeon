@@ -332,7 +332,7 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
         
         {/* Tapered spectral blob */}
         <mesh position={[0, 0.6, 0]}>
-          <cylinderGeometry args={[0.25, 0.25, 1.4, 16]} />
+          <cylinderGeometry args={[0.25, 0.25, 1.4, 5]} />
           <meshBasicMaterial color="#000000" transparent opacity={0.85} />
         </mesh>
         
