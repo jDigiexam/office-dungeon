@@ -215,8 +215,7 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid }) {
 
 function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlayerHit, grid }) {
   const groupRef = useRef();
-  const leftArm = useRef();
-  const rightArm = useRef();
+  const ghostBody = useRef();
   const isDead = useRef(false);
   const isChasing = useRef(false);
 
@@ -274,7 +273,7 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
         const speed = 2.5 * safeDelta;
         const nextX = groupRef.current.position.x + dir.x * speed;
         const nextZ = groupRef.current.position.z + dir.z * speed;
-        const radius = 0.25;
+        const radius = 0.35; // Increased collision radius for larger body
 
         const isSolid = (x, z) => {
           if (!grid) return true;
@@ -288,23 +287,22 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
           groupRef.current.position.z = nextZ;
         }
 
-        const t = state.clock.elapsedTime * 10;
-        if (leftArm.current) leftArm.current.rotation.x = Math.sin(t) * 0.6;
-        if (rightArm.current) rightArm.current.rotation.x = -Math.sin(t) * 0.6;
+        // Add a spooky floating bob to the ghost body
+        if (ghostBody.current) {
+          ghostBody.current.position.y = Math.sin(state.clock.elapsedTime * 4) * 0.15;
+        }
 
       } else if (dist <= 0.6) {
         isDead.current = true;
         groupRef.current.visible = false;
         onPlayerHit();
       }
-    } else {
-       if (leftArm.current) leftArm.current.rotation.x = 0;
-       if (rightArm.current) rightArm.current.rotation.x = 0;
     }
-
+    
+    // Projectile hit detection
     projectilesRef.current.forEach(proj => {
       if (proj.active && proj.mesh?.current) {
-        if (groupRef.current.position.distanceTo(proj.mesh.current.position) < 0.8) {
+        if (groupRef.current.position.distanceTo(proj.mesh.current.position) < 1.0) {
           isDead.current = true;          
           groupRef.current.visible = false;
           proj.active = false;            
@@ -317,41 +315,21 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
 
   return (
     <group ref={groupRef} position={initialPos}>
-      {/* Head */}
-      <mesh position={[0, 0.55, 0]}>
-        <boxGeometry args={[0.25, 0.25, 0.25]} />
-        <meshBasicMaterial color="#000000" transparent opacity={0.9} />
-      </mesh>
-      
-      {/* Glowing Red Eyes */}
-      <mesh position={[0.06, 0.58, 0.13]}>
-        <sphereGeometry args={[0.025]} />
-        <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={3} />
-      </mesh>
-      <mesh position={[-0.06, 0.58, 0.13]}>
-        <sphereGeometry args={[0.025]} />
-        <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={3} />
-      </mesh>
-
-      {/* Torso */}
-      <mesh position={[0, 0.15, 0]}>
-        <boxGeometry args={[0.35, 0.55, 0.2]} />
-        <meshBasicMaterial color="#000000" transparent opacity={0.9} />
-      </mesh>
-
-      {/* Left Arm */}
-      <group ref={leftArm} position={[-0.25, 0.35, 0]}>
-        <mesh position={[0, -0.25, 0]}>
-          <boxGeometry args={[0.12, 0.5, 0.12]} />
-          <meshBasicMaterial color="#000000" transparent opacity={0.9} />
+      <group ref={ghostBody}>
+        {/* Tapered spectral blob (top radius, bottom radius, height, radial segments) */}
+        <mesh position={[0, 0.6, 0]}>
+          <cylinderGeometry args={[0.35, 0.05, 1.4, 16]} />
+          <meshBasicMaterial color="#000000" transparent opacity={0.85} />
         </mesh>
-      </group>
-
-      {/* Right Arm */}
-      <group ref={rightArm} position={[0.25, 0.35, 0]}>
-        <mesh position={[0, -0.25, 0]}>
-          <boxGeometry args={[0.12, 0.5, 0.12]} />
-          <meshBasicMaterial color="#000000" transparent opacity={0.9} />
+        
+        {/* Glowing Red Eyes positioned wider for the larger body */}
+        <mesh position={[0.12, 0.8, 0.3]}>
+          <sphereGeometry args={[0.03]} />
+          <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={4} />
+        </mesh>
+        <mesh position={[-0.12, 0.8, 0.3]}>
+          <sphereGeometry args={[0.03]} />
+          <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={4} />
         </mesh>
       </group>
     </group>

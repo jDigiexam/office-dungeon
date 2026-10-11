@@ -619,13 +619,13 @@ export default function EscapeRoomPage() {
             </div>
           )}
 
-          <div className="absolute bottom-0 left-0 right-0 z-40 bg-stone-900 border-t-4 border-stone-600 p-2 flex items-center justify-between text-stone-200 h-20 pointer-events-none">
+<div className="absolute bottom-0 left-0 right-0 z-40 bg-stone-900 border-t-4 border-stone-600 p-2 flex items-center justify-between text-stone-200 h-20 pointer-events-none">
             <div className="bg-stone-950 border-2 border-stone-700 px-4 py-1 flex flex-col items-center justify-center min-w-[120px]">
               <span className="text-[10px] text-stone-500 font-bold">LEVEL</span>
-              <span className="text-red-500 font-black mt-1">E1M{currentFloor + 1}</span>
+              {/* Locked to LEVEL 1 */}
+              <span className="text-red-500 font-black mt-1">LEVEL 1</span>
             </div>
             
-            {/* 🚨 NEW: HP Bar UI */}
             <div className="bg-stone-950 border-2 border-stone-700 px-4 py-1 flex flex-col items-center justify-center min-w-[160px] mx-2">
               <span className="text-[10px] text-stone-500 font-bold flex justify-between w-full">
                 <span>VITALS</span>
@@ -638,7 +638,10 @@ export default function EscapeRoomPage() {
 
             <div className="hidden md:flex bg-stone-950 border-2 border-stone-700 px-6 py-2 flex-col items-center justify-center flex-1 mx-2">
               <span className="text-[10px] text-stone-500 font-bold">CURRENT SECTOR</span>
-              <span className="text-xs font-bold text-yellow-500 mt-0.5">UNKNOWN AREA</span>
+              {/* Dynamic Sector Naming based on floor progression */}
+              <span className="text-xs font-bold text-yellow-500 mt-0.5">
+                {currentFloor === 0 ? 'ENTRY CORRIDORS' : currentFloor === 1 ? 'MAINFRAME LABS' : 'THE ABYSS'}
+              </span>
             </div>
 
             <div className="bg-stone-950 border-2 border-stone-700 px-4 py-1 flex flex-col items-center justify-center min-w-[180px]">
