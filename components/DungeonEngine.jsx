@@ -175,7 +175,7 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTexture, 
 // ----------------------------------------------------
 // COMBAT & HORROR SYSTEM
 // ----------------------------------------------------
-function LightOrb({ projObj, startPos, dir, projectilesRef }) {
+function LightOrb({ projObj, startPos, dir, projectilesRef, grid }) {
   const meshRef = useRef();
   
   useEffect(() => { projObj.mesh = meshRef; }, [projObj]);
@@ -185,7 +185,14 @@ function LightOrb({ projObj, startPos, dir, projectilesRef }) {
     
     meshRef.current.position.add(dir.clone().multiplyScalar(12 * delta));
     
-    if (meshRef.current.position.distanceTo(startPos) > 20) {
+    const curX = meshRef.current.position.x;
+    const curZ = meshRef.current.position.z;
+    
+    // 🚨 NEW: Wall collision detection for the light orb
+    const isSolid = grid && [1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(curZ)]?.[Math.floor(curX)]);
+
+    // Destroy if it hits a wall OR travels too far
+    if (isSolid || meshRef.current.position.distanceTo(startPos) > 20) {
       projObj.active = false;
       meshRef.current.visible = false;
     }
@@ -204,13 +211,10 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
   const groupRef = useRef();
   const leftArm = useRef();
   const rightArm = useRef();
-  const leftLeg = useRef();
-  const rightLeg = useRef();
   const isDead = useRef(false);
   const isChasing = useRef(false);
 
   const checkLoS = (startX, startZ, endX, endZ) => {
-    // 🚨 1. FAILSAFE: Abort immediately if the camera hasn't stabilized
     if (!grid || isNaN(startX) || isNaN(startZ) || isNaN(endX) || isNaN(endZ)) return false;
     
     let x0 = Math.floor(startX);
@@ -223,7 +227,7 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
     let sz = z0 < z1 ? 1 : -1;
     let err = dx + dz;
 
-    let loopLimit = 30; // 🚨 2. FAILSAFE: Prevent infinite browser lockup loops
+    let loopLimit = 30; 
 
     while (loopLimit-- > 0) {
       if ([1, 2, 12, 22, 7, 3, 4, 32].includes(grid[z0]?.[x0])) return false;
@@ -281,8 +285,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
         const t = state.clock.elapsedTime * 10;
         if (leftArm.current) leftArm.current.rotation.x = Math.sin(t) * 0.6;
         if (rightArm.current) rightArm.current.rotation.x = -Math.sin(t) * 0.6;
-        if (leftLeg.current) leftLeg.current.rotation.x = -Math.sin(t) * 0.6;
-        if (rightLeg.current) rightLeg.current.rotation.x = Math.sin(t) * 0.6;
 
       } else if (dist <= 0.6) {
         isDead.current = true;
@@ -292,8 +294,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
     } else {
        if (leftArm.current) leftArm.current.rotation.x = 0;
        if (rightArm.current) rightArm.current.rotation.x = 0;
-       if (leftLeg.current) leftLeg.current.rotation.x = 0;
-       if (rightLeg.current) rightLeg.current.rotation.x = 0;
     }
 
     projectilesRef.current.forEach(proj => {
@@ -343,20 +343,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
           <meshBasicMaterial color="#000000" transparent opacity={0.9} />
         </mesh>
       </group>
-
-      <group ref={leftLeg} position={[-0.1, -0.15, 0]}>
-        <mesh position={[0, -0.25, 0]}>
-          <boxGeometry args={[0.12, 0.5, 0.12]} />
-          <meshBasicMaterial color="#000000" transparent opacity={0.9} />
-        </mesh>
-      </group>
-
-      <group ref={rightLeg} position={[0.1, -0.15, 0]}>
-        <mesh position={[0, -0.25, 0]}>
-          <boxGeometry args={[0.12, 0.5, 0.12]} />
-          <meshBasicMaterial color="#000000" transparent opacity={0.9} />
-        </mesh>
-      </group>
     </group>
   );
 }
@@ -365,6 +351,9 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids }) {
   const { camera } = useThree();
   const projectilesRef = useRef([]);
   const [projectiles, setProjectiles] = useState([]);
+  
+  // 🚨 NEW: Calculate the player's current floor to pass the correct grid to the light orb
+  const currentFIdx = Math.max(0, Math.min(2, Math.round(camera.position.y / FLOOR_HT)));
 
   useEffect(() => {
     const handleShoot = (e) => {
@@ -394,7 +383,14 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids }) {
   return (
     <>
       {projectiles.map(p => (
-        <LightOrb key={p.id} projObj={p} startPos={p.startPos} dir={p.dir} projectilesRef={projectilesRef} />
+        <LightOrb 
+          key={p.id} 
+          projObj={p} 
+          startPos={p.startPos} 
+          dir={p.dir} 
+          projectilesRef={projectilesRef} 
+          grid={grids?.[currentFIdx]} // 🚨 NEW: Passing the grid to the orb
+        />
       ))}
       {enemiesData.map((e, idx) => (
         <ShadowNPC 
