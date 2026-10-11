@@ -43,6 +43,9 @@ export default function EscapeRoomPage() {
   const [playerGridPos, setPlayerGridPos] = useState({ x: 5, z: 5 });
   const [exploredTiles, setExploredTiles] = useState(new Set());
 
+  // 🚨 NEW: Player Vitals State
+  const [hp, setHp] = useState(100);
+  const [isDead, setIsDead] = useState(false);
   const [screenFlash, setScreenFlash] = useState('');
 
   useEffect(() => {
@@ -88,10 +91,20 @@ export default function EscapeRoomPage() {
     triggerMessage("SHADOW ENTITY ERADICATED.");
   };
 
+  // 🚨 NEW: Updated damage logic
   const handlePlayerHit = () => {
-    triggerMessage("CRITICAL WARNING: ENTITY CONTACT.");
-    setScreenFlash('bg-red-600/60');
-    setTimeout(() => setScreenFlash(''), 300);
+    setHp((prevHp) => {
+      const newHp = Math.max(0, prevHp - 20); // Lose 20 HP per hit
+      if (newHp === 0) {
+        setScreenFlash('bg-red-900/90');
+        setTimeout(() => setIsDead(true), 800);
+      } else {
+        triggerMessage("CRITICAL WARNING: ENTITY CONTACT.");
+        setScreenFlash('bg-red-600/60');
+        setTimeout(() => setScreenFlash(''), 300);
+      }
+      return newHp;
+    });
   };
 
   const handlePuzzleSuccess = (puzzle) => {
@@ -373,21 +386,34 @@ export default function EscapeRoomPage() {
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black text-red-600">
           <div className="border-4 border-stone-700 bg-stone-900 p-8 text-center max-w-md">
             <h1 className="text-4xl font-extrabold mb-1 tracking-widest text-red-600">OFFICE DUNGEON</h1>
-            <p className="mb-8 text-stone-300 text-xs">Use WASD to run. Mouse to look. 'E' to interact.</p>
+            <p className="mb-8 text-stone-300 text-xs">Use WASD to run. Mouse to look. Left Click/Space to fire. 'E' to interact.</p>
             {mapsLoading ? (
               <button disabled className="w-full py-3 bg-stone-700 text-stone-500 font-extrabold animate-pulse">
                 INITIALIZING SATELLITE LINK...
               </button>
             ) : (
-              <button onClick={() => setGameStarted(true)} className="w-full py-3 bg-red-700 hover:bg-red-600 text-black font-extrabold">
+              <button onClick={() => setGameStarted(true)} className="w-full py-3 bg-red-700 hover:bg-red-600 text-black font-extrabold transition-colors">
                 START ESCAPE
               </button>
             )}
           </div>
         </div>
+      ) : isDead ? (
+        // 🚨 NEW: Death Screen Overlay
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-red-950 text-red-500">
+          <div className="border-4 border-red-900 bg-black p-12 text-center max-w-lg shadow-[0_0_50px_rgba(153,27,27,0.5)]">
+            <h1 className="text-6xl font-black mb-4 tracking-widest text-red-600">YOU DIED</h1>
+            <p className="mb-12 text-red-400 text-sm tracking-widest">VITAL SIGNS LOST. ENTITY OVERRUN.</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="w-full py-4 bg-red-800 hover:bg-red-600 text-black font-extrabold text-xl transition-colors uppercase tracking-widest"
+            >
+              REBOOT SYSTEM
+            </button>
+          </div>
+        </div>
       ) : (
         <>
-          {/* 🚨 FIX: We added ID="engine-wrapper" here so the 3D canvas locks ONLY to this div */}
           <div id="engine-wrapper" className={`absolute inset-0 ${activePuzzle ? 'pointer-events-none' : 'pointer-events-auto'}`}>
             <DungeonEngine
               grids={grids}
@@ -442,7 +468,6 @@ export default function EscapeRoomPage() {
           {activePuzzle && (
             <div 
               className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm pointer-events-auto"
-              // 🚨 FIX: Brutal event stoppers to ensure native clicks never touch the document
               onPointerDown={(e) => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); }}
               onClick={(e) => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); }}
               onMouseDown={(e) => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); }}
@@ -599,10 +624,23 @@ export default function EscapeRoomPage() {
               <span className="text-[10px] text-stone-500 font-bold">LEVEL</span>
               <span className="text-red-500 font-black mt-1">E1M{currentFloor + 1}</span>
             </div>
-            <div className="hidden md:flex bg-stone-950 border-2 border-stone-700 px-6 py-2 flex-col items-center justify-center flex-1 mx-4">
+            
+            {/* 🚨 NEW: HP Bar UI */}
+            <div className="bg-stone-950 border-2 border-stone-700 px-4 py-1 flex flex-col items-center justify-center min-w-[160px] mx-2">
+              <span className="text-[10px] text-stone-500 font-bold flex justify-between w-full">
+                <span>VITALS</span>
+                <span className={`${hp <= 40 ? 'text-red-500 animate-pulse' : 'text-stone-500'}`}>{hp}%</span>
+              </span>
+              <div className="w-full h-3 bg-stone-800 mt-1 border border-stone-600 relative overflow-hidden">
+                <div className="h-full bg-red-600 transition-all duration-300" style={{ width: `${hp}%` }} />
+              </div>
+            </div>
+
+            <div className="hidden md:flex bg-stone-950 border-2 border-stone-700 px-6 py-2 flex-col items-center justify-center flex-1 mx-2">
               <span className="text-[10px] text-stone-500 font-bold">CURRENT SECTOR</span>
               <span className="text-xs font-bold text-yellow-500 mt-0.5">UNKNOWN AREA</span>
             </div>
+
             <div className="bg-stone-950 border-2 border-stone-700 px-4 py-1 flex flex-col items-center justify-center min-w-[180px]">
               <span className="text-[10px] text-stone-500 font-bold">INVENTORY</span>
               <div className="flex gap-3 mt-1">
