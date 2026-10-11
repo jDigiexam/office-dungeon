@@ -387,8 +387,10 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
   const parsedData = useMemo(() => {
     const dummy = new THREE.Object3D();
     
-    const wWallsBuffs = woodTexList.map(() => createBuffer());
-    const sWallsBuffs = stoneTexList.map(() => createBuffer());
+    // We have 4 wood textures and 8 stone textures available, but the render block 
+    // currently only maps the first 4 of each. We will use those 4 effectively.
+    const wWallsBuffs = woodTexList.slice(0, 4).map(() => createBuffer());
+    const sWallsBuffs = stoneTexList.slice(0, 4).map(() => createBuffer());
     const wFloorBuff = createBuffer();
     const sFloorBuff = createBuffer();
     const ceilBuff = createBuffer();
@@ -400,9 +402,6 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
       const grid = grids[fIdx];
       if (!grid) continue;
       
-      const isWoodFloor = fIdx < 2;
-      const wLen = woodTexList.length;
-      const sLen = stoneTexList.length;
       const rows = grid.length;
       const cols = grid[0].length;
       const baseY = fIdx * FLOOR_HT;
@@ -411,6 +410,28 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         for (let x = 0; x < cols; x++) {
           const tile = grid[z][x];
           
+          // 🚨 NEW: Spatial Zoning Logic for Progression
+          // Shallow/Start areas = Clean Wood (Zone 1)
+          // Mid areas = Braced Wood (Zone 2)
+          // Deep areas (z > 55) = Heavy Stone (Zone 3)
+          let isStoneZone = fIdx > 0; // Default to stone for higher floors
+          let tIdx = 0;
+
+          if (fIdx === 0) {
+            if (z > 55) {
+              isStoneZone = true; // Transition to stone deep in the maze
+              tIdx = (x + z) % 4; // Mix of 4 stone variants
+            } else if (z > 25) {
+              isStoneZone = false;
+              tIdx = (x % 2 === 0) ? 0 : 1; // Wood Zone 2: Heavy cross braces
+            } else {
+              isStoneZone = false;
+              tIdx = (z % 2 === 0) ? 3 : 2; // Wood Zone 1: Mostly plain timber panels
+            }
+          } else {
+            tIdx = (x * 7 + z * 13) % 4; // Standard scramble for upper floors
+          }
+
           if (tile === 1) {
             let isVisible = false;
             if (z > 0 && grid[z-1][x] !== 1) isVisible = true;
@@ -419,11 +440,10 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
             else if (x < cols - 1 && grid[z][x+1] !== 1) isVisible = true;
 
             if (isVisible) {
-              const tIdx = (x * 7 + z * 13 + fIdx * 3) % (isWoodFloor ? wLen : sLen);
               dummy.position.set(x + 0.5, baseY + (FLOOR_HT / 2), z + 0.5);
               dummy.rotation.set(0, 0, 0);
               dummy.scale.set(1, 1, 1);
-              if (isWoodFloor) wWallsBuffs[tIdx].add(dummy); else sWallsBuffs[tIdx].add(dummy);
+              if (isStoneZone) sWallsBuffs[tIdx].add(dummy); else wWallsBuffs[tIdx].add(dummy);
             }
             continue; 
           }
@@ -442,20 +462,19 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
             dummy.position.set(x + 0.5, baseY, z + 0.5);
             dummy.rotation.set(-Math.PI / 2, 0, 0);
             dummy.scale.set(1, 1, 1);
-            if (isWoodFloor) wFloorBuff.add(dummy); else sFloorBuff.add(dummy);
+            if (isStoneZone) sFloorBuff.add(dummy); else wFloorBuff.add(dummy);
           }
 
           if ([2, 8, 12, 18, 22, 28, 7, 17, 32, 38].includes(tile)) {
-            const tIdx = (x * 7 + z * 13 + fIdx * 3) % (isWoodFloor ? wLen : sLen);
             const lintelHt = FLOOR_HT - 2.0;
             dummy.position.set(x + 0.5, baseY + 2.0 + (lintelHt/2), z + 0.5);
             dummy.rotation.set(0, 0, 0);
             dummy.scale.set(1, lintelHt / FLOOR_HT, 1); 
-            if (isWoodFloor) wWallsBuffs[tIdx].add(dummy); else sWallsBuffs[tIdx].add(dummy);
+            if (isStoneZone) sWallsBuffs[tIdx].add(dummy); else wWallsBuffs[tIdx].add(dummy);
           }
 
           if ([2, 8, 12, 18, 22, 28, 7, 17, 3, 10, 4, 5, 15, 25, 6, 32, 38].includes(tile)) {
-            interactives.push({ tile, x, z, fIdx, baseY });
+            interactives.push({ tile, x, z, fIdx, baseY, isStoneZone, tIdx });
             if (interactives.length > 5000) return { error: "TOO_MANY_ENTITIES", count: interactives.length };
           }
         }
@@ -503,9 +522,11 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
 
       {interactiveElements.map((el, idx) => {
         const { tile, x, z, fIdx, baseY } = el;
-        const wTexList = fIdx < 2 ? woodTexList : stoneTexList;
-        const wTex = wTexList[(x * 7 + z * 13 + fIdx * 3) % wTexList.length];
-        const dTex = fIdx < 2 ? tDoorWood : tDoorMetal;
+        
+        // 🚨 NEW: Pull from the correct zone's texture list
+        const wTexList = isStoneZone ? stoneTexList : woodTexList;
+        const wTex = wTexList[tIdx]; 
+        const dTex = isStoneZone ? tDoorMetal : tDoorWood;
         
         if ([2,8,12,18,22,28,7,17,32,38].includes(tile)) {
           let trimColor = "#dc2626";
