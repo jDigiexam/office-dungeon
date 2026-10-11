@@ -60,15 +60,11 @@ function KeycardMesh({ position, texture, color }) {
     useFrame((_, delta) => { 
       if (cardRef.current) {
         const safeDelta = Math.min(delta, 0.1);
-        
         cardRef.current.rotation.y += safeDelta * 2.0; 
         
         if (cardRef.current.position.y < 0.4) {
           cardRef.current.position.y = THREE.MathUtils.lerp(cardRef.current.position.y, 0.45, safeDelta * 4.0);
-          
-          if (cardRef.current.position.y >= 0.4) {
-            cardRef.current.position.y = 0.4;
-          }
+          if (cardRef.current.position.y >= 0.4) cardRef.current.position.y = 0.4;
         }
       } 
     });
@@ -77,14 +73,7 @@ function KeycardMesh({ position, texture, color }) {
       <group position={position}>
         <mesh ref={cardRef} position={[0, -1.0, 0]}>
           <planeGeometry args={[0.5, 0.5]} />
-          <meshStandardMaterial 
-            map={texture} 
-            emissive={color} 
-            emissiveIntensity={0.8} 
-            transparent={true} 
-            side={THREE.DoubleSide} 
-            alphaTest={0.5} 
-          />
+          <meshStandardMaterial map={texture} emissive={color} emissiveIntensity={0.8} transparent={true} side={THREE.DoubleSide} alphaTest={0.5} />
         </mesh>
       </group>
     );
@@ -94,9 +83,7 @@ function TerminalMesh({ position, texture }) {
     const crtRef = useRef();
     
     useFrame(({ camera }) => { 
-      if (crtRef.current) {
-        crtRef.current.lookAt(camera.position); 
-      }
+      if (crtRef.current) crtRef.current.lookAt(camera.position); 
     });
     
     return (
@@ -105,18 +92,9 @@ function TerminalMesh({ position, texture }) {
           <boxGeometry args={[0.5, 0.8, 0.5]} />
           <meshStandardMaterial color="#808080" roughness={0.9} />
         </mesh>
-        
         <mesh ref={crtRef} position={[0, 1.1, 0]}>
           <planeGeometry args={[0.7, 0.7]} />
-          <meshStandardMaterial 
-            map={texture} 
-            emissive="#ffffff" 
-            emissiveMap={texture} 
-            emissiveIntensity={0.6} 
-            transparent={true} 
-            side={THREE.DoubleSide} 
-            alphaTest={0.5} 
-          />
+          <meshStandardMaterial map={texture} emissive="#ffffff" emissiveMap={texture} emissiveIntensity={0.6} transparent={true} side={THREE.DoubleSide} alphaTest={0.5} />
         </mesh>
       </group>
     );
@@ -195,7 +173,7 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTexture, 
 }
 
 // ----------------------------------------------------
-// 4. BULLETPROOF PHYSICS & CONTROLS
+// 4. CONTROLS
 // ----------------------------------------------------
 function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove }) {
   const controlsRef = useRef();
@@ -387,8 +365,6 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
   const parsedData = useMemo(() => {
     const dummy = new THREE.Object3D();
     
-    // We have 4 wood textures and 8 stone textures available, but the render block 
-    // currently only maps the first 4 of each. We will use those 4 effectively.
     const wWallsBuffs = woodTexList.slice(0, 4).map(() => createBuffer());
     const sWallsBuffs = stoneTexList.slice(0, 4).map(() => createBuffer());
     const wFloorBuff = createBuffer();
@@ -410,26 +386,22 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         for (let x = 0; x < cols; x++) {
           const tile = grid[z][x];
           
-          // 🚨 NEW: Spatial Zoning Logic for Progression
-          // Shallow/Start areas = Clean Wood (Zone 1)
-          // Mid areas = Braced Wood (Zone 2)
-          // Deep areas (z > 55) = Heavy Stone (Zone 3)
-          let isStoneZone = fIdx > 0; // Default to stone for higher floors
+          let isStoneZone = fIdx > 0;
           let tIdx = 0;
 
           if (fIdx === 0) {
             if (z > 55) {
-              isStoneZone = true; // Transition to stone deep in the maze
-              tIdx = (x + z) % 4; // Mix of 4 stone variants
+              isStoneZone = true;
+              tIdx = (x + z) % 4; 
             } else if (z > 25) {
               isStoneZone = false;
-              tIdx = (x % 2 === 0) ? 0 : 1; // Wood Zone 2: Heavy cross braces
+              tIdx = (x % 2 === 0) ? 0 : 1; 
             } else {
               isStoneZone = false;
-              tIdx = (z % 2 === 0) ? 3 : 2; // Wood Zone 1: Mostly plain timber panels
+              tIdx = (z % 2 === 0) ? 3 : 2; 
             }
           } else {
-            tIdx = (x * 7 + z * 13) % 4; // Standard scramble for upper floors
+            tIdx = (x * 7 + z * 13) % 4; 
           }
 
           if (tile === 1) {
@@ -521,9 +493,8 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
       <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorStone, color: "#71717a", roughness: 0.9, side: THREE.DoubleSide}} bufferData={ceilFinal} />
 
       {interactiveElements.map((el, idx) => {
-        const { tile, x, z, fIdx, baseY } = el;
+        const { tile, x, z, fIdx, baseY, isStoneZone, tIdx } = el;
         
-        // 🚨 NEW: Pull from the correct zone's texture list
         const wTexList = isStoneZone ? stoneTexList : woodTexList;
         const wTex = wTexList[tIdx]; 
         const dTex = isStoneZone ? tDoorMetal : tDoorWood;
