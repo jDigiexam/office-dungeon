@@ -412,6 +412,7 @@ export default function EscapeRoomPage() {
               onPlayerMove={handlePlayerMove} 
               onEradicate={handleEnemyEradicated}
               onPlayerHit={handlePlayerHit}
+              isPuzzleActive={!!activePuzzle} // 🚨 NEW
             />
           </div>
 

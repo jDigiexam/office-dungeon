@@ -186,13 +186,19 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid }) {
     meshRef.current.position.add(dir.clone().multiplyScalar(12 * delta));
     
     const curX = meshRef.current.position.x;
+    const curY = meshRef.current.position.y;
     const curZ = meshRef.current.position.z;
     
-    // 🚨 NEW: Wall collision detection for the light orb
+    // 1. Check Wall collisions via the 2D grid
     const isSolid = grid && [1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(curZ)]?.[Math.floor(curX)]);
 
-    // Destroy if it hits a wall OR travels too far
-    if (isSolid || meshRef.current.position.distanceTo(startPos) > 20) {
+    // 🚨 2. NEW: Check Floor and Ceiling collisions
+    const floorY = Math.floor(startPos.y / FLOOR_HT) * FLOOR_HT;
+    const ceilY = floorY + FLOOR_HT;
+    const hitVertical = curY <= floorY + 0.1 || curY >= ceilY - 0.1;
+
+    // Destroy if it hits a wall, floor, ceiling, OR travels too far
+    if (isSolid || hitVertical || meshRef.current.position.distanceTo(startPos) > 20) {
       projObj.active = false;
       meshRef.current.visible = false;
     }
@@ -410,7 +416,7 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids }) {
 // ----------------------------------------------------
 // 4. CONTROLS
 // ----------------------------------------------------
-function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove }) {
+function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove, isPuzzleActive }) {
   const controlsRef = useRef();
   const moveState = useRef({ forward: false, backward: false, left: false, right: false });
   const currentFloorRef = useRef(0);
@@ -558,7 +564,13 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
 
   return (
     <>
-      <PointerLockControls makeDefault ref={controlsRef} minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI * 3 / 4} />
+      <PointerLockControls 
+        makeDefault 
+        ref={controlsRef} 
+        minPolarAngle={Math.PI / 4} 
+        maxPolarAngle={Math.PI * 3 / 4} 
+        enabled={!isPuzzleActive} // 🚨 NEW: Completely ignores clicks while puzzle is open
+      />
       <mesh ref={handRef} renderOrder={999}>
         <planeGeometry args={[0.23, 0.23]} />
         <meshBasicMaterial map={handTexture} transparent={true} depthTest={false} />
@@ -571,7 +583,7 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
 // ----------------------------------------------------
 // 5. MAIN SCENE RENDERING
 // ----------------------------------------------------
-function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove, onEradicate, onPlayerHit }) {
+function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove, onEradicate, onPlayerHit, isPuzzleActive }) {
   const woodTexList = useTexture([
     '/wall_timber_structure_cross.png', '/wall_timber_structure_diagonal.png',
     '/wall_timber_structure_vertical.png', '/wall_timber_structure.png'
@@ -762,19 +774,19 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
       })}
       
       <CombatManager enemiesData={enemiesData} grids={grids} onEradicate={onEradicate} onPlayerHit={onPlayerHit} />
-      <PlayerControls grids={grids} handTexture={tHand} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} onPlayerMove={onPlayerMove} />
+      <PlayerControls grids={grids} handTexture={tHand} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} onPlayerMove={onPlayerMove} isPuzzleActive={isPuzzleActive} />
     </>
   );
 }
 
-export default function DungeonEngine({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove, onEradicate, onPlayerHit }) {
+export default function DungeonEngine({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove, onEradicate, onPlayerHit, isPuzzleActive }) {
   return (
     <div className="w-full h-screen bg-black relative">
       <Canvas camera={{ position: initialSpawn || [5.5, 0.8, 5.5], fov: 80, near: 0.01, far: 50 }} gl={{ antialias: false }}>
         <fog attach="fog" args={['#000000', 4, 18]} />
         <ambientLight intensity={1.0} color="#ffffff" />
         <Suspense fallback={null}>
-        <DungeonScene grids={grids} initialSpawn={initialSpawn} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} onPlayerMove={onPlayerMove} onEradicate={onEradicate} onPlayerHit={onPlayerHit} />
+        <DungeonScene grids={grids} initialSpawn={initialSpawn} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} onPlayerMove={onPlayerMove} onEradicate={onEradicate} onPlayerHit={onPlayerHit} isPuzzleActive={isPuzzleActive} />
         </Suspense>
       </Canvas>
     </div>
