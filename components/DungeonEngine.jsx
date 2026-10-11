@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useMemo, Suspense } from 'react';
+import React, { useRef, useEffect, useMemo, Suspense, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { PointerLockControls, useTexture, Html } from '@react-three/drei';
 import * as THREE from 'three';
@@ -183,10 +183,8 @@ function LightOrb({ projObj, startPos, dir, projectilesRef }) {
   useFrame((state, delta) => {
     if (!projObj.active || !meshRef.current) return;
     
-    // Move the orb forward along its vector
     meshRef.current.position.add(dir.clone().multiplyScalar(12 * delta));
     
-    // Dissipate after it travels 20 units
     if (meshRef.current.position.distanceTo(startPos) > 20) {
       projObj.active = false;
       meshRef.current.visible = false;
@@ -210,32 +208,28 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
     if (isDead.current || !groupRef.current) return;
     const safeDelta = Math.min(delta, 0.1);
 
-    // Only activate if the player is on the same floor level
     const yDist = Math.abs(groupRef.current.position.y - playerCamera.position.y);
     if (yDist > 2.0) return;
 
     const dist = groupRef.current.position.distanceTo(playerCamera.position);
     
-    // Chase mechanics: Activate if player is within 12 units
     if (dist < 12 && dist > 0.6) {
       groupRef.current.lookAt(playerCamera.position.x, groupRef.current.position.y, playerCamera.position.z);
       const dir = new THREE.Vector3().subVectors(playerCamera.position, groupRef.current.position).normalize();
-      dir.y = 0; // Prevent them from flying upward
-      groupRef.current.position.add(dir.multiplyScalar(2.5 * safeDelta)); // Chase speed
+      dir.y = 0; 
+      groupRef.current.position.add(dir.multiplyScalar(2.5 * safeDelta)); 
     } else if (dist <= 0.6) {
-      // Jump scare / Hit player
       isDead.current = true;
       groupRef.current.visible = false;
       onPlayerHit();
     }
 
-    // Check collision against all active player projectiles
     projectilesRef.current.forEach(proj => {
       if (proj.active && proj.mesh?.current) {
         if (groupRef.current.position.distanceTo(proj.mesh.current.position) < 0.8) {
-          isDead.current = true;          // Kill Enemy
+          isDead.current = true;          
           groupRef.current.visible = false;
-          proj.active = false;            // Destroy Orb
+          proj.active = false;            
           proj.mesh.current.visible = false;
           onEradicate();
         }
@@ -245,12 +239,10 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
 
   return (
     <group ref={groupRef} position={initialPos}>
-      {/* Ghostly Black Silhouette */}
       <mesh position={[0, 0, 0]}>
         <capsuleGeometry args={[0.25, 0.8, 4, 8]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.8} />
       </mesh>
-      {/* Glowing Red Eyes */}
       <mesh position={[0.1, 0.3, 0.22]}><sphereGeometry args={[0.04]} /><meshBasicMaterial color="#ef4444" /></mesh>
       <mesh position={[-0.1, 0.3, 0.22]}><sphereGeometry args={[0.04]} /><meshBasicMaterial color="#ef4444" /></mesh>
       <pointLight color="#ef4444" intensity={0.5} distance={2} position={[0, 0.3, 0.3]} />
@@ -263,31 +255,30 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit }) {
   const projectilesRef = useRef([]);
   const [projectiles, setProjectiles] = useState([]);
 
-// Global listener for Spacebar OR Left-Click to shoot
-useEffect(() => {
-  const handleShoot = (e) => {
-    const isSpacebar = e.type === 'keydown' && e.code === 'Space';
-    const isLeftClick = e.type === 'mousedown' && e.button === 0;
+  useEffect(() => {
+    const handleShoot = (e) => {
+      const isSpacebar = e.type === 'keydown' && e.code === 'Space';
+      const isLeftClick = e.type === 'mousedown' && e.button === 0;
 
-    if ((isSpacebar || isLeftClick) && document.pointerLockElement) {
-      if (isSpacebar) e.preventDefault(); // Prevent page scroll from spacebar
-      
-      const dir = new THREE.Vector3();
-      camera.getWorldDirection(dir);
-      const newProj = { id: Math.random(), startPos: camera.position.clone(), dir, active: true, mesh: null };
-      projectilesRef.current.push(newProj);
-      setProjectiles(prev => [...prev, newProj]); 
-    }
-  };
+      if ((isSpacebar || isLeftClick) && document.pointerLockElement) {
+        if (isSpacebar) e.preventDefault(); 
+        
+        const dir = new THREE.Vector3();
+        camera.getWorldDirection(dir);
+        const newProj = { id: Math.random(), startPos: camera.position.clone(), dir, active: true, mesh: null };
+        projectilesRef.current.push(newProj);
+        setProjectiles(prev => [...prev, newProj]); 
+      }
+    };
 
-  window.addEventListener('mousedown', handleShoot);
-  window.addEventListener('keydown', handleShoot);
-  
-  return () => {
-    window.removeEventListener('mousedown', handleShoot);
-    window.removeEventListener('keydown', handleShoot);
-  };
-}, [camera]);
+    window.addEventListener('mousedown', handleShoot);
+    window.addEventListener('keydown', handleShoot);
+    
+    return () => {
+      window.removeEventListener('mousedown', handleShoot);
+      window.removeEventListener('keydown', handleShoot);
+    };
+  }, [camera]);
 
   return (
     <>
@@ -465,7 +456,7 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
 // ----------------------------------------------------
 // 5. MAIN SCENE RENDERING
 // ----------------------------------------------------
-function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove }) {
+function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove, onEradicate, onPlayerHit }) {
   const woodTexList = useTexture([
     '/wall_timber_structure_cross.png', '/wall_timber_structure_diagonal.png',
     '/wall_timber_structure_vertical.png', '/wall_timber_structure.png'
@@ -605,12 +596,11 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
 
   const { wWallsFinal, sWallsFinal, wFloorFinal, sFloorFinal, ceilFinal, interactiveElements } = parsedData;
 
-// 🚨 NEW: Filter out tile 9 for the Combat Manager
-const enemiesData = useMemo(() => {
-  return interactiveElements
-    .filter(el => el.tile === 9)
-    .map(el => ({ pos: [el.x + 0.5, el.baseY + 1.0, el.z + 0.5] }));
-}, [interactiveElements]);
+  const enemiesData = useMemo(() => {
+    return interactiveElements
+      .filter(el => el.tile === 9)
+      .map(el => ({ pos: [el.x + 0.5, el.baseY + 1.0, el.z + 0.5] }));
+  }, [interactiveElements]);
 
   return (
     <>
@@ -656,7 +646,6 @@ const enemiesData = useMemo(() => {
         return null;
       })}
       
-      {/* 🚨 NEW: Render the Combat System */}
       <CombatManager enemiesData={enemiesData} onEradicate={onEradicate} onPlayerHit={onPlayerHit} />
       <PlayerControls grids={grids} handTexture={tHand} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} onPlayerMove={onPlayerMove} />
     </>
