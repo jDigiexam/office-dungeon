@@ -209,8 +209,8 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
   const isDead = useRef(false);
   const isChasing = useRef(false);
 
-  // Digital Differential Analyzer (DDA) for Line of Sight
   const checkLoS = (startX, startZ, endX, endZ) => {
+    if (!grid) return false;
     let x0 = Math.floor(startX);
     let z0 = Math.floor(startZ);
     const x1 = Math.floor(endX);
@@ -222,7 +222,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
     let err = dx + dz;
 
     while (true) {
-      // If the ray hits a wall, door, or terminal, Line of Sight is broken
       if ([1, 2, 12, 22, 7, 3, 4, 32].includes(grid[z0]?.[x0])) return false;
       if (x0 === x1 && z0 === z1) break;
       const e2 = 2 * err;
@@ -242,11 +241,9 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
     const dz = groupRef.current.position.z - playerCamera.position.z;
     const sqDist = dx * dx + dz * dz;
     
-    // 🚨 1. SHORTER RANGE: Sleep if > 8 units away (8 squared = 64)
     if (sqDist > 64) {
       isChasing.current = false;
     } else {
-      // 🚨 2. LINE OF SIGHT: Only chase if they can actually see the player
       const hasLoS = checkLoS(groupRef.current.position.x, groupRef.current.position.z, playerCamera.position.x, playerCamera.position.z);
       if (hasLoS) isChasing.current = true;
     }
@@ -260,15 +257,16 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
         const dir = new THREE.Vector3().subVectors(playerCamera.position, groupRef.current.position).normalize();
         dir.y = 0; 
 
-        // 🚨 3. WALL COLLISION: Check geometry before stepping forward
         const speed = 2.5 * safeDelta;
         const nextX = groupRef.current.position.x + dir.x * speed;
         const nextZ = groupRef.current.position.z + dir.z * speed;
         const radius = 0.25;
 
-        const isSolid = (x, z) => [1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(z)]?.[Math.floor(x)]);
+        const isSolid = (x, z) => {
+          if (!grid) return true;
+          return [1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(z)]?.[Math.floor(x)]);
+        };
 
-        // Wall sliding logic
         if (!isSolid(nextX, groupRef.current.position.z) && !isSolid(nextX + (dir.x > 0 ? radius : -radius), groupRef.current.position.z)) {
           groupRef.current.position.x = nextX;
         }
@@ -276,7 +274,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
           groupRef.current.position.z = nextZ;
         }
 
-        // 🚨 4. PROCEDURAL ANIMATION: Swing arms and legs while moving
         const t = state.clock.elapsedTime * 10;
         if (leftArm.current) leftArm.current.rotation.x = Math.sin(t) * 0.6;
         if (rightArm.current) rightArm.current.rotation.x = -Math.sin(t) * 0.6;
@@ -289,14 +286,12 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
         onPlayerHit();
       }
     } else {
-       // Return to idle resting stance if player is out of sight/range
        if (leftArm.current) leftArm.current.rotation.x = 0;
        if (rightArm.current) rightArm.current.rotation.x = 0;
        if (leftLeg.current) leftLeg.current.rotation.x = 0;
        if (rightLeg.current) rightLeg.current.rotation.x = 0;
     }
 
-    // Projectile Hit Detection
     projectilesRef.current.forEach(proj => {
       if (proj.active && proj.mesh?.current) {
         if (groupRef.current.position.distanceTo(proj.mesh.current.position) < 0.8) {
@@ -312,13 +307,11 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
 
   return (
     <group ref={groupRef} position={initialPos}>
-      {/* Head */}
       <mesh position={[0, 0.55, 0]}>
         <boxGeometry args={[0.25, 0.25, 0.25]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.9} />
       </mesh>
       
-      {/* Glowing Red Eyes */}
       <mesh position={[0.06, 0.58, 0.13]}>
         <sphereGeometry args={[0.025]} />
         <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={3} />
@@ -328,13 +321,11 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
         <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={3} />
       </mesh>
 
-      {/* Torso */}
       <mesh position={[0, 0.15, 0]}>
         <boxGeometry args={[0.35, 0.55, 0.2]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.9} />
       </mesh>
 
-      {/* Left Arm (Pivot at shoulder) */}
       <group ref={leftArm} position={[-0.25, 0.35, 0]}>
         <mesh position={[0, -0.25, 0]}>
           <boxGeometry args={[0.12, 0.5, 0.12]} />
@@ -342,7 +333,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
         </mesh>
       </group>
 
-      {/* Right Arm (Pivot at shoulder) */}
       <group ref={rightArm} position={[0.25, 0.35, 0]}>
         <mesh position={[0, -0.25, 0]}>
           <boxGeometry args={[0.12, 0.5, 0.12]} />
@@ -350,7 +340,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
         </mesh>
       </group>
 
-      {/* Left Leg (Pivot at hips) */}
       <group ref={leftLeg} position={[-0.1, -0.15, 0]}>
         <mesh position={[0, -0.25, 0]}>
           <boxGeometry args={[0.12, 0.5, 0.12]} />
@@ -358,7 +347,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
         </mesh>
       </group>
 
-      {/* Right Leg (Pivot at hips) */}
       <group ref={rightLeg} position={[0.1, -0.15, 0]}>
         <mesh position={[0, -0.25, 0]}>
           <boxGeometry args={[0.12, 0.5, 0.12]} />
@@ -411,8 +399,8 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids }) {
           playerCamera={camera} 
           projectilesRef={projectilesRef} 
           onEradicate={onEradicate} 
-          onPlayerHit={onPlayerHit} 
-          grid={grids[e.fIdx]} // 🚨 NEW: Passing the floor grid down
+          onPlayerHit={onPlayerHit}
+          grid={grids?.[e.fIdx]} 
         />
       ))}
     </>
@@ -773,7 +761,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         return null;
       })}
       
-      <CombatManager enemiesData={enemiesData} onEradicate={onEradicate} onPlayerHit={onPlayerHit} />
+      <CombatManager enemiesData={enemiesData} grids={grids} onEradicate={onEradicate} onPlayerHit={onPlayerHit} />
       <PlayerControls grids={grids} handTexture={tHand} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} onPlayerMove={onPlayerMove} />
     </>
   );
