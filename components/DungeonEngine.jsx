@@ -263,20 +263,31 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit }) {
   const projectilesRef = useRef([]);
   const [projectiles, setProjectiles] = useState([]);
 
-  // Global listener for Left-Click to shoot
-  useEffect(() => {
-    const handleFire = (e) => {
-      if (e.button === 0 && document.pointerLockElement) {
-        const dir = new THREE.Vector3();
-        camera.getWorldDirection(dir);
-        const newProj = { id: Math.random(), startPos: camera.position.clone(), dir, active: true, mesh: null };
-        projectilesRef.current.push(newProj);
-        setProjectiles(prev => [...prev, newProj]); // Trigger react render for the new orb component
-      }
-    };
-    window.addEventListener('mousedown', handleFire);
-    return () => window.removeEventListener('mousedown', handleFire);
-  }, [camera]);
+// Global listener for Spacebar OR Left-Click to shoot
+useEffect(() => {
+  const handleShoot = (e) => {
+    const isSpacebar = e.type === 'keydown' && e.code === 'Space';
+    const isLeftClick = e.type === 'mousedown' && e.button === 0;
+
+    if ((isSpacebar || isLeftClick) && document.pointerLockElement) {
+      if (isSpacebar) e.preventDefault(); // Prevent page scroll from spacebar
+      
+      const dir = new THREE.Vector3();
+      camera.getWorldDirection(dir);
+      const newProj = { id: Math.random(), startPos: camera.position.clone(), dir, active: true, mesh: null };
+      projectilesRef.current.push(newProj);
+      setProjectiles(prev => [...prev, newProj]); 
+    }
+  };
+
+  window.addEventListener('mousedown', handleShoot);
+  window.addEventListener('keydown', handleShoot);
+  
+  return () => {
+    window.removeEventListener('mousedown', handleShoot);
+    window.removeEventListener('keydown', handleShoot);
+  };
+}, [camera]);
 
   return (
     <>
