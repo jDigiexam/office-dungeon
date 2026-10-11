@@ -210,7 +210,9 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
   const isChasing = useRef(false);
 
   const checkLoS = (startX, startZ, endX, endZ) => {
-    if (!grid) return false;
+    // 🚨 1. FAILSAFE: Abort immediately if the camera hasn't stabilized
+    if (!grid || isNaN(startX) || isNaN(startZ) || isNaN(endX) || isNaN(endZ)) return false;
+    
     let x0 = Math.floor(startX);
     let z0 = Math.floor(startZ);
     const x1 = Math.floor(endX);
@@ -221,7 +223,9 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
     let sz = z0 < z1 ? 1 : -1;
     let err = dx + dz;
 
-    while (true) {
+    let loopLimit = 30; // 🚨 2. FAILSAFE: Prevent infinite browser lockup loops
+
+    while (loopLimit-- > 0) {
       if ([1, 2, 12, 22, 7, 3, 4, 32].includes(grid[z0]?.[x0])) return false;
       if (x0 === x1 && z0 === z1) break;
       const e2 = 2 * err;
