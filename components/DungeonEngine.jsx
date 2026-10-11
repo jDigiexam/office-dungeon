@@ -206,12 +206,21 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
 
   useFrame((state, delta) => {
     if (isDead.current || !groupRef.current) return;
-    const safeDelta = Math.min(delta, 0.1);
-
+    
+    // 1. EARLY EXIT: Only calculate math if the player is on the same floor
     const yDist = Math.abs(groupRef.current.position.y - playerCamera.position.y);
     if (yDist > 2.0) return;
 
-    const dist = groupRef.current.position.distanceTo(playerCamera.position);
+    // 2. EARLY EXIT: Cheap distance check. If player is > 15 units away, go to sleep.
+    const dx = groupRef.current.position.x - playerCamera.position.x;
+    const dz = groupRef.current.position.z - playerCamera.position.z;
+    const sqDist = dx * dx + dz * dz;
+    
+    if (sqDist > 225) return; // 15^2 = 225
+
+    // 3. WAKE UP: Precise chase mechanics
+    const safeDelta = Math.min(delta, 0.1);
+    const dist = Math.sqrt(sqDist);
     
     if (dist < 12 && dist > 0.6) {
       groupRef.current.lookAt(playerCamera.position.x, groupRef.current.position.y, playerCamera.position.z);
@@ -224,6 +233,7 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
       onPlayerHit();
     }
 
+    // 4. HIT DETECTION
     projectilesRef.current.forEach(proj => {
       if (proj.active && proj.mesh?.current) {
         if (groupRef.current.position.distanceTo(proj.mesh.current.position) < 0.8) {
@@ -243,9 +253,15 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
         <capsuleGeometry args={[0.25, 0.8, 4, 8]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.8} />
       </mesh>
-      <mesh position={[0.1, 0.3, 0.22]}><sphereGeometry args={[0.04]} /><meshBasicMaterial color="#ef4444" /></mesh>
-      <mesh position={[-0.1, 0.3, 0.22]}><sphereGeometry args={[0.04]} /><meshBasicMaterial color="#ef4444" /></mesh>
-      <pointLight color="#ef4444" intensity={0.5} distance={2} position={[0, 0.3, 0.3]} />
+      {/* Optimized Eyes: Switched to standard material with high emissive glow, removed pointLight */}
+      <mesh position={[0.1, 0.3, 0.22]}>
+        <sphereGeometry args={[0.04]} />
+        <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={2} />
+      </mesh>
+      <mesh position={[-0.1, 0.3, 0.22]}>
+        <sphereGeometry args={[0.04]} />
+        <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={2} />
+      </mesh>
     </group>
   );
 }
