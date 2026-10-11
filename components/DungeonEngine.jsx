@@ -189,10 +189,10 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid }) {
     const curY = meshRef.current.position.y;
     const curZ = meshRef.current.position.z;
     
-    // 1. Check Wall collisions via the 2D grid
+    // Check Wall collisions via the 2D grid
     const isSolid = grid && [1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(curZ)]?.[Math.floor(curX)]);
 
-    // 🚨 2. NEW: Check Floor and Ceiling collisions
+    // Check Floor and Ceiling collisions
     const floorY = Math.floor(startPos.y / FLOOR_HT) * FLOOR_HT;
     const ceilY = floorY + FLOOR_HT;
     const hitVertical = curY <= floorY + 0.1 || curY >= ceilY - 0.1;
@@ -317,11 +317,13 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
 
   return (
     <group ref={groupRef} position={initialPos}>
+      {/* Head */}
       <mesh position={[0, 0.55, 0]}>
         <boxGeometry args={[0.25, 0.25, 0.25]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.9} />
       </mesh>
       
+      {/* Glowing Red Eyes */}
       <mesh position={[0.06, 0.58, 0.13]}>
         <sphereGeometry args={[0.025]} />
         <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={3} />
@@ -331,11 +333,13 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
         <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={3} />
       </mesh>
 
+      {/* Torso */}
       <mesh position={[0, 0.15, 0]}>
         <boxGeometry args={[0.35, 0.55, 0.2]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.9} />
       </mesh>
 
+      {/* Left Arm */}
       <group ref={leftArm} position={[-0.25, 0.35, 0]}>
         <mesh position={[0, -0.25, 0]}>
           <boxGeometry args={[0.12, 0.5, 0.12]} />
@@ -343,6 +347,7 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
         </mesh>
       </group>
 
+      {/* Right Arm */}
       <group ref={rightArm} position={[0.25, 0.35, 0]}>
         <mesh position={[0, -0.25, 0]}>
           <boxGeometry args={[0.12, 0.5, 0.12]} />
@@ -358,7 +363,6 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids }) {
   const projectilesRef = useRef([]);
   const [projectiles, setProjectiles] = useState([]);
   
-  // 🚨 NEW: Calculate the player's current floor to pass the correct grid to the light orb
   const currentFIdx = Math.max(0, Math.min(2, Math.round(camera.position.y / FLOOR_HT)));
 
   useEffect(() => {
@@ -395,7 +399,7 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids }) {
           startPos={p.startPos} 
           dir={p.dir} 
           projectilesRef={projectilesRef} 
-          grid={grids?.[currentFIdx]} // 🚨 NEW: Passing the grid to the orb
+          grid={grids?.[currentFIdx]} 
         />
       ))}
       {enemiesData.map((e, idx) => (
@@ -569,7 +573,7 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
         ref={controlsRef} 
         minPolarAngle={Math.PI / 4} 
         maxPolarAngle={Math.PI * 3 / 4} 
-        enabled={!isPuzzleActive} // 🚨 NEW: Completely ignores clicks while puzzle is open
+        selector="#engine-wrapper" // 🚨 Binds the click lock exclusively to the 3D wrapper
       />
       <mesh ref={handRef} renderOrder={999}>
         <planeGeometry args={[0.23, 0.23]} />

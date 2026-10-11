@@ -22,34 +22,27 @@ export default function EscapeRoomPage() {
   const [spawnCoords, setSpawnCoords] = useState([5.5, 0.8, 5.5]);
   const [mapsLoading, setMapsLoading] = useState(true);
 
-  // Core Puzzle States
   const [activePuzzle, setActivePuzzle] = useState(null);
   const [solvedPuzzles, setSolvedPuzzles] = useState([]);
   const [puzzleInput, setPuzzleInput] = useState('');
   const [puzzleError, setPuzzleError] = useState('');
 
-  // Random Riddle States
   const [assignedRiddles, setAssignedRiddles] = useState({}); 
   const [usedRiddleIndices, setUsedRiddleIndices] = useState([]);
   
-  // Grid Mini-Game States
   const [puzzleGrid, setPuzzleGrid] = useState([]);
   
-  // Memory Match Mini-Game States
   const [memoryIndex, setMemoryIndex] = useState(0);
   const [isPlayingMemory, setIsPlayingMemory] = useState(false);
   const [flashNode, setFlashNode] = useState(null);
 
-  // Codebreaker (Mastermind) Mini-Game States
   const [mastermindCode, setMastermindCode] = useState('');
   const [mastermindGuesses, setMastermindGuesses] = useState([]);
   const [mastermindInput, setMastermindInput] = useState('');
 
-  // Fog of War States
   const [playerGridPos, setPlayerGridPos] = useState({ x: 5, z: 5 });
   const [exploredTiles, setExploredTiles] = useState(new Set());
 
-  // Damage State
   const [screenFlash, setScreenFlash] = useState('');
 
   useEffect(() => {
@@ -101,9 +94,6 @@ export default function EscapeRoomPage() {
     setTimeout(() => setScreenFlash(''), 300);
   };
 
-  // ------------------------------------------------------------------
-  // PUZZLE LOGIC & HANDLERS
-  // ------------------------------------------------------------------
   const handlePuzzleSuccess = (puzzle) => {
     const { reward } = puzzle;
     const newGrids = [...grids];
@@ -263,9 +253,6 @@ export default function EscapeRoomPage() {
     }
   };
 
-  // ------------------------------------------------------------------
-  // WORLD INTERACTION
-  // ------------------------------------------------------------------
   const handleInteract = (tileType, x, z, fIdx) => {
     const openDoor = (targetType) => {
       const newGrids = [...grids];
@@ -400,7 +387,8 @@ export default function EscapeRoomPage() {
         </div>
       ) : (
         <>
-          <div className={`absolute inset-0 ${activePuzzle ? 'pointer-events-none' : 'pointer-events-auto'}`}>
+          {/* 🚨 FIX: We added ID="engine-wrapper" here so the 3D canvas locks ONLY to this div */}
+          <div id="engine-wrapper" className={`absolute inset-0 ${activePuzzle ? 'pointer-events-none' : 'pointer-events-auto'}`}>
             <DungeonEngine
               grids={grids}
               initialSpawn={spawnCoords}
@@ -412,7 +400,7 @@ export default function EscapeRoomPage() {
               onPlayerMove={handlePlayerMove} 
               onEradicate={handleEnemyEradicated}
               onPlayerHit={handlePlayerHit}
-              isPuzzleActive={!!activePuzzle} // 🚨 NEW
+              isPuzzleActive={!!activePuzzle} 
             />
           </div>
 
@@ -454,8 +442,10 @@ export default function EscapeRoomPage() {
           {activePuzzle && (
             <div 
               className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm pointer-events-auto"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => e.stopPropagation()}
+              // 🚨 FIX: Brutal event stoppers to ensure native clicks never touch the document
+              onPointerDown={(e) => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); }}
+              onClick={(e) => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); }}
+              onMouseDown={(e) => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); }}
             >
               <div className="bg-stone-900 border-4 border-emerald-600 p-8 w-[600px] max-w-[90vw] shadow-2xl shadow-emerald-900/20">
                 <div className="flex justify-between items-center mb-6 border-b-2 border-stone-700 pb-4">
