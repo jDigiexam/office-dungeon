@@ -40,6 +40,15 @@ export default function EscapeRoomPage() {
   const [isPlayingMemory, setIsPlayingMemory] = useState(false);
   const [flashNode, setFlashNode] = useState(null);
 
+  // Codebreaker (Mastermind) Mini-Game States
+  const [mastermindCode, setMastermindCode] = useState('');
+  const [mastermindGuesses, setMastermindGuesses] = useState([]);
+  const [mastermindInput, setMastermindInput] = useState('');
+
+  // Fog of War States
+  const [playerGridPos, setPlayerGridPos] = useState({ x: 5, z: 5 });
+  const [exploredTiles, setExploredTiles] = useState(new Set());
+
   useEffect(() => {
     const fetchMaps = async () => {
       try {
@@ -62,6 +71,21 @@ export default function EscapeRoomPage() {
   const triggerMessage = (msg) => {
     setMessage(msg);
     setTimeout(() => setMessage(''), 3000);
+  };
+
+  const handlePlayerMove = (x, z) => {
+    if (x === playerGridPos.x && z === playerGridPos.z) return;
+
+    setPlayerGridPos({ x, z });
+    setExploredTiles(prev => {
+      const next = new Set(prev);
+      for(let dx = -1; dx <= 1; dx++) {
+        for(let dz = -1; dz <= 1; dz++) {
+          next.add(`${x + dx}_${z + dz}`);
+        }
+      }
+      return next;
+    });
   };
 
   // ------------------------------------------------------------------
@@ -178,6 +202,54 @@ export default function EscapeRoomPage() {
     }
   };
 
+  const handleMastermindSubmit = () => {
+    if (mastermindInput.length !== 4 || isNaN(mastermindInput)) {
+      setPuzzleError('ENTER A VALID 4-DIGIT NUMBER.');
+      return;
+    }
+
+    let bulls = 0;
+    let cows = 0;
+    const targetArr = mastermindCode.split('');
+    const guessArr = mastermindInput.split('');
+
+    for (let i = 0; i < 4; i++) {
+      if (guessArr[i] === targetArr[i]) {
+        bulls++;
+        targetArr[i] = null; 
+        guessArr[i] = null;
+      }
+    }
+
+    for (let i = 0; i < 4; i++) {
+      if (guessArr[i] !== null) {
+        const matchIdx = targetArr.indexOf(guessArr[i]);
+        if (matchIdx > -1) {
+          cows++;
+          targetArr[matchIdx] = null;
+        }
+      }
+    }
+
+    const newGuesses = [...mastermindGuesses, { guess: mastermindInput, bulls, cows }];
+    setMastermindGuesses(newGuesses);
+    setMastermindInput('');
+    setPuzzleError('');
+
+    if (bulls === 4) {
+      setTimeout(() => handlePuzzleSuccess(activePuzzle), 500);
+    } else if (newGuesses.length >= 6) {
+      setPuzzleError(`LOCKOUT. THE CODE WAS: ${mastermindCode}`);
+      setTimeout(() => {
+        let newCode = '';
+        for(let i=0; i<4; i++) newCode += Math.floor(Math.random() * 10).toString();
+        setMastermindCode(newCode);
+        setMastermindGuesses([]);
+        setPuzzleError('');
+      }, 3000);
+    }
+  };
+
   // ------------------------------------------------------------------
   // WORLD INTERACTION
   // ------------------------------------------------------------------
@@ -250,6 +322,14 @@ export default function EscapeRoomPage() {
           playMemorySequence(terminalData.sequence);
         }
 
+        if (terminalData.type === 'mastermind') {
+          let newCode = '';
+          for(let i=0; i<4; i++) newCode += Math.floor(Math.random() * 10).toString();
+          setMastermindCode(newCode);
+          setMastermindGuesses([]);
+          setMastermindInput('');
+        }
+
         setActivePuzzle({ ...puzzleDataToUse, key: puzzleKey });
         setPuzzleInput(''); setPuzzleError('');
       } else {
@@ -315,7 +395,40 @@ export default function EscapeRoomPage() {
             clearTeleport={() => setTeleportCoords(null)}
             onFloorChange={(f) => setCurrentFloor(f)}
             onEnterElevator={handleEnterElevator}
+            onPlayerMove={handlePlayerMove} 
           />
+
+          <div className="absolute top-4 right-4 z-40 bg-stone-900/90 border-2 border-stone-600 p-2 pointer-events-none shadow-2xl backdrop-blur-sm">
+            <div className="text-[10px] text-emerald-500 font-black mb-2 text-center tracking-widest">SECTOR SCANNER</div>
+            <div 
+              className="grid gap-[1px] bg-black border border-stone-800 p-0.5"
+              style={{ gridTemplateColumns: `repeat(15, minmax(0, 1fr))` }}
+            >
+              {Array.from({ length: 15 * 15 }).map((_, idx) => {
+                const radarX = playerGridPos.x - 7 + (idx % 15);
+                const radarZ = playerGridPos.z - 7 + Math.floor(idx / 15);
+                const tileKey = `${radarX}_${radarZ}`;
+                
+                let tileClass = "w-3 h-3 bg-black"; 
+                
+                if (exploredTiles.has(tileKey) && grids?.[currentFloor]?.[radarZ]?.[radarX] !== undefined) {
+                  const type = grids[currentFloor][radarZ][radarX];
+                  
+                  if (radarX === playerGridPos.x && radarZ === playerGridPos.z) {
+                    tileClass = "w-3 h-3 bg-red-500 animate-pulse rounded-full shadow-[0_0_8px_rgba(239,68,68,1)]"; 
+                  } else if (type === 1) tileClass = "w-3 h-3 bg-stone-700"; 
+                  else if (type === 0) tileClass = "w-3 h-3 bg-stone-900"; 
+                  else if (type === 4) tileClass = "w-3 h-3 bg-emerald-500"; 
+                  else if ([2,5,12,15,22,25].includes(type)) tileClass = "w-3 h-3 bg-yellow-500"; 
+                  else if ([7,32,38,17].includes(type)) tileClass = "w-3 h-3 bg-stone-500"; 
+                  else if (type === 3 || type === 10) tileClass = "w-3 h-3 bg-cyan-500"; 
+                  else tileClass = "w-3 h-3 bg-stone-900"; 
+                }
+                
+                return <div key={idx} className={tileClass} />;
+              })}
+            </div>
+          </div>
 
           {activePuzzle && (
             <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
@@ -326,7 +439,40 @@ export default function EscapeRoomPage() {
                 </div>
                 <p className="text-stone-200 text-lg mb-8 leading-relaxed">{activePuzzle.question}</p>
                 
-                {activePuzzle.type === 'memory-match' ? (
+                {activePuzzle.type === 'mastermind' ? (
+                  <div className="flex flex-col gap-4 w-full max-w-sm mx-auto">
+                    <div className="bg-stone-950 border-2 border-stone-700 p-4 min-h-[240px] flex flex-col gap-2">
+                      {mastermindGuesses.map((g, i) => (
+                        <div key={i} className="flex justify-between items-center text-lg font-black text-stone-300 bg-stone-900 px-4 py-2 border border-stone-700">
+                          <span className="tracking-[0.5em]">{g.guess}</span>
+                          <div className="flex gap-1">
+                            {Array.from({ length: g.bulls }).map((_, j) => <div key={`b-${j}`} className="w-3 h-3 bg-emerald-500 rounded-full" />)}
+                            {Array.from({ length: g.cows }).map((_, j) => <div key={`c-${j}`} className="w-3 h-3 bg-yellow-500 rounded-full" />)}
+                          </div>
+                        </div>
+                      ))}
+                      {mastermindGuesses.length === 0 && <p className="text-stone-600 text-sm text-center mt-8">NO ATTEMPTS LOGGED</p>}
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        maxLength="4"
+                        value={mastermindInput}
+                        onChange={(e) => { setMastermindInput(e.target.value.replace(/\D/g, '')); setPuzzleError(''); }}
+                        onKeyDown={(e) => e.key === 'Enter' && handleMastermindSubmit()}
+                        disabled={mastermindGuesses.length >= 6}
+                        className="flex-1 bg-black border-2 border-stone-600 text-emerald-400 p-3 font-mono text-xl focus:border-emerald-500 outline-none tracking-widest text-center"
+                        placeholder="0000"
+                        autoFocus
+                      />
+                      <button onClick={handleMastermindSubmit} disabled={mastermindGuesses.length >= 6} className="bg-emerald-700 hover:bg-emerald-500 text-black px-6 font-extrabold uppercase tracking-widest transition-colors">
+                        RUN
+                      </button>
+                    </div>
+                    <p className="text-xs text-stone-500 text-right">ATTEMPTS REMAINING: {6 - mastermindGuesses.length}</p>
+                  </div>
+                ) : activePuzzle.type === 'memory-match' ? (
                   <div className="grid grid-cols-2 gap-4 mx-auto w-64">
                     {[0, 1, 2, 3].map((node) => {
                       const colors = ['bg-red-700', 'bg-blue-700', 'bg-emerald-700', 'bg-yellow-600'];

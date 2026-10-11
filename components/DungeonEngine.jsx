@@ -61,15 +61,11 @@ function KeycardMesh({ position, texture, color }) {
       if (cardRef.current) {
         const safeDelta = Math.min(delta, 0.1);
         
-        // 1. Keep the classic rotation
         cardRef.current.rotation.y += safeDelta * 2.0; 
         
-        // 2. 🚨 NEW: Animate rising out of the ground
         if (cardRef.current.position.y < 0.4) {
-          // Smoothly lerp the card upwards
           cardRef.current.position.y = THREE.MathUtils.lerp(cardRef.current.position.y, 0.45, safeDelta * 4.0);
           
-          // Snap it to exactly 0.4 once it gets close enough to stop the math calculations
           if (cardRef.current.position.y >= 0.4) {
             cardRef.current.position.y = 0.4;
           }
@@ -79,7 +75,6 @@ function KeycardMesh({ position, texture, color }) {
     
     return (
       <group position={position}>
-        {/* 🚨 NEW: We start the Y position at -1.0 (completely under the floor) */}
         <mesh ref={cardRef} position={[0, -1.0, 0]}>
           <planeGeometry args={[0.5, 0.5]} />
           <meshStandardMaterial 
@@ -98,7 +93,6 @@ function KeycardMesh({ position, texture, color }) {
 function TerminalMesh({ position, texture }) {
     const crtRef = useRef();
     
-    // 🚨 FIX: "Billboarding" - The CRT monitor always rotates to face the player's camera
     useFrame(({ camera }) => { 
       if (crtRef.current) {
         crtRef.current.lookAt(camera.position); 
@@ -107,13 +101,11 @@ function TerminalMesh({ position, texture }) {
     
     return (
       <group position={position}>
-        {/* The Solid Gray Pedestal (Does not rotate) */}
         <mesh position={[0, 0.4, 0]}>
           <boxGeometry args={[0.5, 0.8, 0.5]} />
           <meshStandardMaterial color="#808080" roughness={0.9} />
         </mesh>
         
-        {/* The CRT Monitor Sprite (Rotates to face the player) */}
         <mesh ref={crtRef} position={[0, 1.1, 0]}>
           <planeGeometry args={[0.7, 0.7]} />
           <meshStandardMaterial 
@@ -205,11 +197,12 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTexture, 
 // ----------------------------------------------------
 // 4. BULLETPROOF PHYSICS & CONTROLS
 // ----------------------------------------------------
-function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator }) {
+function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove }) {
   const controlsRef = useRef();
   const moveState = useRef({ forward: false, backward: false, left: false, right: false });
   const currentFloorRef = useRef(0);
   const elevatorDebounce = useRef(false);
+  const lastPos = useRef({ x: -1, z: -1 });
   
   const bobTime = useRef(0);
   const bobAmp = useRef(0); 
@@ -239,8 +232,6 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.repeat) return; 
-      
-      // Ignore NEW key presses if a puzzle menu is open
       if (!document.pointerLockElement) return;
 
       const key = e.key.toLowerCase();
@@ -264,7 +255,6 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
     };
     
     const handleKeyUp = (e) => {
-      // 🚨 FIX: ALWAYS process key releases so the engine knows you let go of the keys!
       const key = e.key.toLowerCase();
       if (key === 'w') moveState.current.forward = false;
       if (key === 's') moveState.current.backward = false;
@@ -322,7 +312,6 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
       const gx = Math.floor(x); const gz = Math.floor(z);
       if (gz < 0 || gz >= grids[currentFIdx].length || gx < 0 || gx >= grids[currentFIdx][0].length) return true;
       const tile = grids[currentFIdx][gz][gx];
-      // added 32 to the array to handle light gray manually opened door
       return [1, 2, 12, 22, 7, 3, 4, 32].includes(tile);
     };
 
@@ -338,12 +327,19 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
     camera.position.z = newZ;
     if (collidesAt(camera.position.x, camera.position.z)) camera.position.z = oldZ;
 
-    // 🚨 NEW: Elevator Proximity Trigger (If you walk into an open elevator tile (10), you teleport)
     const currentMapTile = grids[currentFIdx]?.[Math.floor(camera.position.z)]?.[Math.floor(camera.position.x)];
     if (currentMapTile === 10 && !elevatorDebounce.current) {
       elevatorDebounce.current = true;
       onEnterElevator(currentFIdx);
       setTimeout(() => { elevatorDebounce.current = false; }, 2000);
+    }
+
+    const curX = Math.floor(camera.position.x);
+    const curZ = Math.floor(camera.position.z);
+    if (curX !== lastPos.current.x || curZ !== lastPos.current.z) {
+      lastPos.current.x = curX;
+      lastPos.current.z = curZ;
+      if (onPlayerMove) onPlayerMove(curX, curZ);
     }
   });
 
@@ -362,7 +358,7 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
 // ----------------------------------------------------
 // 5. MAIN SCENE RENDERING
 // ----------------------------------------------------
-function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator }) {
+function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove }) {
   const woodTexList = useTexture([
     '/wall_timber_structure_cross.png', '/wall_timber_structure_diagonal.png',
     '/wall_timber_structure_vertical.png', '/wall_timber_structure.png'
@@ -381,7 +377,6 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
   ]);
 
   useEffect(() => {
-    // Make sure you add tCrt to the array being filtered here so it stays pixelated!
     [...woodTexList, ...stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt].forEach(t => {
       if(t) { t.magFilter = t.minFilter = THREE.NearestFilter; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.needsUpdate = true; }
     });
@@ -450,7 +445,6 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
             if (isWoodFloor) wFloorBuff.add(dummy); else sFloorBuff.add(dummy);
           }
 
-          // Added 32 and 38 to generate door meshes
           if ([2, 8, 12, 18, 22, 28, 7, 17, 32, 38].includes(tile)) {
             const tIdx = (x * 7 + z * 13 + fIdx * 3) % (isWoodFloor ? wLen : sLen);
             const lintelHt = FLOOR_HT - 2.0;
@@ -513,22 +507,18 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         const wTex = wTexList[(x * 7 + z * 13 + fIdx * 3) % wTexList.length];
         const dTex = fIdx < 2 ? tDoorWood : tDoorMetal;
         
-        // Add 32 and 38 to the inclusion check
         if ([2,8,12,18,22,28,7,17,32,38].includes(tile)) {
           let trimColor = "#dc2626";
           if (tile === 12 || tile === 18) trimColor = "#2563eb";
           if (tile === 22 || tile === 28) trimColor = "#eab308";
           
-          // Apply the neutral trim to BOTH Gray and Light Gray doors
           if (tile === 7 || tile === 17 || tile === 32 || tile === 38) trimColor = "#a1a1aa"; 
           
-          // Pass 38 into the isOpened array!
           return <DoorMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={[8,18,28,17,38].includes(tile)} wallTexture={wTex} doorTexture={dTex} trimColor={trimColor} />;
         }
         
         if (tile === 3 || tile === 10) return <ElevatorMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={tile === 10} wallTexture={wTex} doorTexture={tDoorMetalFrame} litTexture={tWindow} />;
-       // Replace the old Terminal line with this one:
-       if (tile === 4) return <TerminalMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tCrt} />;
+        if (tile === 4) return <TerminalMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tCrt} />;
 
         if (tile === 5) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tKeyRed} color="#8B0000" />;
         if (tile === 15) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tKeyBlue} color="#00008B" />;
@@ -538,19 +528,19 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         return null;
       })}
       
-      <PlayerControls grids={grids} handTexture={tHand} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} />
+      <PlayerControls grids={grids} handTexture={tHand} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} onPlayerMove={onPlayerMove} />
     </>
   );
 }
 
-export default function DungeonEngine({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator }) {
+export default function DungeonEngine({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove }) {
   return (
     <div className="w-full h-screen bg-black relative">
       <Canvas camera={{ position: initialSpawn || [5.5, 0.8, 5.5], fov: 80, near: 0.01, far: 50 }} gl={{ antialias: false }}>
         <fog attach="fog" args={['#000000', 4, 18]} />
         <ambientLight intensity={1.0} color="#ffffff" />
         <Suspense fallback={null}>
-          <DungeonScene grids={grids} initialSpawn={initialSpawn} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} />
+          <DungeonScene grids={grids} initialSpawn={initialSpawn} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} onPlayerMove={onPlayerMove} />
         </Suspense>
       </Canvas>
     </div>
