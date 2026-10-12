@@ -422,6 +422,7 @@ export default function EscapeRoomPage() {
                   GLOWING LIQUID IS SPILLED ON YOUR COAT.<br/>
                   YOU HAVE THE FAINT MEMORY THAT YOU WERE ONCE<br/>
                   A RESEARCH SCIENTIST.
+                </p>
                   
                   <p className="text-stone-500 font-bold tracking-widest leading-loose">
                   YOUR RIGHT HAND BURNS FROM THE CHEMICALS.<br/>
