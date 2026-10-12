@@ -391,6 +391,8 @@ export default function EscapeRoomPage() {
             }
             .animate-scroll-text {
               animation: cinematic-scroll 35s linear infinite;
+              animation-delay: 1s;
+              animation-fill-mode: backwards;
             }
           `}</style>
 
@@ -422,7 +424,7 @@ export default function EscapeRoomPage() {
                   YOUR RIGHT HAND BURNS AND YOUR MIND RACES.
                   YOUR MISSION: FIND OUT WHAT HAPPENED AND ESCAPE...
                 </p>
-                <p className="text-red-500 font-bold tracking-widest leading-loose">
+                <p className="text-stone-500 font-bold tracking-widest leading-loose">
                   BUT THE SECURITY GRID IS LOCKED.<br/>
                   AND THE THERMAL SCANS INDICATE YOU ARE NOT ALONE...
                 </p>
