@@ -408,20 +408,24 @@ export default function EscapeRoomPage() {
             >
               <div className="absolute w-full animate-scroll-text flex flex-col gap-8 text-center px-12">
                 <p className="text-red-500 font-bold tracking-widest leading-loose">
-                  YEAR 2027.<br/>
-                  SECTOR 4 OF THE MEGACORP BIOENGINEERING COMPLEX
+                  11-02-2026<br/>
+                  SECTOR 4 OF THE MEGACORP BIOENGINEERING COMPLEX<br/>
                   WENT DARK EXACTLY 72 HOURS AGO.
                 </p>
                 <p className="text-stone-300 font-bold tracking-widest leading-loose">
                   NO EVACUATION ORDER WAS ISSUED.<br/>
-                  NO SURVIVORS HAVE EMERGED.
-                  SOMETHING WENT WRONG.
+                  NO SURVIVORS HAVE EMERGED.<br/>
+                  SOMETHING WENT WRONG.<br/>
                 </p>
                 <p className="text-stone-300 font-bold tracking-widest leading-loose">
-                  YOU AWAKE NEAR A LAB BENCH AND SPILLED CHEMICALS<br/>
-                  WITH THE FAINT MEMORY THAT YOU WERE ONCE
+                  YOU AWAKE NEAR A LAB BENCH.<br/>
+                  GLOWING LIQUID IS SPILLED ON YOUR COAT.<br/>
+                  YOU HAVE THE FAINT MEMORY THAT YOU WERE ONCE<br/>
                   A RESEARCH SCIENTIST.
-                  YOUR RIGHT HAND BURNS AND YOUR MIND RACES.
+                  
+                  <p className="text-stone-500 font-bold tracking-widest leading-loose">
+                  YOUR RIGHT HAND BURNS FROM THE CHEMICALS.<br/>
+                  YOUR MIND RACES AND YOU THINK YOU SEE MOVING SHADOWS.<br/>
                   YOUR MISSION: FIND OUT WHAT HAPPENED AND ESCAPE...
                 </p>
                 <p className="text-stone-500 font-bold tracking-widest leading-loose">
