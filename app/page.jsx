@@ -47,6 +47,18 @@ export default function EscapeRoomPage() {
   const [isDead, setIsDead] = useState(false);
   const [screenFlash, setScreenFlash] = useState('');
 
+// 🚨 Gameplay Playlist State
+const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+  
+// This playlist will cycle while the player is on Floor 0 and Floor 1
+const gameplayPlaylist = [
+  '/05 Dark Energy.mp3',
+  '/06 Requiem for Ravenholm.mp3',
+  '/07 Pulse Phase.mp3',
+  '/08 Ravenholm Reprise.mp3',
+  '/12 Apprehension and Evasion.mp3'
+];
+
   useEffect(() => {
     const fetchMaps = async () => {
       try {
@@ -383,55 +395,47 @@ export default function EscapeRoomPage() {
       {!gameStarted ? (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black text-red-600">
           
-          {/* 🚨 INJECTED CSS for the scrolling animation */}
+          <audio src="/In the House, In a Heartbeat.mp3" autoPlay loop />
+
           <style>{`
             @keyframes cinematic-scroll {
               0% { transform: translateY(100%); }
               100% { transform: translateY(-100%); }
             }
             .animate-scroll-text {
-              animation: cinematic-scroll 35s linear infinite;
-              animation-delay: 1s;
-              animation-fill-mode: backwards;
+              animation: cinematic-scroll 60s linear infinite;
             }
           `}</style>
 
           <div className="border-4 border-stone-800 bg-stone-900 p-8 flex flex-col items-center justify-center w-full max-w-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] relative">
             <h1 className="text-6xl font-black mb-4 tracking-widest text-red-600 drop-shadow-[0_0_10px_rgba(220,38,38,0.5)]">
-              ZERO-DAY ESCAPE ROOM
+              OFFICE DUNGEON
             </h1>
             
-            {/* 🚨 THE CRAWL OVERLAY */}
             <div 
               className="relative w-full h-64 my-6 bg-black border-y-2 border-stone-800 overflow-hidden"
               style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)' }}
             >
               <div className="absolute w-full animate-scroll-text flex flex-col gap-8 text-center px-12">
                 <p className="text-red-500 font-bold tracking-widest leading-loose">
-                  11-02-2026<br/>
-                  SECTOR 4 OF THE MEGACORP BIOENGINEERING COMPLEX<br/>
-                  WENT DARK EXACTLY 72 HOURS AGO.
+                  YEAR 209X.<br/>
+                  SECTOR 4 OF THE MEGADODO OFFICE COMPLEX WENT DARK EXACTLY 72 HOURS AGO.
                 </p>
                 <p className="text-stone-300 font-bold tracking-widest leading-loose">
                   NO EVACUATION ORDER WAS ISSUED.<br/>
-                  NO SURVIVORS HAVE EMERGED.<br/>
-                  SOMETHING WENT WRONG.<br/>
+                  NO SURVIVORS HAVE EMERGED.
                 </p>
                 <p className="text-stone-300 font-bold tracking-widest leading-loose">
-                  YOU AWAKE NEAR A LAB BENCH.<br/>
-                  GLOWING LIQUID IS SPILLED ON YOUR COAT.<br/>
-                  YOU HAVE THE FAINT MEMORY THAT YOU WERE ONCE<br/>
-                  A RESEARCH SCIENTIST.
+                  YOU ARE A CORPORATE RECOVERY AGENT.<br/>
+                  YOUR MISSION: RETRIEVE HIGH-PRIORITY ASSETS FROM THE MAINFRAME TERMINALS.
                 </p>
-                  
-                  <p className="text-stone-500 font-bold tracking-widest leading-loose">
-                  YOUR RIGHT HAND BURNS FROM THE CHEMICALS.<br/>
-                  YOUR MIND RACES AND YOU THINK YOU SEE MOVING SHADOWS.<br/>
-                  YOUR MISSION: FIND OUT WHAT HAPPENED AND ESCAPE...
-                </p>
-                <p className="text-stone-500 font-bold tracking-widest leading-loose">
+                <p className="text-red-500 font-bold tracking-widest leading-loose">
                   BUT THE SECURITY GRID IS LOCKED.<br/>
-                  AND THE THERMAL SCANS INDICATE YOU ARE NOT ALONE...
+                  AND THE THERMAL SCANS INDICATE YOU ARE NOT ALONE.
+                </p>
+                <p className="text-stone-300 font-bold tracking-widest leading-loose">
+                  SHADOW ENTITIES ROAM THE HALLS.<br/>
+                  THEY DO NOT BLEED, BUT THEY CAN BE ERADICATED WITH LIGHT.
                 </p>
                 <p className="text-red-600 font-black tracking-[0.3em] text-xl mt-4">
                   SURVIVE. ESCAPE.
@@ -445,13 +449,13 @@ export default function EscapeRoomPage() {
             
             {mapsLoading ? (
               <button disabled className="w-full py-4 bg-stone-800 text-stone-500 font-extrabold tracking-widest animate-pulse border-2 border-stone-700">
-                INITIALIZING LINK...
+                INITIALIZING SATELLITE LINK...
               </button>
             ) : (
               <button onClick={() => setGameStarted(true)} className="w-full py-4 bg-red-800 hover:bg-red-600 text-black font-black text-xl tracking-[0.3em] transition-colors border-2 border-red-900 shadow-[0_0_15px_rgba(153,27,27,0.8)]">
-                INITIATE ESCAPE.
-              </button> 
-            )} 
+                INITIATE DESCENT
+              </button>
+            )}
           </div>
         </div>
       ) : isDead ? (
@@ -469,6 +473,24 @@ export default function EscapeRoomPage() {
         </div>
       ) : (
         <>
+          {/* 🚨 MAIN PLAYLIST: Plays on Floor 0 and Floor 1. Cycles to the next track when one ends. */}
+          {gameStarted && currentFloor < 2 && !isDead && (
+            <audio 
+              autoPlay 
+              src={gameplayPlaylist[currentTrackIndex]} 
+              onEnded={() => setCurrentTrackIndex((prev) => (prev + 1) % gameplayPlaylist.length)} 
+            />
+          )}
+
+          {/* 🚨 BOSS MUSIC: Takes over exclusively when the player reaches Floor 2. */}
+          {gameStarted && currentFloor === 2 && !isDead && (
+            <audio 
+              autoPlay 
+              loop 
+              src="/24 You're Not Supposed to Be Here.mp3" 
+            />
+          )}
+
           <div id="engine-wrapper" className={`absolute inset-0 ${activePuzzle ? 'pointer-events-none' : 'pointer-events-auto'}`}>
             <DungeonEngine
               grids={grids}
@@ -482,6 +504,7 @@ export default function EscapeRoomPage() {
               onEradicate={handleEnemyEradicated}
               onPlayerHit={handlePlayerHit}
               isPuzzleActive={!!activePuzzle} 
+              currentFloor={currentFloor}
             />
           </div>
 

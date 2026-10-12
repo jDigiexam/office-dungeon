@@ -817,12 +817,22 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
   );
 }
 
-export default function DungeonEngine({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove, onEradicate, onPlayerHit, isPuzzleActive }) {
+export default function DungeonEngine({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove, onEradicate, onPlayerHit, isPuzzleActive, currentFloor }) {
+  
+  // 🚨 NEW: Dynamic Atmosphere logic
+  const isHell = currentFloor === 2;
+  const fogColor = isHell ? '#450a0a' : '#000000';
+  const fogFar = isHell ? 12 : 18; // Fog is thicker in hell
+  const lightColor = isHell ? '#ef4444' : '#ffffff';
+  const lightIntensity = isHell ? 0.3 : 1.0;
+
   return (
     <div className="w-full h-screen bg-black relative">
       <Canvas camera={{ position: initialSpawn || [5.5, 0.8, 5.5], fov: 80, near: 0.01, far: 50 }} gl={{ antialias: false }}>
-        <fog attach="fog" args={['#000000', 4, 18]} />
-        <ambientLight intensity={1.0} color="#ffffff" />
+        {/* 🚨 NEW: Reactive fog and lighting */}
+        <fog attach="fog" args={[fogColor, 4, fogFar]} />
+        <ambientLight intensity={lightIntensity} color={lightColor} />
+        
         <Suspense fallback={null}>
         <DungeonScene grids={grids} initialSpawn={initialSpawn} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} onPlayerMove={onPlayerMove} onEradicate={onEradicate} onPlayerHit={onPlayerHit} isPuzzleActive={isPuzzleActive} />
         </Suspense>
