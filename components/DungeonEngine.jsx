@@ -251,8 +251,9 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
   useFrame((state, delta) => {
     if (isDead.current || !groupRef.current) return;
     
+    // Increased Y-distance check since the monster is much taller now
     const yDist = Math.abs(groupRef.current.position.y - playerCamera.position.y);
-    if (yDist > 2.0) return;
+    if (yDist > 3.0) return;
 
     const dx = groupRef.current.position.x - playerCamera.position.x;
     const dz = groupRef.current.position.z - playerCamera.position.z;
@@ -274,10 +275,10 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
         const dir = new THREE.Vector3().subVectors(playerCamera.position, groupRef.current.position).normalize();
         dir.y = 0; 
 
-        const speed = 2.5 * safeDelta;
+        const speed = 3.0 * safeDelta; // Slightly faster to match their long stride
         const nextX = groupRef.current.position.x + dir.x * speed;
         const nextZ = groupRef.current.position.z + dir.z * speed;
-        const radius = 0.35; 
+        const radius = 0.3; 
 
         const isSolid = (x, z) => {
           if (!grid) return true;
@@ -291,15 +292,17 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
           groupRef.current.position.z = nextZ;
         }
 
+        // Retain a slight, eerie hovering motion on the main body
         if (ghostBody.current) {
-          ghostBody.current.position.y = Math.sin(state.clock.elapsedTime * 4) * 0.15;
+          ghostBody.current.position.y = Math.sin(state.clock.elapsedTime * 3) * 0.08;
         }
 
-        const t = state.clock.elapsedTime * 10;
-        if (leftArm.current) leftArm.current.rotation.x = Math.sin(t) * 0.6;
-        if (rightArm.current) rightArm.current.rotation.x = -Math.sin(t) * 0.6;
-        if (leftLeg.current) leftLeg.current.rotation.x = -Math.sin(t) * 0.6;
-        if (rightLeg.current) rightLeg.current.rotation.x = Math.sin(t) * 0.6;
+        // Long, sweeping stride animations
+        const t = state.clock.elapsedTime * 8;
+        if (leftArm.current) leftArm.current.rotation.x = Math.sin(t) * 0.7;
+        if (rightArm.current) rightArm.current.rotation.x = -Math.sin(t) * 0.7;
+        if (leftLeg.current) leftLeg.current.rotation.x = -Math.sin(t) * 0.7;
+        if (rightLeg.current) rightLeg.current.rotation.x = Math.sin(t) * 0.7;
 
       } else if (dist <= 0.6) {
         isDead.current = true;
@@ -330,51 +333,57 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
     <group ref={groupRef} position={initialPos}>
       <group ref={ghostBody}>
         
-        {/* Tapered spectral blob */}
-        <mesh position={[0, 0.6, 0]}>
-          <cylinderGeometry args={[0.25, 0.25, 1.4, 5]} />
-          <meshBasicMaterial color="#000000" transparent opacity={0.85} />
+        {/* Massive Blocky Head */}
+        <mesh position={[0, 1.9, 0]}>
+          <boxGeometry args={[0.4, 0.4, 0.4]} />
+          <meshBasicMaterial color="#000000" transparent opacity={0.9} />
         </mesh>
         
-        {/* Glowing Red Eyes */}
-        <mesh position={[0.12, 0.8, 0.3]}>
-          <sphereGeometry args={[0.03]} />
-          <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={4} />
+        {/* Piercing Red Eyes */}
+        <mesh position={[0.1, 1.95, 0.21]}>
+          <sphereGeometry args={[0.035]} />
+          <meshStandardMaterial color="#eb1414" emissive="#eb1414" emissiveIntensity={5} />
         </mesh>
-        <mesh position={[-0.12, 0.8, 0.3]}>
-          <sphereGeometry args={[0.03]} />
-          <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={4} />
+        <mesh position={[-0.1, 1.95, 0.21]}>
+          <sphereGeometry args={[0.035]} />
+          <meshStandardMaterial color="#eb1414" emissive="#eb1414" emissiveIntensity={5} />
         </mesh>
 
-        {/* Left Arm (Pivot at shoulder) */}
-        <group ref={leftArm} position={[-0.4, 0.9, 0]}>
-          <mesh position={[0, -0.3, 0]}>
-            <boxGeometry args={[0.12, 0.6, 0.12]} />
-            <meshBasicMaterial color="#000000" transparent opacity={0.85} />
+        {/* Extremely Slim Torso */}
+        <mesh position={[0, 1.3, 0]}>
+          <boxGeometry args={[0.2, 0.8, 0.15]} />
+          <meshBasicMaterial color="#000000" transparent opacity={0.9} />
+        </mesh>
+
+        {/* Long Spindly Left Arm (Pivot at high shoulder) */}
+        <group ref={leftArm} position={[-0.18, 1.65, 0]}>
+          <mesh position={[0, -0.7, 0]}>
+            <boxGeometry args={[0.08, 1.4, 0.08]} />
+            <meshBasicMaterial color="#000000" transparent opacity={0.9} />
           </mesh>
         </group>
 
-        {/* Right Arm (Pivot at shoulder) */}
-        <group ref={rightArm} position={[0.4, 0.9, 0]}>
-          <mesh position={[0, -0.3, 0]}>
-            <boxGeometry args={[0.12, 0.6, 0.12]} />
-            <meshBasicMaterial color="#000000" transparent opacity={0.85} />
+        {/* Long Spindly Right Arm (Pivot at high shoulder) */}
+        <group ref={rightArm} position={[0.18, 1.65, 0]}>
+          <mesh position={[0, -0.7, 0]}>
+            <boxGeometry args={[0.08, 1.4, 0.08]} />
+            <meshBasicMaterial color="#000000" transparent opacity={0.9} />
           </mesh>
         </group>
 
-        {/* Left Leg (Pivot at base of body) */}
-        <group ref={leftLeg} position={[-0.15, -0.1, 0]}>
-          <mesh position={[0, -0.3, 0]}>
-            <boxGeometry args={[0.12, 0.6, 0.12]} />
-            <meshBasicMaterial color="#000000" transparent opacity={0.85} />
+        {/* Long Left Leg (Pivot at base of slim torso) */}
+        <group ref={leftLeg} position={[-0.07, 0.9, 0]}>
+          <mesh position={[0, -0.7, 0]}>
+            <boxGeometry args={[0.08, 1.4, 0.08]} />
+            <meshBasicMaterial color="#000000" transparent opacity={0.9} />
           </mesh>
         </group>
 
-        {/* Right Leg (Pivot at base of body) */}
-        <group ref={rightLeg} position={[0.15, -0.1, 0]}>
-          <mesh position={[0, -0.3, 0]}>
-            <boxGeometry args={[0.12, 0.6, 0.12]} />
-            <meshBasicMaterial color="#000000" transparent opacity={0.85} />
+        {/* Long Right Leg (Pivot at base of slim torso) */}
+        <group ref={rightLeg} position={[0.07, 0.9, 0]}>
+          <mesh position={[0, -0.7, 0]}>
+            <boxGeometry args={[0.08, 1.4, 0.08]} />
+            <meshBasicMaterial color="#000000" transparent opacity={0.9} />
           </mesh>
         </group>
 

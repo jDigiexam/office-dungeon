@@ -43,7 +43,6 @@ export default function EscapeRoomPage() {
   const [playerGridPos, setPlayerGridPos] = useState({ x: 5, z: 5 });
   const [exploredTiles, setExploredTiles] = useState(new Set());
 
-  // 🚨 NEW: Player Vitals State
   const [hp, setHp] = useState(100);
   const [isDead, setIsDead] = useState(false);
   const [screenFlash, setScreenFlash] = useState('');
@@ -91,10 +90,9 @@ export default function EscapeRoomPage() {
     triggerMessage("SHADOW ENTITY ERADICATED.");
   };
 
-  // 🚨 NEW: Updated damage logic
   const handlePlayerHit = () => {
     setHp((prevHp) => {
-      const newHp = Math.max(0, prevHp - 20); // Lose 20 HP per hit
+      const newHp = Math.max(0, prevHp - 20); 
       if (newHp === 0) {
         setScreenFlash('bg-red-900/90');
         setTimeout(() => setIsDead(true), 800);
@@ -384,22 +382,72 @@ export default function EscapeRoomPage() {
     <main className="relative w-full h-screen overflow-hidden bg-black font-mono select-none">
       {!gameStarted ? (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black text-red-600">
-          <div className="border-4 border-stone-700 bg-stone-900 p-8 text-center max-w-md">
-            <h1 className="text-4xl font-extrabold mb-1 tracking-widest text-red-600">OFFICE DUNGEON</h1>
-            <p className="mb-8 text-stone-300 text-xs">Use WASD to run. Mouse to look. Left Click/Space to fire. 'E' to interact.</p>
+          
+          {/* 🚨 INJECTED CSS for the scrolling animation */}
+          <style>{`
+            @keyframes cinematic-scroll {
+              0% { transform: translateY(100%); }
+              100% { transform: translateY(-100%); }
+            }
+            .animate-scroll-text {
+              animation: cinematic-scroll 35s linear infinite;
+            }
+          `}</style>
+
+          <div className="border-4 border-stone-800 bg-stone-900 p-8 flex flex-col items-center justify-center w-full max-w-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] relative">
+            <h1 className="text-6xl font-black mb-4 tracking-widest text-red-600 drop-shadow-[0_0_10px_rgba(220,38,38,0.5)]">
+              OFFICE DUNGEON
+            </h1>
+            
+            {/* 🚨 THE CRAWL OVERLAY */}
+            <div 
+              className="relative w-full h-64 my-6 bg-black border-y-2 border-stone-800 overflow-hidden"
+              style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)' }}
+            >
+              <div className="absolute w-full animate-scroll-text flex flex-col gap-8 text-center px-12">
+                <p className="text-red-500 font-bold tracking-widest leading-loose">
+                  YEAR 2027.<br/>
+                  SECTOR 4 OF THE MEGACORP BIOENGINEERING COMPLEX
+                  WENT DARK EXACTLY 72 HOURS AGO.
+                </p>
+                <p className="text-stone-300 font-bold tracking-widest leading-loose">
+                  NO EVACUATION ORDER WAS ISSUED.<br/>
+                  NO SURVIVORS HAVE EMERGED.
+                  SOMETHING WENT WRONG.
+                </p>
+                <p className="text-stone-300 font-bold tracking-widest leading-loose">
+                  YOU AWAKE NEAR A LAB BENCH AND SPILLED CHEMICALS<br/>
+                  WITH THE FAINT MEMORY THAT YOU WERE ONCE
+                  A RESEARCH SCIENTIST.
+                  YOUR RIGHT HAND BURNS AND YOUR MIND RACES.
+                  YOUR MISSION: FIND OUT WHAT HAPPENED AND ESCAPE...
+                </p>
+                <p className="text-red-500 font-bold tracking-widest leading-loose">
+                  BUT THE SECURITY GRID IS LOCKED.<br/>
+                  AND THE THERMAL SCANS INDICATE YOU ARE NOT ALONE...
+                </p>
+                <p className="text-red-600 font-black tracking-[0.3em] text-xl mt-4">
+                  SURVIVE. ESCAPE.
+                </p>
+              </div>
+            </div>
+
+            <p className="mb-8 text-stone-400 text-xs tracking-[0.2em] uppercase font-bold text-center">
+              Controls: WASD to Move | Mouse to Look | Left Click/Space to Fire | 'E' to Interact
+            </p>
+            
             {mapsLoading ? (
-              <button disabled className="w-full py-3 bg-stone-700 text-stone-500 font-extrabold animate-pulse">
-                INITIALIZING SATELLITE LINK...
+              <button disabled className="w-full py-4 bg-stone-800 text-stone-500 font-extrabold tracking-widest animate-pulse border-2 border-stone-700">
+                INITIALIZING LINK...
               </button>
             ) : (
-              <button onClick={() => setGameStarted(true)} className="w-full py-3 bg-red-700 hover:bg-red-600 text-black font-extrabold transition-colors">
-                START ESCAPE
-              </button>
-            )}
+              <button onClick={() => setGameStarted(true)} className="w-full py-4 bg-red-800 hover:bg-red-600 text-black font-black text-xl tracking-[0.3em] transition-colors border-2 border-red-900 shadow-[0_0_15px_rgba(153,27,27,0.8)]">
+                INITIATE ESCAPE.
+              </button> 
+            )} 
           </div>
         </div>
       ) : isDead ? (
-        // 🚨 NEW: Death Screen Overlay
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-red-950 text-red-500">
           <div className="border-4 border-red-900 bg-black p-12 text-center max-w-lg shadow-[0_0_50px_rgba(153,27,27,0.5)]">
             <h1 className="text-6xl font-black mb-4 tracking-widest text-red-600">YOU DIED</h1>
@@ -619,10 +667,9 @@ export default function EscapeRoomPage() {
             </div>
           )}
 
-<div className="absolute bottom-0 left-0 right-0 z-40 bg-stone-900 border-t-4 border-stone-600 p-2 flex items-center justify-between text-stone-200 h-20 pointer-events-none">
+          <div className="absolute bottom-0 left-0 right-0 z-40 bg-stone-900 border-t-4 border-stone-600 p-2 flex items-center justify-between text-stone-200 h-20 pointer-events-none">
             <div className="bg-stone-950 border-2 border-stone-700 px-4 py-1 flex flex-col items-center justify-center min-w-[120px]">
               <span className="text-[10px] text-stone-500 font-bold">LEVEL</span>
-              {/* Locked to LEVEL 1 */}
               <span className="text-red-500 font-black mt-1">LEVEL 1</span>
             </div>
             
@@ -638,7 +685,6 @@ export default function EscapeRoomPage() {
 
             <div className="hidden md:flex bg-stone-950 border-2 border-stone-700 px-6 py-2 flex-col items-center justify-center flex-1 mx-2">
               <span className="text-[10px] text-stone-500 font-bold">CURRENT SECTOR</span>
-              {/* Dynamic Sector Naming based on floor progression */}
               <span className="text-xs font-bold text-yellow-500 mt-0.5">
                 {currentFloor === 0 ? 'ENTRY CORRIDORS' : currentFloor === 1 ? 'MAINFRAME LABS' : 'THE ABYSS'}
               </span>
