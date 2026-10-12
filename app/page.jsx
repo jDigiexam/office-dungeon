@@ -398,7 +398,7 @@ export default function EscapeRoomPage() {
 
           <div className="border-4 border-stone-800 bg-stone-900 p-8 flex flex-col items-center justify-center w-full max-w-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] relative">
             <h1 className="text-6xl font-black mb-4 tracking-widest text-red-600 drop-shadow-[0_0_10px_rgba(220,38,38,0.5)]">
-              ZERO DAY ESCAPE ROOM
+              ZERO-DAY ESCAPE ROOM
             </h1>
             
             {/* 🚨 THE CRAWL OVERLAY */}
