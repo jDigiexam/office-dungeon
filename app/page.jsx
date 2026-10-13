@@ -541,7 +541,7 @@ export default function EscapeRoomPage() {
             >
               <div className="absolute w-full animate-scroll-text flex flex-col gap-8 text-center px-12">
                 <p className="text-red-500 font-bold tracking-widest leading-loose">
-                  11-02-2026<br/>
+                  2026.11.02<br/>
                   SECTOR 4 OF THE MEGACORP BIOENGINEERING COMPLEX<br/>
                   WENT DARK EXACTLY 72 HOURS AGO.
                 </p>
@@ -556,12 +556,12 @@ export default function EscapeRoomPage() {
                   YOU HAVE THE FAINT MEMORY THAT YOU WERE ONCE<br/>
                   A RESEARCH SCIENTIST.
                 </p>
-                <p className="text-stone-500 font-bold tracking-widest leading-loose">
+                <p className="text-stone-300 font-bold tracking-widest leading-loose">
                   YOUR RIGHT HAND BURNS FROM THE CHEMICALS.<br/>
                   YOUR MIND RACES AND YOU THINK YOU SEE MOVING SHADOWS.<br/>
                   YOUR MISSION: FIND OUT WHAT HAPPENED AND ESCAPE...
                 </p>
-                <p className="text-stone-500 font-bold tracking-widest leading-loose">
+                <p className="text-stone-300 font-bold tracking-widest leading-loose">
                   BUT THE SECURITY GRID IS LOCKED.<br/>
                   AND THE THERMAL SCANS INDICATE YOU ARE NOT ALONE...
                 </p>
