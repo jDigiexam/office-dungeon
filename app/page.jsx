@@ -403,7 +403,7 @@ const gameplayPlaylist = [
           onClick={() => setSystemBooted(true)}
         >
           <div className="text-red-600 animate-pulse font-bold tracking-widest text-xl border-2 border-red-900 p-8 shadow-[0_0_30px_rgba(153,27,27,0.5)]">
-            CLICK TO INITIALIZE TERMINAL...
+            CLICK TO INITIALIZE THE GAME...
           </div>
         </div>
       ) : !gameStarted ? (
@@ -424,7 +424,8 @@ const gameplayPlaylist = [
 
             <div className="border-4 border-stone-800 bg-stone-900 p-8 flex flex-col items-center justify-center w-full max-w-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] relative">
             <h1 className="text-6xl font-black mb-4 tracking-widest text-red-600 drop-shadow-[0_0_10px_rgba(220,38,38,0.5)]">
-              ZERO-DAY ESCAPE ROOM
+              ZERO-DAY <br/>
+              ESCAPE ROOM
             </h1>
             
             {/* 🚨 THE CRAWL OVERLAY */}
@@ -450,12 +451,12 @@ const gameplayPlaylist = [
                   A RESEARCH SCIENTIST.
                 </p>
                   
-                <p className="text-stone-500 font-bold tracking-widest leading-loose">
+                <p className="text-stone-300 font-bold tracking-widest leading-loose">
                   YOUR RIGHT HAND BURNS FROM THE CHEMICALS.<br/>
                   YOUR MIND RACES AND YOU THINK YOU SEE MOVING SHADOWS.<br/>
                   YOUR MISSION: FIND OUT WHAT HAPPENED AND ESCAPE...
                 </p>
-                <p className="text-stone-500 font-bold tracking-widest leading-loose">
+                <p className="text-stone-300 font-bold tracking-widest leading-loose">
                   BUT THE SECURITY GRID IS LOCKED.<br/>
                   AND THE THERMAL SCANS INDICATE YOU ARE NOT ALONE...
                 </p>
