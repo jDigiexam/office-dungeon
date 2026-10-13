@@ -11,7 +11,7 @@ const FALLBACK_GRID = Array(10).fill(Array(10).fill(0)).map((row, z) =>
   row.map((col, x) => (x === 0 || x === 9 || z === 0 || z === 9 ? 1 : 0))
 );
 
-// 🚨 NEW: Smart Audio Crossfader Component
+// 🚨 UPGRADED: Smart Audio Crossfader Component
 function AudioCrossfader({ currentSrc, loopCurrent, onNextTrack }) {
   const audio1 = useRef(null);
   const audio2 = useRef(null);
@@ -24,7 +24,6 @@ function AudioCrossfader({ currentSrc, loopCurrent, onNextTrack }) {
     const activeAudio = activeIdx.current === 0 ? audio1.current : audio2.current;
     const standbyAudio = activeIdx.current === 0 ? audio2.current : audio1.current;
 
-    // If there is no track (e.g. death screen), fade everything out to silence
     if (!currentSrc) {
       [audio1.current, audio2.current].forEach(a => {
         if (!a || a.paused) return;
@@ -38,26 +37,24 @@ function AudioCrossfader({ currentSrc, loopCurrent, onNextTrack }) {
       return;
     }
 
-    // Avoid restarting if the requested track is already playing
     if (activeAudio && activeAudio.src && new URL(activeAudio.src).pathname.endsWith(currentSrc)) {
       activeAudio.loop = loopCurrent;
       return;
     }
 
-    // Swap active players
     activeIdx.current = activeIdx.current === 0 ? 1 : 0;
     const newAudio = standbyAudio;
     const oldAudio = activeAudio;
 
     newAudio.src = currentSrc;
     newAudio.loop = loopCurrent;
+    newAudio.currentTime = 0; // 🚨 FIX: Explicitly rewind the buffer to zero
     newAudio.volume = 0;
-    delete newAudio.dataset.fadingOut; // Reset fade trigger flag
+    delete newAudio.dataset.fadingOut; 
     
     const playPromise = newAudio.play();
     if (playPromise !== undefined) playPromise.catch(() => console.log('Autoplay prevented by browser'));
 
-    // Smoothly Crossfade: Raise new audio volume, lower old audio volume
     let fadeVol = 0;
     faderRef.current = setInterval(() => {
       fadeVol += 0.05;
@@ -71,16 +68,18 @@ function AudioCrossfader({ currentSrc, loopCurrent, onNextTrack }) {
           oldAudio.volume = Math.max(0, 1 - fadeVol);
         }
       }
-    }, 100); // Transitions over 2 seconds (20 ticks * 100ms)
+    }, 100); 
 
     return () => clearInterval(faderRef.current);
   }, [currentSrc, loopCurrent]);
 
   const handleTimeUpdate = (e) => {
-    if (loopCurrent) return; // Don't trigger early transitions if the track loops
+    if (loopCurrent) return; 
     const audio = e.target;
-    // Trigger the next track 2 seconds early so they smoothly bleed into one another
-    if (audio.duration && audio.duration - audio.currentTime <= 2.0) {
+    
+    // 🚨 FIX: Added `audio.currentTime > 5` 
+    // The track MUST play for at least 5 seconds before the crossfader is allowed to check for the 2-second ending mark.
+    if (audio.duration && audio.currentTime > 5 && (audio.duration - audio.currentTime <= 2.0)) {
       if (!audio.dataset.fadingOut) {
         audio.dataset.fadingOut = "true";
         if (onNextTrack) onNextTrack();
@@ -353,7 +352,7 @@ export default function EscapeRoomPage() {
 
     if (bulls === 4) {
       setTimeout(() => handlePuzzleSuccess(activePuzzle), 500);
-    } else if (newGuesses.length >= 6) {
+    } else if (newGuesses.length >= 8) { // 🚨 CHANGED FROM 6 TO 8
       setPuzzleError(`LOCKOUT. THE CODE WAS: ${mastermindCode}`);
       setTimeout(() => {
         let newCode = '';
@@ -689,16 +688,22 @@ export default function EscapeRoomPage() {
                         value={mastermindInput}
                         onChange={(e) => { setMastermindInput(e.target.value.replace(/\D/g, '')); setPuzzleError(''); }}
                         onKeyDown={(e) => e.key === 'Enter' && handleMastermindSubmit()}
-                        disabled={mastermindGuesses.length >= 6}
+                        disabled={mastermindGuesses.length >= 8} // 🚨 CHANGED TO 8
                         className="flex-1 bg-black border-2 border-stone-600 text-emerald-400 p-3 font-mono text-xl focus:border-emerald-500 outline-none tracking-widest text-center"
                         placeholder="0000"
                         autoFocus
                       />
-                      <button onClick={handleMastermindSubmit} disabled={mastermindGuesses.length >= 6} className="bg-emerald-700 hover:bg-emerald-500 text-black px-6 font-extrabold uppercase tracking-widest transition-colors">
+                      <button 
+                        onClick={handleMastermindSubmit} 
+                        disabled={mastermindGuesses.length >= 8} // 🚨 CHANGED TO 8
+                        className="bg-emerald-700 hover:bg-emerald-500 text-black px-6 font-extrabold uppercase tracking-widest transition-colors"
+                      >
                         RUN
                       </button>
                     </div>
-                    <p className="text-xs text-stone-500 text-right">ATTEMPTS REMAINING: {6 - mastermindGuesses.length}</p>
+                    <p className="text-xs text-stone-500 text-right">
+                      ATTEMPTS REMAINING: {8 - mastermindGuesses.length} {/* 🚨 CHANGED TO 8 */}
+                    </p>
                   </div>
                 ) : activePuzzle.type === 'memory-match' ? (
                   <div className="grid grid-cols-2 gap-4 mx-auto w-64">
