@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { loadMapFromImage } from '@/lib/mapParser';
 import { TERMINAL_DIRECTORY, RIDDLE_BANK } from '@/lib/puzzleData';
@@ -10,6 +10,91 @@ const DungeonEngine = dynamic(() => import('@/components/DungeonEngine'), { ssr:
 const FALLBACK_GRID = Array(10).fill(Array(10).fill(0)).map((row, z) => 
   row.map((col, x) => (x === 0 || x === 9 || z === 0 || z === 9 ? 1 : 0))
 );
+
+// 🚨 NEW: Smart Audio Crossfader Component
+function AudioCrossfader({ currentSrc, loopCurrent, onNextTrack }) {
+  const audio1 = useRef(null);
+  const audio2 = useRef(null);
+  const activeIdx = useRef(0);
+  const faderRef = useRef(null);
+
+  useEffect(() => {
+    if (faderRef.current) clearInterval(faderRef.current);
+
+    const activeAudio = activeIdx.current === 0 ? audio1.current : audio2.current;
+    const standbyAudio = activeIdx.current === 0 ? audio2.current : audio1.current;
+
+    // If there is no track (e.g. death screen), fade everything out to silence
+    if (!currentSrc) {
+      [audio1.current, audio2.current].forEach(a => {
+        if (!a || a.paused) return;
+        let v = a.volume;
+        const t = setInterval(() => {
+          v -= 0.1;
+          if (v <= 0) { a.volume = 0; a.pause(); clearInterval(t); } 
+          else { a.volume = v; }
+        }, 100);
+      });
+      return;
+    }
+
+    // Avoid restarting if the requested track is already playing
+    if (activeAudio && activeAudio.src && new URL(activeAudio.src).pathname.endsWith(currentSrc)) {
+      activeAudio.loop = loopCurrent;
+      return;
+    }
+
+    // Swap active players
+    activeIdx.current = activeIdx.current === 0 ? 1 : 0;
+    const newAudio = standbyAudio;
+    const oldAudio = activeAudio;
+
+    newAudio.src = currentSrc;
+    newAudio.loop = loopCurrent;
+    newAudio.volume = 0;
+    delete newAudio.dataset.fadingOut; // Reset fade trigger flag
+    
+    const playPromise = newAudio.play();
+    if (playPromise !== undefined) playPromise.catch(() => console.log('Autoplay prevented by browser'));
+
+    // Smoothly Crossfade: Raise new audio volume, lower old audio volume
+    let fadeVol = 0;
+    faderRef.current = setInterval(() => {
+      fadeVol += 0.05;
+      if (fadeVol >= 1) {
+        newAudio.volume = 1;
+        if (oldAudio) { oldAudio.volume = 0; oldAudio.pause(); }
+        clearInterval(faderRef.current);
+      } else {
+        newAudio.volume = fadeVol;
+        if (oldAudio && !oldAudio.paused) {
+          oldAudio.volume = Math.max(0, 1 - fadeVol);
+        }
+      }
+    }, 100); // Transitions over 2 seconds (20 ticks * 100ms)
+
+    return () => clearInterval(faderRef.current);
+  }, [currentSrc, loopCurrent]);
+
+  const handleTimeUpdate = (e) => {
+    if (loopCurrent) return; // Don't trigger early transitions if the track loops
+    const audio = e.target;
+    // Trigger the next track 2 seconds early so they smoothly bleed into one another
+    if (audio.duration && audio.duration - audio.currentTime <= 2.0) {
+      if (!audio.dataset.fadingOut) {
+        audio.dataset.fadingOut = "true";
+        if (onNextTrack) onNextTrack();
+      }
+    }
+  };
+
+  return (
+    <>
+      <audio ref={audio1} onTimeUpdate={handleTimeUpdate} onEnded={onNextTrack} />
+      <audio ref={audio2} onTimeUpdate={handleTimeUpdate} onEnded={onNextTrack} />
+    </>
+  );
+}
 
 export default function EscapeRoomPage() {
   const [currentFloor, setCurrentFloor] = useState(0);
@@ -47,20 +132,21 @@ export default function EscapeRoomPage() {
   const [isDead, setIsDead] = useState(false);
   const [screenFlash, setScreenFlash] = useState('');
 
-  // 🚨 NEW: Boot state to bypass browser audio autoplay restrictions
-  const [systemBooted, setSystemBooted] = useState(false);
+  const [systemBooted, setSystemBooted] = useState(false); 
 
-// 🚨 Gameplay Playlist State
-const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   
-// This playlist will cycle while the player is on Floor 0 and Floor 1
-const gameplayPlaylist = [
-  '/05 Dark Energy.mp3',
-  '/06 Requiem for Ravenholm.mp3',
-  '/07 Pulse Phase.mp3',
-  '/08 Ravenholm Reprise.mp3',
-  '/12 Apprehension and Evasion.mp3'
-];
+  // MP3 playlist for level 1
+  const gameplayPlaylist = [
+    '/17 Triage at Dawn.mp3', 
+    '/05 Dark Energy.mp3',
+    '/06 Requiem for Ravenholm.mp3',
+    '/07 Pulse Phase.mp3',
+    '/08 Ravenholm Reprise.mp3',
+    '/12 Apprehension and Evasion.mp3',
+    '/14 Our Resurrected Teleport.mp3'
+   
+  ];
 
   useEffect(() => {
     const fetchMaps = async () => {
@@ -393,27 +479,49 @@ const gameplayPlaylist = [
     setGrids(newGrids);
   };
 
+  // 🚨 Determine which audio track should be playing right now
+  let activeAudioSrc = "";
+  let loopAudio = false;
+
+  if (!systemBooted) {
+    activeAudioSrc = "";
+  } else if (!gameStarted) {
+    activeAudioSrc = "/In the House, In a Heartbeat.mp3";
+    loopAudio = true;
+  } else if (isDead) {
+    activeAudioSrc = ""; // Silence upon death
+  } else if (currentFloor === 2) {
+    activeAudioSrc = "/43 Lambda Core.mp3";
+    loopAudio = true;
+  } else {
+    activeAudioSrc = gameplayPlaylist[currentTrackIndex];
+    loopAudio = false; 
+  }
+
   return (
     <main className="relative w-full h-screen overflow-hidden bg-black font-mono select-none">
       
-      {/* 🚨 PRE-BOOT SCREEN: Required to unlock browser audio autoplay */}
+      {/* 🚨 This component handles all the heavy lifting for fading music in and out */}
+      <AudioCrossfader 
+        currentSrc={activeAudioSrc} 
+        loopCurrent={loopAudio} 
+        onNextTrack={() => setCurrentTrackIndex((prev) => (prev + 1) % gameplayPlaylist.length)} 
+      />
+
       {!systemBooted ? (
         <div 
           className="absolute inset-0 z-[60] flex items-center justify-center bg-black cursor-pointer hover:bg-stone-900 transition-colors duration-500" 
           onClick={() => setSystemBooted(true)}
         >
           <div className="text-red-600 animate-pulse font-bold tracking-widest text-xl border-2 border-red-900 p-8 shadow-[0_0_30px_rgba(153,27,27,0.5)]">
-            CLICK TO INITIALIZE THE GAME...
+            CLICK TO INITIALIZE TERMINAL...
           </div>
         </div>
       ) : !gameStarted ? (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black text-red-600">
           
-          <audio src="/In the House, In a Heartbeat.mp3" autoPlay loop />
-
           <style>{`
             @keyframes cinematic-scroll {
-              /* 🚨 FIX: Start exactly at the bottom of the 256px container, not 100% of the text's height */
               0% { transform: translateY(260px); }
               100% { transform: translateY(-100%); }
             }
@@ -422,13 +530,11 @@ const gameplayPlaylist = [
             }
           `}</style>
 
-            <div className="border-4 border-stone-800 bg-stone-900 p-8 flex flex-col items-center justify-center w-full max-w-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] relative">
+          <div className="border-4 border-stone-800 bg-stone-900 p-8 flex flex-col items-center justify-center w-full max-w-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] relative">
             <h1 className="text-6xl font-black mb-4 tracking-widest text-red-600 drop-shadow-[0_0_10px_rgba(220,38,38,0.5)]">
-              ZERO-DAY <br/>
-              ESCAPE ROOM
+              ZERO-DAY ESCAPE ROOM
             </h1>
             
-            {/* 🚨 THE CRAWL OVERLAY */}
             <div 
               className="relative w-full h-64 my-6 bg-black border-y-2 border-stone-800 overflow-hidden"
               style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)' }}
@@ -450,13 +556,12 @@ const gameplayPlaylist = [
                   YOU HAVE THE FAINT MEMORY THAT YOU WERE ONCE<br/>
                   A RESEARCH SCIENTIST.
                 </p>
-                  
-                <p className="text-stone-300 font-bold tracking-widest leading-loose">
+                <p className="text-stone-500 font-bold tracking-widest leading-loose">
                   YOUR RIGHT HAND BURNS FROM THE CHEMICALS.<br/>
                   YOUR MIND RACES AND YOU THINK YOU SEE MOVING SHADOWS.<br/>
                   YOUR MISSION: FIND OUT WHAT HAPPENED AND ESCAPE...
                 </p>
-                <p className="text-stone-300 font-bold tracking-widest leading-loose">
+                <p className="text-stone-500 font-bold tracking-widest leading-loose">
                   BUT THE SECURITY GRID IS LOCKED.<br/>
                   AND THE THERMAL SCANS INDICATE YOU ARE NOT ALONE...
                 </p>
@@ -496,24 +601,6 @@ const gameplayPlaylist = [
         </div>
       ) : (
         <>
-          {/* 🚨 MAIN PLAYLIST: Plays on Floor 0 and Floor 1. Cycles to the next track when one ends. */}
-          {gameStarted && currentFloor < 2 && !isDead && (
-            <audio 
-              autoPlay 
-              src={gameplayPlaylist[currentTrackIndex]} 
-              onEnded={() => setCurrentTrackIndex((prev) => (prev + 1) % gameplayPlaylist.length)} 
-            />
-          )}
-
-          {/* 🚨 BOSS MUSIC: Takes over exclusively when the player reaches Floor 2. */}
-          {gameStarted && currentFloor === 2 && !isDead && (
-            <audio 
-              autoPlay 
-              loop 
-              src="/24 You're Not Supposed to Be Here.mp3" 
-            />
-          )}
-
           <div id="engine-wrapper" className={`absolute inset-0 ${activePuzzle ? 'pointer-events-none' : 'pointer-events-auto'}`}>
             <DungeonEngine
               grids={grids}
