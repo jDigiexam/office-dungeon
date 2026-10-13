@@ -130,6 +130,7 @@ export default function EscapeRoomPage() {
   const [hp, setHp] = useState(100);
   const [isDead, setIsDead] = useState(false);
   const [screenFlash, setScreenFlash] = useState('');
+  const [isFading, setIsFading] = useState(false); // 🚨 NEW: Elevator fade state
 
   const [systemBooted, setSystemBooted] = useState(false); 
 
@@ -458,24 +459,53 @@ export default function EscapeRoomPage() {
       return;
     }
     
-    let safeTransit = { x: 2.5, y: targetFloor * 3.2 + 0.8, z: 2.5 };
-    let found = false;
-    for (let z = 0; z < grids[targetFloor].length; z++) {
-      for (let x = 0; x < grids[targetFloor][z].length; x++) {
-        if (grids[targetFloor][z][x] === 0) {
-          safeTransit = { x: x + 0.5, y: targetFloor * 3.2 + 0.8, z: z + 0.5 };
-          found = true; break;
+    // 🚨 1. Trigger the screen fade out
+    setIsFading(true);
+
+    // 🚨 2. Wait 2 seconds for the screen to go completely black before teleporting
+    setTimeout(() => {
+      let foundX = 5.5;
+      let foundZ = 5.5;
+      let found = false;
+
+      for (let z = 0; z < grids[targetFloor].length; z++) {
+        for (let x = 0; x < grids[targetFloor][z].length; x++) {
+          if (grids[targetFloor][z][x] === 9) {
+            foundX = x + 0.5;
+            foundZ = z + 0.5;
+            found = true; 
+            break;
+          }
+        }
+        if (found) break;
+      }
+
+      if (!found) {
+        for (let z = 2; z < grids[targetFloor].length - 2; z++) {
+          for (let x = 2; x < grids[targetFloor][z].length - 2; x++) {
+            if (grids[targetFloor][z][x] === 0) {
+              foundX = x + 0.5;
+              foundZ = z + 0.5;
+              found = true; 
+              break;
+            }
+          }
+          if (found) break;
         }
       }
-      if (found) break;
-    }
 
-    setTeleportCoords(safeTransit);
-    triggerMessage(`ELEVATOR TRANSIT: FLOOR E1M${targetFloor + 1}`);
-    
-    const newGrids = [...grids];
-    newGrids[fIdx] = grids[fIdx].map(row => row.map(cell => cell === 10 ? 3 : cell));
-    setGrids(newGrids);
+      const safeTransit = { x: foundX, y: targetFloor * 3.2 + 0.8, z: foundZ };
+      setTeleportCoords(safeTransit);
+      triggerMessage(`ELEVATOR TRANSIT: FLOOR E1M${targetFloor + 1}`);
+      
+      const newGrids = [...grids];
+      newGrids[fIdx] = grids[fIdx].map(row => row.map(cell => cell === 10 ? 3 : cell));
+      setGrids(newGrids);
+
+      // 🚨 3. Fade back in after giving the 3D engine a split second to render the new floor
+      setTimeout(() => setIsFading(false), 500);
+
+    }, 2000);
   };
 
   // 🚨 Determine which audio track should be playing right now
@@ -617,7 +647,11 @@ export default function EscapeRoomPage() {
             />
           </div>
 
-          <div className={`absolute inset-0 z-40 pointer-events-none transition-colors duration-100 ${screenFlash}`} />
+        {/* Existing fast red flash for damage */}
+        <div className={`absolute inset-0 z-40 pointer-events-none transition-colors duration-100 ${screenFlash}`} />
+
+        {/* 🚨 NEW: Slow black fade for the elevator */}
+        <div className={`absolute inset-0 z-40 pointer-events-none transition-opacity duration-[2000ms] bg-black ${isFading ? 'opacity-100' : 'opacity-0'}`} />
 
           <div className="absolute top-4 right-4 z-40 bg-stone-900/90 border-2 border-stone-600 p-2 pointer-events-none shadow-2xl backdrop-blur-sm">
             <div className="text-[10px] text-emerald-500 font-black mb-2 text-center tracking-widest">SECTOR SCANNER</div>
