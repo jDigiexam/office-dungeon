@@ -11,22 +11,28 @@ const FALLBACK_GRID = Array(10).fill(Array(10).fill(0)).map((row, z) =>
   row.map((col, x) => (x === 0 || x === 9 || z === 0 || z === 9 ? 1 : 0))
 );
 
-// 🚨 UPGRADED: Smart Audio Crossfader Component
+// 🚨 UPGRADED: Audio Crossfader Component
 function AudioCrossfader({ currentSrc, loopCurrent, onNextTrack }) {
   const audio1 = useRef(null);
   const audio2 = useRef(null);
   const activeIdx = useRef(0);
   const faderRef = useRef(null);
+  
+  // Track the exact string request to avoid browser URI encoding (%20) mismatch bugs
+  const playingSrc = useRef("");
 
   useEffect(() => {
+    const a1 = audio1.current;
+    const a2 = audio2.current;
+    if (!a1 || !a2) return;
+
     if (faderRef.current) clearInterval(faderRef.current);
 
-    const activeAudio = activeIdx.current === 0 ? audio1.current : audio2.current;
-    const standbyAudio = activeIdx.current === 0 ? audio2.current : audio1.current;
-
+    // If no track is supposed to play, fade both to 0
     if (!currentSrc) {
-      [audio1.current, audio2.current].forEach(a => {
-        if (!a || a.paused) return;
+      playingSrc.current = "";
+      [a1, a2].forEach(a => {
+        if (a.paused) return;
         let v = a.volume;
         const t = setInterval(() => {
           v -= 0.1;
@@ -37,60 +43,82 @@ function AudioCrossfader({ currentSrc, loopCurrent, onNextTrack }) {
       return;
     }
 
-    if (activeAudio && activeAudio.src && new URL(activeAudio.src).pathname.endsWith(currentSrc)) {
+    // If the requested track is already playing, just update its loop state and exit
+    if (playingSrc.current === currentSrc) {
+      const activeAudio = activeIdx.current === 0 ? a1 : a2;
       activeAudio.loop = loopCurrent;
       return;
     }
 
+    // A new track was requested, initiate crossfade
+    playingSrc.current = currentSrc;
+    
+    const oldAudio = activeIdx.current === 0 ? a1 : a2;
     activeIdx.current = activeIdx.current === 0 ? 1 : 0;
-    const newAudio = standbyAudio;
-    const oldAudio = activeAudio;
+    const newAudio = activeIdx.current === 0 ? a1 : a2;
 
     newAudio.src = currentSrc;
     newAudio.loop = loopCurrent;
-    newAudio.currentTime = 0; // 🚨 FIX: Explicitly rewind the buffer to zero
+    newAudio.currentTime = 0;
     newAudio.volume = 0;
-    delete newAudio.dataset.fadingOut; 
+    newAudio.dataset.fadingOut = "false"; // Reset the transition lock
     
     const playPromise = newAudio.play();
-    if (playPromise !== undefined) playPromise.catch(() => console.log('Autoplay prevented by browser'));
+    if (playPromise !== undefined) {
+      playPromise.catch((err) => console.log('Autoplay prevented by browser', err));
+    }
 
+    // Smoothly blend the volumes over 2 seconds
     let fadeVol = 0;
     faderRef.current = setInterval(() => {
       fadeVol += 0.05;
       if (fadeVol >= 1) {
         newAudio.volume = 1;
-        if (oldAudio) { oldAudio.volume = 0; oldAudio.pause(); }
+        if (oldAudio && !oldAudio.paused) { 
+          oldAudio.volume = 0; 
+          oldAudio.pause(); 
+        }
         clearInterval(faderRef.current);
       } else {
-        newAudio.volume = fadeVol;
+        newAudio.volume = Math.min(1, fadeVol);
         if (oldAudio && !oldAudio.paused) {
           oldAudio.volume = Math.max(0, 1 - fadeVol);
         }
       }
-    }, 100); 
+    }, 100);
 
-    return () => clearInterval(faderRef.current);
+    return () => {
+      if (faderRef.current) clearInterval(faderRef.current);
+    };
   }, [currentSrc, loopCurrent]);
 
   const handleTimeUpdate = (e) => {
-    if (loopCurrent) return; 
+    if (loopCurrent) return;
     const audio = e.target;
     
-    // 🚨 FIX: Added `audio.currentTime > 5` 
-    // The track MUST play for at least 5 seconds before the crossfader is allowed to check for the 2-second ending mark.
-    if (audio.duration && audio.currentTime > 5 && (audio.duration - audio.currentTime <= 2.0)) {
-      if (!audio.dataset.fadingOut) {
-        audio.dataset.fadingOut = "true";
+    // Trigger transition 2.5 seconds early so the 2-second crossfade fully completes before the file stops
+    if (audio.duration && audio.currentTime > 5 && (audio.duration - audio.currentTime <= 2.5)) {
+      if (audio.dataset.fadingOut !== "true") {
+        audio.dataset.fadingOut = "true"; // Lock the transition so it can't fire twice
         if (onNextTrack) onNextTrack();
       }
     }
   };
 
+  // Fallback in case timeUpdate misses the window
+  const handleEnded = (e) => {
+    if (loopCurrent) return;
+    const audio = e.target;
+    if (audio.dataset.fadingOut !== "true") {
+      audio.dataset.fadingOut = "true";
+      if (onNextTrack) onNextTrack();
+    }
+  };
+
   return (
     <>
-      <audio ref={audio1} onTimeUpdate={handleTimeUpdate} onEnded={onNextTrack} />
-      <audio ref={audio2} onTimeUpdate={handleTimeUpdate} onEnded={onNextTrack} />
+      <audio ref={audio1} onTimeUpdate={handleTimeUpdate} onEnded={handleEnded} />
+      <audio ref={audio2} onTimeUpdate={handleTimeUpdate} onEnded={handleEnded} />
     </>
   );
 }
