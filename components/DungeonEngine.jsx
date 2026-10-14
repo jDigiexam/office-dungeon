@@ -77,7 +77,7 @@ function KeycardMesh({ position, texture, color }) {
         </mesh>
       </group>
     );
-  }
+}
 
 function TerminalMesh({ position, texture }) {
     const crtRef = useRef();
@@ -98,7 +98,7 @@ function TerminalMesh({ position, texture }) {
         </mesh>
       </group>
     );
-  }
+}
 
 function CeilingLightMesh({ position, texture }) {
   return (
@@ -178,7 +178,10 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTexture, 
 function LightOrb({ projObj, startPos, dir, projectilesRef, grid }) {
   const meshRef = useRef();
   
-  useEffect(() => { projObj.mesh = meshRef; }, [projObj]);
+  useEffect(() => { 
+    projObj.mesh = meshRef; 
+    if (meshRef.current) meshRef.current.position.copy(startPos);
+  }, [projObj, startPos]);
 
   useFrame((state, delta) => {
     if (!projObj.active || !meshRef.current) return;
@@ -202,7 +205,7 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid }) {
   });
 
   return (
-    <mesh ref={meshRef} position={startPos}>
+    <mesh ref={meshRef}>
       <sphereGeometry args={[0.08]} />
       <meshBasicMaterial color="#fef08a" />
       <pointLight color="#fef08a" intensity={2.0} distance={4} decay={2} />
@@ -225,6 +228,10 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
     return tex;
   }, [texture]);
 
+  useEffect(() => {
+    if (groupRef.current) groupRef.current.position.copy(startPos);
+  }, [startPos]);
+
   useFrame((state, delta) => {
     if (!isActive.current || !groupRef.current) return;
     
@@ -237,7 +244,6 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
     groupRef.current.position.add(dir.clone().multiplyScalar(8 * delta));
     
     const curX = groupRef.current.position.x;
-    const curY = groupRef.current.position.y;
     const curZ = groupRef.current.position.z;
     
     const isSolid = grid && [1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(curZ)]?.[Math.floor(curX)]);
@@ -256,8 +262,7 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
   });
 
   return (
-    <group ref={groupRef} position={startPos}>
-      {/* 🚨 SAFELY RENDER SPRITE MATERIAL ONLY */}
+    <group ref={groupRef}>
       <sprite position={[0, -0.2, 0]} scale={[1.2, 1.2, 1]}>
         <spriteMaterial map={projTex || undefined} color="#ffffff" transparent={true} />
       </sprite>
@@ -324,12 +329,6 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
       return;
     }
     
-    const walkFrames = [6, 5, 4, 3];
-    const currentFrame = Math.floor(state.clock.elapsedTime * 6) % 4;
-    
-    bossTex.offset.x = 0; 
-    bossTex.offset.y = walkFrames[currentFrame] * (1/7); 
-
     const dx = groupRef.current.position.x - playerCamera.position.x;
     const dz = groupRef.current.position.z - playerCamera.position.z;
     const sqDist = dx * dx + dz * dz;
@@ -337,17 +336,17 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
     
     const hasLoS = checkLoS(groupRef.current.position.x, groupRef.current.position.z, playerCamera.position.x, playerCamera.position.z);
     
+    const timeSinceShot = state.clock.elapsedTime - lastShot.current;
+
     if (dist < 15 && hasLoS) {
       groupRef.current.lookAt(playerCamera.position.x, groupRef.current.position.y, playerCamera.position.z);
       
-      if (state.clock.elapsedTime - lastShot.current > 2.5) {
+      if (timeSinceShot > 2.5) {
         lastShot.current = state.clock.elapsedTime;
         const dir = new THREE.Vector3().subVectors(playerCamera.position, groupRef.current.position).normalize();
         
-        bossTex.offset.y = 2 * (1/7);
-        
-        const spawnPos = groupRef.current.position.clone().add(dir.clone().multiplyScalar(1.0));
-        spawnPos.y += 1.0; 
+        const spawnPos = groupRef.current.position.clone().add(dir.clone().multiplyScalar(0.8));
+        spawnPos.y += 0.5; 
         onSpawnEnemyOrb({ id: Math.random(), startPos: spawnPos, dir });
       }
 
@@ -372,6 +371,16 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
           groupRef.current.position.z = nextZ;
         }
       }
+    }
+
+    if (timeSinceShot < 0.3) {
+      bossTex.offset.x = 0; 
+      bossTex.offset.y = 2 * (1/7); 
+    } else {
+      const walkFrames = [6, 5, 4, 3];
+      const currentFrame = Math.floor(state.clock.elapsedTime * 6) % 4;
+      bossTex.offset.x = 0; 
+      bossTex.offset.y = walkFrames[currentFrame] * (1/7); 
     }
 
     projectilesRef.current.forEach(proj => {
@@ -641,7 +650,7 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTextu
               initialPos={e.pos} 
               playerCamera={camera} 
               projectilesRef={projectilesRef} 
-              onEradicate={() => { /* Optional: custom boss eradicate logic */ }} 
+              onEradicate={() => onEradicate(true)} 
               onPlayerHit={onPlayerHit}
               grid={grids?.[e.fIdx]} 
               onSpawnEnemyOrb={(orb) => setEnemyProjectiles(prev => [...prev, orb])}
@@ -656,7 +665,7 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTextu
             initialPos={e.pos} 
             playerCamera={camera} 
             projectilesRef={projectilesRef} 
-            onEradicate={onEradicate} 
+            onEradicate={() => onEradicate(false)} 
             onPlayerHit={onPlayerHit}
             grid={grids?.[e.fIdx]} 
           />
@@ -849,7 +858,6 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     '/wall_stone_depth.png', '/wall_stone.png'
   ]);
 
-  // 🚨 FIXED: Loaded the underscore-separated texture names
   const [tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj] = useTexture([
     '/floor_stone_pattern.png', '/floor_tiles_tan_large.png', '/door_wood.png', '/door_metal_gate.png',
     '/door_metal_frame.png', '/window_round_pane_lit.png', '/hand.png',

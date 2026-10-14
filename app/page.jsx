@@ -224,8 +224,16 @@ export default function EscapeRoomPage() {
     });
   };
 
-  const handleEnemyEradicated = () => {
-    triggerMessage("SHADOW ENTITY ERADICATED.");
+  const handleEnemyEradicated = (isBoss) => {
+    if (isBoss === true) {
+      setIsFading(true);
+      setTimeout(() => {
+        setGameWon(true);
+        setIsFading(false);
+      }, 2000);
+    } else {
+      triggerMessage("SHADOW ENTITY ERADICATED.");
+    }
   };
 
   const handlePlayerHit = () => {
