@@ -218,16 +218,6 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
   const { camera } = useThree();
   const isActive = useRef(true);
 
-  const projTex = useMemo(() => {
-    if (!texture) return null;
-    const tex = texture.clone();
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(1/11, 1/12); 
-    tex.magFilter = THREE.NearestFilter;
-    tex.needsUpdate = true;
-    return tex;
-  }, [texture]);
-
   useEffect(() => {
     if (groupRef.current) groupRef.current.position.copy(startPos);
   }, [startPos]);
@@ -235,13 +225,15 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
   useFrame((state, delta) => {
     if (!isActive.current || !groupRef.current) return;
     
-    if (projTex) {
+    // 🚨 FIX: We map the texture globally to avoid clone wiping
+    if (texture) {
       const currentFrame = Math.floor(state.clock.elapsedTime * 12) % 8;
-      projTex.offset.x = currentFrame * (1/11);
-      projTex.offset.y = 0; 
+      texture.offset.x = currentFrame * (1/11);
+      texture.offset.y = 0; 
     }
 
-    groupRef.current.position.add(dir.clone().multiplyScalar(8 * delta));
+    // 🚨 Increased projectile speed from 8 to 15
+    groupRef.current.position.add(dir.clone().multiplyScalar(15 * delta));
     
     const curX = groupRef.current.position.x;
     const curZ = groupRef.current.position.z;
@@ -263,8 +255,9 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
 
   return (
     <group ref={groupRef}>
-      <sprite position={[0, -0.2, 0]} scale={[1.2, 1.2, 1]}>
-        <spriteMaterial map={projTex || undefined} color="#ffffff" transparent={true} />
+      {/* 🚨 Centered the sprite perfectly on the light source */}
+      <sprite position={[0, 0, 0]} scale={[1.5, 1.5, 1]}>
+        <spriteMaterial map={texture || undefined} color="#ffffff" transparent={true} />
       </sprite>
       <pointLight color="#22c55e" intensity={2.0} distance={5} decay={2} />
     </group>
@@ -341,7 +334,8 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
     if (dist < 15 && hasLoS) {
       groupRef.current.lookAt(playerCamera.position.x, groupRef.current.position.y, playerCamera.position.z);
       
-      if (timeSinceShot > 2.5) {
+      // 🚨 FIX: Greatly increased boss fire rate (every 1.2s instead of 2.5s)
+      if (timeSinceShot > 1.2) {
         lastShot.current = state.clock.elapsedTime;
         const dir = new THREE.Vector3().subVectors(playerCamera.position, groupRef.current.position).normalize();
         
@@ -871,6 +865,11 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     });
     woodTexList.forEach(t => t.repeat.set(1, 3.2));
     stoneTexList.forEach(t => t.repeat.set(1, 3.2));
+    
+    // 🚨 FIX: Configure the projectile texture grid format correctly
+    if (tEnemyProj) {
+      tEnemyProj.repeat.set(1/11, 1/11); 
+    }
   }, [woodTexList, stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj]);
 
   const parsedData = useMemo(() => {
