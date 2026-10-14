@@ -5,11 +5,11 @@ import dynamic from 'next/dynamic';
 import { loadMapFromImage } from '@/lib/mapParser';
 import { TERMINAL_DIRECTORY, RIDDLE_BANK } from '@/lib/puzzleData';
 
+const DungeonEngine = dynamic(() => import('@/components/DungeonEngine'), { ssr: false });
+
 const FALLBACK_GRID = Array(10).fill(Array(10).fill(0)).map((row, z) => 
   row.map((col, x) => (x === 0 || x === 9 || z === 0 || z === 9 ? 1 : 0))
 );
-
-const [signalValues, setSignalValues] = useState({ freq: 1, amp: 1, phase: 0 });
 
 // 🚨 UPGRADED: Audio Crossfader Component
 function AudioCrossfader({ currentSrc, loopCurrent, onNextTrack }) {
@@ -161,7 +161,7 @@ export default function EscapeRoomPage() {
   const [screenFlash, setScreenFlash] = useState('');
   const [isFading, setIsFading] = useState(false); // 🚨 NEW: Elevator fade state
 
-  const DungeonEngine = dynamic(() => import('@/components/DungeonEngine'), { ssr: false });
+  const [signalValues, setSignalValues] = useState({ freq: 1, amp: 1, phase: 0 });
 
   const [systemBooted, setSystemBooted] = useState(false); 
 
