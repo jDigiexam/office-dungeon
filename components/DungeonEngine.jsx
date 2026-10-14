@@ -215,7 +215,6 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
   const { camera } = useThree();
   const isActive = useRef(true);
 
-  // Safely clone the pre-loaded texture so multiple projectiles animate independently
   const projTex = useMemo(() => {
     if (!texture) return null;
     const tex = texture.clone();
@@ -258,8 +257,9 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
 
   return (
     <group ref={groupRef} position={startPos}>
+      {/* 🚨 SAFELY RENDER SPRITE MATERIAL ONLY */}
       <sprite position={[0, -0.2, 0]} scale={[1.2, 1.2, 1]}>
-        {projTex ? <spriteMaterial map={projTex} color="#ffffff" transparent={true} /> : <meshBasicMaterial color="#22c55e" />}
+        <spriteMaterial map={projTex || undefined} color="#ffffff" transparent={true} />
       </sprite>
       <pointLight color="#22c55e" intensity={2.0} distance={5} decay={2} />
     </group>
@@ -275,7 +275,6 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
   const hp = useRef(25); 
   const lastShot = useRef(0);
 
-  // Clone the pre-loaded texture to avoid sharing offsets
   const bossTex = useMemo(() => {
     if (!texture) return null;
     const tex = texture.clone();
@@ -402,7 +401,7 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
   return (
     <group ref={groupRef} position={initialPos}>
       <sprite position={[0, 0.75, 0]} scale={[2.5, 2.5, 1]}>
-        {bossTex ? <spriteMaterial ref={spriteMaterialRef} map={bossTex} color="#ffffff" transparent={true} /> : null}
+        <spriteMaterial ref={spriteMaterialRef} map={bossTex || undefined} color="#ffffff" transparent={true} />
       </sprite>
     </group>
   );
@@ -839,7 +838,6 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
 // 5. MAIN SCENE RENDERING
 // ----------------------------------------------------
 function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove, onEradicate, onPlayerHit, isPuzzleActive }) {
-  // 🚨 FIXED: Pre-load ALL textures at the top level to prevent mid-game React Suspense crashes
   const woodTexList = useTexture([
     '/wall_timber_structure_cross.png', '/wall_timber_structure_diagonal.png',
     '/wall_timber_structure_vertical.png', '/wall_timber_structure.png'
@@ -851,6 +849,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     '/wall_stone_depth.png', '/wall_stone.png'
   ]);
 
+  // 🚨 FIXED: Loaded the underscore-separated texture names
   const [tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj] = useTexture([
     '/floor_stone_pattern.png', '/floor_tiles_tan_large.png', '/door_wood.png', '/door_metal_gate.png',
     '/door_metal_frame.png', '/window_round_pane_lit.png', '/hand.png',
@@ -1030,7 +1029,6 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         return null;
       })}
       
-      {/* 🚨 Passed the pre-loaded textures into the combat manager */}
       <CombatManager enemiesData={enemiesData} grids={grids} onEradicate={onEradicate} onPlayerHit={onPlayerHit} bossTexture={tBoss} orbTexture={tEnemyProj} />
       <PlayerControls grids={grids} handTexture={tHand} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} onPlayerMove={onPlayerMove} isPuzzleActive={isPuzzleActive} />
     </>
