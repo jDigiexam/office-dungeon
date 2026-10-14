@@ -470,6 +470,10 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
   useEffect(() => {
     if (teleportCoords) {
       camera.position.set(teleportCoords.x, teleportCoords.y, teleportCoords.z);
+      
+      // 🚨 FIX: Instantly sync the floor reference so useFrame doesn't pull the player back down
+      currentFloorRef.current = Math.max(0, Math.min(2, Math.round(teleportCoords.y / FLOOR_HT)));
+      
       clearTeleport();
     }
   }, [teleportCoords, camera, clearTeleport]);
