@@ -11,6 +11,8 @@ const FALLBACK_GRID = Array(10).fill(Array(10).fill(0)).map((row, z) =>
   row.map((col, x) => (x === 0 || x === 9 || z === 0 || z === 9 ? 1 : 0))
 );
 
+const [signalValues, setSignalValues] = useState({ freq: 1, amp: 1, phase: 0 });
+
 // 🚨 UPGRADED: Audio Crossfader Component
 function AudioCrossfader({ currentSrc, loopCurrent, onNextTrack }) {
   const audio1 = useRef(null);
@@ -476,6 +478,10 @@ export default function EscapeRoomPage() {
           setMastermindInput('');
         }
 
+        if (terminalData.type === 'signal-sync') {
+          setSignalValues({ freq: 1, amp: 1, phase: 0 });
+        }
+
         setActivePuzzle({ ...puzzleDataToUse, key: puzzleKey });
         setPuzzleInput(''); setPuzzleError('');
       } else {
@@ -834,6 +840,64 @@ export default function EscapeRoomPage() {
                       />
                     ))}
                   </div>
+
+) : activePuzzle.type === 'signal-sync' ? (
+  <div className="flex flex-col gap-6 w-full mx-auto">
+    
+    {/* Oscilloscope Display */}
+    <div className="bg-stone-950 border-2 border-stone-700 w-full h-40 relative overflow-hidden flex items-center justify-center shadow-[inset_0_0_20px_rgba(0,0,0,1)]">
+      {/* Grid Lines */}
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(16,185,129,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.1)_1px,transparent_1px)] bg-[size:20px_20px]" />
+      
+      <svg viewBox="0 0 300 150" className="w-full h-full absolute inset-0 drop-shadow-[0_0_5px_rgba(16,185,129,0.8)]">
+        {/* Target Wave (Red / Dim) */}
+        <path 
+          d={`M ${Array.from({length: 61}).map((_, i) => `${i * 5},${75 + Math.sin((i * 5 * 0.02 * activePuzzle.target.freq) + (activePuzzle.target.phase * 0.5)) * (activePuzzle.target.amp * 12)}`).join(' L ')}`} 
+          fill="none" stroke="#991b1b" strokeWidth="3" opacity="0.5" strokeDasharray="4 4" 
+        />
+        {/* Player Wave (Emerald / Bright) */}
+        <path 
+          d={`M ${Array.from({length: 61}).map((_, i) => `${i * 5},${75 + Math.sin((i * 5 * 0.02 * signalValues.freq) + (signalValues.phase * 0.5)) * (signalValues.amp * 12)}`).join(' L ')}`} 
+          fill="none" stroke="#10b981" strokeWidth="3" 
+        />
+      </svg>
+    </div>
+
+    {/* Calibration Sliders */}
+    <div className="flex flex-col gap-4 bg-stone-950 border border-stone-800 p-4">
+      {[
+        { label: 'FREQUENCY (Hz)', key: 'freq', min: 1, max: 5 },
+        { label: 'AMPLITUDE (mV)', key: 'amp', min: 1, max: 5 },
+        { label: 'PHASE SHIFT', key: 'phase', min: 0, max: 4 }
+      ].map(slider => (
+        <div key={slider.key} className="flex flex-col gap-1">
+          <div className="flex justify-between text-xs font-bold text-stone-500 tracking-widest">
+            <span>{slider.label}</span>
+            <span className="text-emerald-500">{signalValues[slider.key]}</span>
+          </div>
+          <input 
+            type="range" 
+            min={slider.min} 
+            max={slider.max} 
+            step="1"
+            value={signalValues[slider.key]}
+            onChange={(e) => {
+              const newVals = { ...signalValues, [slider.key]: parseInt(e.target.value) };
+              setSignalValues(newVals);
+              
+              // Check Win Condition
+              if (newVals.freq === activePuzzle.target.freq && 
+                  newVals.amp === activePuzzle.target.amp && 
+                  newVals.phase === activePuzzle.target.phase) {
+                setTimeout(() => handlePuzzleSuccess(activePuzzle), 600);
+              }
+            }}
+            className="w-full accent-emerald-500 h-2 bg-stone-800 rounded-none appearance-none cursor-pointer"
+          />
+        </div>
+      ))}
+    </div>
+  </div>
                 ) : activePuzzle.type === 'multiple-choice' ? (
                   <div className="flex flex-col gap-3">
                     {activePuzzle.options.map((opt, i) => (

@@ -254,12 +254,36 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid }) {
   );
 }
 
-// 🚨 NEW: Boss Component
+// 🚨 UPDATED: Boss Component with Line of Sight and Collision
 function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlayerHit, grid, onSpawnEnemyOrb }) {
   const groupRef = useRef();
   const isDead = useRef(false);
-  const hp = useRef(10); // Takes 10 hits
+  const hp = useRef(10); 
   const lastShot = useRef(0);
+
+  // Line of sight raycasting
+  const checkLoS = (startX, startZ, endX, endZ) => {
+    if (!grid || isNaN(startX) || isNaN(startZ) || isNaN(endX) || isNaN(endZ)) return false;
+    let x0 = Math.floor(startX);
+    let z0 = Math.floor(startZ);
+    const x1 = Math.floor(endX);
+    const z1 = Math.floor(endZ);
+    const dx = Math.abs(x1 - x0);
+    const dz = -Math.abs(z1 - z0);
+    let sx = x0 < x1 ? 1 : -1;
+    let sz = z0 < z1 ? 1 : -1;
+    let err = dx + dz;
+
+    let loopLimit = 30; 
+    while (loopLimit-- > 0) {
+      if ([1, 2, 12, 22, 7, 3, 4, 32].includes(grid[z0]?.[x0])) return false;
+      if (x0 === x1 && z0 === z1) break;
+      const e2 = 2 * err;
+      if (e2 >= dz) { err += dz; x0 += sx; }
+      if (e2 <= dx) { err += dx; z0 += sz; }
+    }
+    return true;
+  };
   
   useFrame((state, delta) => {
     if (isDead.current || !groupRef.current) return;
@@ -269,30 +293,45 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
     const sqDist = dx * dx + dz * dz;
     const dist = Math.sqrt(sqDist);
     
-    // Boss shoots if within range and has line of sight
-    if (dist < 15) {
+    // Check Line of Sight
+    const hasLoS = checkLoS(groupRef.current.position.x, groupRef.current.position.z, playerCamera.position.x, playerCamera.position.z);
+    
+    if (dist < 15 && hasLoS) {
       groupRef.current.lookAt(playerCamera.position.x, groupRef.current.position.y, playerCamera.position.z);
       
       if (state.clock.elapsedTime - lastShot.current > 2.5) {
         lastShot.current = state.clock.elapsedTime;
         const dir = new THREE.Vector3().subVectors(playerCamera.position, groupRef.current.position).normalize();
         
-        // Spawn slightly in front of the boss
         const spawnPos = groupRef.current.position.clone().add(dir.clone().multiplyScalar(1.0));
         spawnPos.y += 1.0; 
         onSpawnEnemyOrb({ id: Math.random(), startPos: spawnPos, dir });
       }
 
-      // Slower movement towards player
       if (dist > 1.5) {
         const dir = new THREE.Vector3().subVectors(playerCamera.position, groupRef.current.position).normalize();
         dir.y = 0; 
         const speed = 1.2 * delta; 
-        groupRef.current.position.add(dir.multiplyScalar(speed));
+        
+        const nextX = groupRef.current.position.x + dir.x * speed;
+        const nextZ = groupRef.current.position.z + dir.z * speed;
+        const radius = 0.6; // Boss collision radius
+
+        const isSolid = (x, z) => {
+          if (!grid) return true;
+          return [1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(z)]?.[Math.floor(x)]);
+        };
+
+        // Apply movement only if the next position is not inside a wall
+        if (!isSolid(nextX, groupRef.current.position.z) && !isSolid(nextX + (dir.x > 0 ? radius : -radius), groupRef.current.position.z)) {
+          groupRef.current.position.x = nextX;
+        }
+        if (!isSolid(groupRef.current.position.x, nextZ) && !isSolid(groupRef.current.position.x, nextZ + (dir.z > 0 ? radius : -radius))) {
+          groupRef.current.position.z = nextZ;
+        }
       }
     }
 
-    // Handle incoming player hits
     projectilesRef.current.forEach(proj => {
       if (proj.active && proj.mesh?.current) {
         if (groupRef.current.position.distanceTo(proj.mesh.current.position) < 1.5) {
@@ -300,14 +339,13 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
           proj.mesh.current.visible = false;
           hp.current -= 1;
           
-          // Flash effect on hit
           groupRef.current.children[0].material.emissiveIntensity = 2;
           setTimeout(() => { if (groupRef.current) groupRef.current.children[0].material.emissiveIntensity = 0; }, 100);
 
           if (hp.current <= 0) {
             isDead.current = true;          
             groupRef.current.visible = false;
-            onEradicate(); // You might want to pass a specific boss defeat message here later
+            onEradicate(); 
           }
         }
       }
