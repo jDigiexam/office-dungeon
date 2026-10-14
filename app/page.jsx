@@ -498,41 +498,30 @@ export default function EscapeRoomPage() {
 
     // 2. Wait 2 seconds for the screen to go completely black before teleporting
     setTimeout(() => {
-      let foundX = 5.5;
-      let foundZ = 5.5;
-      let found = false;
+      let safeTransit;
 
-      // 🚨 PRIMARY SCAN: Look specifically for your Magenta tile (9)
-      for (let z = 0; z < grids[targetFloor].length; z++) {
-        for (let x = 0; x < grids[targetFloor][z].length; x++) {
-          if (grids[targetFloor][z][x] === 9) {
-            foundX = x + 0.5;
-            // 🚨 FIX: Offset the Z coordinate by 1 tile so you don't spawn inside the monster's physics collider!
-            foundZ = z + 1.5; 
-            found = true; 
-            break;
-          }
-        }
-        if (found) break;
-      }
-
-      // 🚨 FALLBACK: If no magenta tile exists, find a safe white floor tile (0) away from the edges
-      if (!found) {
+      // 🚨 PRIMARY: Use the pre-calculated magenta spawn point if it exists
+      if (floorSpawns[targetFloor]) {
+        safeTransit = {
+          x: floorSpawns[targetFloor][0],
+          y: targetFloor * 3.2 + 0.8,
+          z: floorSpawns[targetFloor][2]
+        };
+      } else {
+        // 🚨 FALLBACK: If no magenta tile exists, find a safe white floor tile
+        let foundX = 5.5, foundZ = 5.5;
         for (let z = 2; z < grids[targetFloor].length - 2; z++) {
           for (let x = 2; x < grids[targetFloor][z].length - 2; x++) {
             if (grids[targetFloor][z][x] === 0) {
               foundX = x + 0.5;
               foundZ = z + 0.5;
-              found = true; 
               break;
             }
           }
-          if (found) break;
         }
+        safeTransit = { x: foundX, y: targetFloor * 3.2 + 0.8, z: foundZ };
       }
 
-      // Execute the safe transit
-      const safeTransit = { x: foundX, y: targetFloor * 3.2 + 0.8, z: foundZ };
       setTeleportCoords(safeTransit);
       
       // Forcefully update the state so the UI and Boss Music trigger instantly
