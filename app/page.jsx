@@ -5,8 +5,6 @@ import dynamic from 'next/dynamic';
 import { loadMapFromImage } from '@/lib/mapParser';
 import { TERMINAL_DIRECTORY, RIDDLE_BANK } from '@/lib/puzzleData';
 
-const DungeonEngine = dynamic(() => import('@/components/DungeonEngine'), { ssr: false });
-
 const FALLBACK_GRID = Array(10).fill(Array(10).fill(0)).map((row, z) => 
   row.map((col, x) => (x === 0 || x === 9 || z === 0 || z === 9 ? 1 : 0))
 );
@@ -162,6 +160,8 @@ export default function EscapeRoomPage() {
   const [isDead, setIsDead] = useState(false);
   const [screenFlash, setScreenFlash] = useState('');
   const [isFading, setIsFading] = useState(false); // 🚨 NEW: Elevator fade state
+
+  const DungeonEngine = dynamic(() => import('@/components/DungeonEngine'), { ssr: false });
 
   const [systemBooted, setSystemBooted] = useState(false); 
 
