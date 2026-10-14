@@ -507,7 +507,8 @@ export default function EscapeRoomPage() {
         for (let x = 0; x < grids[targetFloor][z].length; x++) {
           if (grids[targetFloor][z][x] === 9) {
             foundX = x + 0.5;
-            foundZ = z + 0.5;
+            // 🚨 FIX: Offset the Z coordinate by 1 tile so you don't spawn inside the monster's physics collider!
+            foundZ = z + 1.5; 
             found = true; 
             break;
           }
