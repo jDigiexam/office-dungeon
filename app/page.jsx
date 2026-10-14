@@ -564,7 +564,7 @@ export default function EscapeRoomPage() {
   let loopAudio = false;
 
   if (!systemBooted) {
-    activeAudioSrc = "";
+    activeAudioSrc = "/In the House, In a Heartbeat.mp3";
   } else if (gameWon) {
     activeAudioSrc = "/14 Our Resurrected Teleport.mp3"; // Eerie ambient track for the ending
     loopAudio = true;
@@ -696,22 +696,22 @@ export default function EscapeRoomPage() {
                     YOU DEFEATED THE OMEGA ANOMALY.
                   </p>
                   <p className="text-stone-300 font-bold tracking-widest leading-loose">
-                    THE FINAL CONTAINMENT DOORS OPENED, ALLOWING YOU TO ASCEND TO THE SURFACE.
+                    THE FINAL CONTAINMENT DOORS OPEN, ALLOWING YOU TO ASCEND TO THE SURFACE.
                   </p>
                   <p className="text-stone-300 font-bold tracking-widest leading-loose">
-                    BUT AS THE ELEVATOR DOORS PARTED, YOU WERE NOT GREETED BY RESCUE TEAMS.
+                    BUT AS THE ELEVATOR DOORS PART, YOU ARE NOT GREETED BY RESCUE TEAMS.
                   </p>
                   <p className="text-stone-300 font-bold tracking-widest leading-loose">
                     THE SKY IS BURNING. THE CITY IS IN RUINS.
                   </p>
                   <p className="text-stone-300 font-bold tracking-widest leading-loose">
-                    THE BIOENGINEERING COMPLEX WAS NOT THE ONLY SECTOR TO FALL.
+                    THE BIOENGINEERING COMPLEX WAS NOT JUST THE BEGINNING.
                   </p>
                   <p className="text-emerald-500 font-black tracking-[0.3em] text-2xl mt-12">
-                    MISSION ACCOMPLISHED.
+                    LIFE ON THE SURFACE CRAWLS WITH SHADES AND HELLISH FIGURES.
                   </p>
                   <p className="text-red-600 font-black tracking-[0.3em] text-3xl mt-4 drop-shadow-[0_0_15px_rgba(220,38,38,0.8)]">
-                    NEW NIGHTMARE BEGUN.
+                    THE REAL NIGHTMARE BEGINS.
                   </p>
                 </div>
               </div>
