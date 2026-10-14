@@ -77,7 +77,7 @@ function KeycardMesh({ position, texture, color }) {
         </mesh>
       </group>
     );
-}
+  }
 
 function TerminalMesh({ position, texture }) {
     const crtRef = useRef();
@@ -98,7 +98,7 @@ function TerminalMesh({ position, texture }) {
         </mesh>
       </group>
     );
-}
+  }
 
 function CeilingLightMesh({ position, texture }) {
   return (
@@ -210,21 +210,21 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid }) {
   );
 }
 
-// Animated Green Projectile Component
-function EnemyOrb({ startPos, dir, onPlayerHit, grid }) {
+function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
   const groupRef = useRef();
   const { camera } = useThree();
   const isActive = useRef(true);
 
-  const projTex = useTexture('/green projectile.png');
-
-  useEffect(() => {
-    if (projTex) {
-      projTex.wrapS = projTex.wrapT = THREE.RepeatWrapping;
-      projTex.repeat.set(1/11, 1/12); 
-      projTex.magFilter = THREE.NearestFilter;
-    }
-  }, [projTex]);
+  // Safely clone the pre-loaded texture so multiple projectiles animate independently
+  const projTex = useMemo(() => {
+    if (!texture) return null;
+    const tex = texture.clone();
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(1/11, 1/12); 
+    tex.magFilter = THREE.NearestFilter;
+    tex.needsUpdate = true;
+    return tex;
+  }, [texture]);
 
   useFrame((state, delta) => {
     if (!isActive.current || !groupRef.current) return;
@@ -259,15 +259,14 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid }) {
   return (
     <group ref={groupRef} position={startPos}>
       <sprite position={[0, -0.2, 0]} scale={[1.2, 1.2, 1]}>
-        <spriteMaterial map={projTex} color="#ffffff" transparent={true} />
+        {projTex ? <spriteMaterial map={projTex} color="#ffffff" transparent={true} /> : <meshBasicMaterial color="#22c55e" />}
       </sprite>
       <pointLight color="#22c55e" intensity={2.0} distance={5} decay={2} />
     </group>
   );
 }
 
-// Boss Component with Sprite Animation
-function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlayerHit, grid, onSpawnEnemyOrb }) {
+function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlayerHit, grid, onSpawnEnemyOrb, texture }) {
   const groupRef = useRef();
   const spriteMaterialRef = useRef();
   const isDead = useRef(false);
@@ -276,15 +275,16 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
   const hp = useRef(25); 
   const lastShot = useRef(0);
 
-  const bossTex = useTexture('/Hell Knight_2.png'); 
-  
-  useEffect(() => {
-    if (bossTex) {
-      bossTex.wrapS = bossTex.wrapT = THREE.RepeatWrapping;
-      bossTex.repeat.set(1/8, 1/7); 
-      bossTex.magFilter = THREE.NearestFilter; 
-    }
-  }, [bossTex]);
+  // Clone the pre-loaded texture to avoid sharing offsets
+  const bossTex = useMemo(() => {
+    if (!texture) return null;
+    const tex = texture.clone();
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(1/8, 1/7); 
+    tex.magFilter = THREE.NearestFilter; 
+    tex.needsUpdate = true;
+    return tex;
+  }, [texture]);
 
   const checkLoS = (startX, startZ, endX, endZ) => {
     if (!grid || isNaN(startX) || isNaN(startZ) || isNaN(endX) || isNaN(endZ)) return false;
@@ -402,13 +402,12 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
   return (
     <group ref={groupRef} position={initialPos}>
       <sprite position={[0, 0.75, 0]} scale={[2.5, 2.5, 1]}>
-        <spriteMaterial ref={spriteMaterialRef} map={bossTex} color="#ffffff" transparent={true} />
+        {bossTex ? <spriteMaterial ref={spriteMaterialRef} map={bossTex} color="#ffffff" transparent={true} /> : null}
       </sprite>
     </group>
   );
 }
 
-// Shorter & Tougher Shadow Entities
 function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlayerHit, grid }) {
   const groupRef = useRef();
   const ghostBody = useRef();
@@ -580,8 +579,7 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
   );
 }
 
-// Combat Manager
-function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids }) {
+function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTexture, orbTexture }) {
   const { camera } = useThree();
   const projectilesRef = useRef([]);
   const [projectiles, setProjectiles] = useState([]);
@@ -633,6 +631,7 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids }) {
           dir={ep.dir} 
           onPlayerHit={onPlayerHit} 
           grid={grids?.[currentFIdx]} 
+          texture={orbTexture}
         />
       ))}
       {enemiesData.map((e, idx) => {
@@ -647,6 +646,7 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids }) {
               onPlayerHit={onPlayerHit}
               grid={grids?.[e.fIdx]} 
               onSpawnEnemyOrb={(orb) => setEnemyProjectiles(prev => [...prev, orb])}
+              texture={bossTexture}
             />
           );
         }
@@ -686,7 +686,6 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
   useEffect(() => {
     if (teleportCoords) {
       camera.position.set(teleportCoords.x, teleportCoords.y, teleportCoords.z);
-      // 🚨 Teleport Fix: Sync the floor immediately so useFrame doesn't pull the player back down
       currentFloorRef.current = Math.max(0, Math.min(2, Math.round(teleportCoords.y / FLOOR_HT)));
       clearTeleport();
     }
@@ -840,6 +839,7 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
 // 5. MAIN SCENE RENDERING
 // ----------------------------------------------------
 function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove, onEradicate, onPlayerHit, isPuzzleActive }) {
+  // 🚨 FIXED: Pre-load ALL textures at the top level to prevent mid-game React Suspense crashes
   const woodTexList = useTexture([
     '/wall_timber_structure_cross.png', '/wall_timber_structure_diagonal.png',
     '/wall_timber_structure_vertical.png', '/wall_timber_structure.png'
@@ -851,19 +851,20 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     '/wall_stone_depth.png', '/wall_stone.png'
   ]);
 
-  const [tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt] = useTexture([
+  const [tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj] = useTexture([
     '/floor_stone_pattern.png', '/floor_tiles_tan_large.png', '/door_wood.png', '/door_metal_gate.png',
     '/door_metal_frame.png', '/window_round_pane_lit.png', '/hand.png',
-    '/red_keycard.png', '/blue_keycard.png', '/yellow_keycard.png', '/right_handed_crt.png'
+    '/red_keycard.png', '/blue_keycard.png', '/yellow_keycard.png', '/right_handed_crt.png',
+    '/Hell Knight_2.png', '/green projectile.png'
   ]);
 
   useEffect(() => {
-    [...woodTexList, ...stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt].forEach(t => {
+    [...woodTexList, ...stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj].forEach(t => {
       if(t) { t.magFilter = t.minFilter = THREE.NearestFilter; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.needsUpdate = true; }
     });
     woodTexList.forEach(t => t.repeat.set(1, 3.2));
     stoneTexList.forEach(t => t.repeat.set(1, 3.2));
-  }, [woodTexList, stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt]);
+  }, [woodTexList, stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj]);
 
   const parsedData = useMemo(() => {
     const dummy = new THREE.Object3D();
@@ -1029,7 +1030,8 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         return null;
       })}
       
-      <CombatManager enemiesData={enemiesData} grids={grids} onEradicate={onEradicate} onPlayerHit={onPlayerHit} />
+      {/* 🚨 Passed the pre-loaded textures into the combat manager */}
+      <CombatManager enemiesData={enemiesData} grids={grids} onEradicate={onEradicate} onPlayerHit={onPlayerHit} bossTexture={tBoss} orbTexture={tEnemyProj} />
       <PlayerControls grids={grids} handTexture={tHand} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} onPlayerMove={onPlayerMove} isPuzzleActive={isPuzzleActive} />
     </>
   );
