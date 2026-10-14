@@ -254,46 +254,61 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid }) {
   );
 }
 
-// 🚨 UPDATED: Boss Component with Line of Sight and Collision
 function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlayerHit, grid, onSpawnEnemyOrb }) {
   const groupRef = useRef();
+  const spriteMaterialRef = useRef();
   const isDead = useRef(false);
-  const hp = useRef(10); 
+  const deathTime = useRef(0);
+  
+  const hp = useRef(25); 
   const lastShot = useRef(0);
 
-  // Line of sight raycasting
-  const checkLoS = (startX, startZ, endX, endZ) => {
-    if (!grid || isNaN(startX) || isNaN(startZ) || isNaN(endX) || isNaN(endZ)) return false;
-    let x0 = Math.floor(startX);
-    let z0 = Math.floor(startZ);
-    const x1 = Math.floor(endX);
-    const z1 = Math.floor(endZ);
-    const dx = Math.abs(x1 - x0);
-    const dz = -Math.abs(z1 - z0);
-    let sx = x0 < x1 ? 1 : -1;
-    let sz = z0 < z1 ? 1 : -1;
-    let err = dx + dz;
-
-    let loopLimit = 30; 
-    while (loopLimit-- > 0) {
-      if ([1, 2, 12, 22, 7, 3, 4, 32].includes(grid[z0]?.[x0])) return false;
-      if (x0 === x1 && z0 === z1) break;
-      const e2 = 2 * err;
-      if (e2 >= dz) { err += dz; x0 += sx; }
-      if (e2 <= dx) { err += dx; z0 += sz; }
+  const bossTex = useTexture('/Hell Knight_transparent.png'); // Must be the edited transparent version
+  
+  useEffect(() => {
+    if (bossTex) {
+      bossTex.wrapS = bossTex.wrapT = THREE.RepeatWrapping;
+      // 🚨 Frame exactly 1/8th of the width and 1/7th of the height
+      bossTex.repeat.set(1/8, 1/7); 
+      bossTex.magFilter = THREE.NearestFilter; 
     }
-    return true;
+  }, [bossTex]);
+
+  const checkLoS = (startX, startZ, endX, endZ) => {
+    // ... keep your existing checkLoS logic here
   };
   
   useFrame((state, delta) => {
-    if (isDead.current || !groupRef.current) return;
+    if (!groupRef.current || !bossTex) return;
+
+    if (isDead.current) {
+      // 🚨 Handle Death Animation (Bottom row of the sheet)
+      const timeSinceDeath = state.clock.elapsedTime - deathTime.current;
+      const deathFrameIndex = Math.min(Math.floor(timeSinceDeath * 8), 6); // 7 death frames
+      
+      // Bottom row is y-offset 0 in WebGL UV coordinates
+      bossTex.offset.y = 0;
+      bossTex.offset.x = deathFrameIndex * (1/8);
+
+      if (timeSinceDeath > 1.5) {
+        groupRef.current.visible = false;
+      }
+      return;
+    }
     
+    // 🚨 Handle Walking Animation (Front-facing, Column 0, Rows 1-4)
+    // In WebGL, y=0 is the bottom. Rows 1-4 from the top are y-offsets 6, 5, 4, 3 (out of 7)
+    const walkFrames = [6, 5, 4, 3];
+    const currentFrame = Math.floor(state.clock.elapsedTime * 6) % 4;
+    
+    bossTex.offset.x = 0; // Front facing column
+    bossTex.offset.y = walkFrames[currentFrame] * (1/7); 
+
     const dx = groupRef.current.position.x - playerCamera.position.x;
     const dz = groupRef.current.position.z - playerCamera.position.z;
     const sqDist = dx * dx + dz * dz;
     const dist = Math.sqrt(sqDist);
     
-    // Check Line of Sight
     const hasLoS = checkLoS(groupRef.current.position.x, groupRef.current.position.z, playerCamera.position.x, playerCamera.position.z);
     
     if (dist < 15 && hasLoS) {
@@ -303,6 +318,9 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
         lastShot.current = state.clock.elapsedTime;
         const dir = new THREE.Vector3().subVectors(playerCamera.position, groupRef.current.position).normalize();
         
+        // 🚨 Briefly show the attack frame (Row 5 from top -> y-offset 2)
+        bossTex.offset.y = 2 * (1/7);
+        
         const spawnPos = groupRef.current.position.clone().add(dir.clone().multiplyScalar(1.0));
         spawnPos.y += 1.0; 
         onSpawnEnemyOrb({ id: Math.random(), startPos: spawnPos, dir });
@@ -311,18 +329,17 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
       if (dist > 1.5) {
         const dir = new THREE.Vector3().subVectors(playerCamera.position, groupRef.current.position).normalize();
         dir.y = 0; 
-        const speed = 1.2 * delta; 
+        const speed = 2.5 * delta; 
         
         const nextX = groupRef.current.position.x + dir.x * speed;
         const nextZ = groupRef.current.position.z + dir.z * speed;
-        const radius = 0.6; // Boss collision radius
+        const radius = 0.6; 
 
         const isSolid = (x, z) => {
           if (!grid) return true;
           return [1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(z)]?.[Math.floor(x)]);
         };
 
-        // Apply movement only if the next position is not inside a wall
         if (!isSolid(nextX, groupRef.current.position.z) && !isSolid(nextX + (dir.x > 0 ? radius : -radius), groupRef.current.position.z)) {
           groupRef.current.position.x = nextX;
         }
@@ -339,12 +356,16 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
           proj.mesh.current.visible = false;
           hp.current -= 1;
           
-          groupRef.current.children[0].material.emissiveIntensity = 2;
-          setTimeout(() => { if (groupRef.current) groupRef.current.children[0].material.emissiveIntensity = 0; }, 100);
+          if (spriteMaterialRef.current) {
+            spriteMaterialRef.current.color.setHex(0xff0000);
+            setTimeout(() => { 
+              if (spriteMaterialRef.current) spriteMaterialRef.current.color.setHex(0xffffff); 
+            }, 100);
+          }
 
-          if (hp.current <= 0) {
-            isDead.current = true;          
-            groupRef.current.visible = false;
+          if (hp.current <= 0 && !isDead.current) {
+            isDead.current = true;
+            deathTime.current = state.clock.elapsedTime;
             onEradicate(); 
           }
         }
@@ -354,14 +375,9 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
 
   return (
     <group ref={groupRef} position={initialPos}>
-      <mesh position={[0, 1.2, 0]}>
-        <boxGeometry args={[1.2, 2.4, 1.2]} />
-        <meshStandardMaterial color="#450a0a" emissive="#ef4444" emissiveIntensity={0} roughness={0.8} />
-      </mesh>
-      <mesh position={[0, 2.0, 0.6]}>
-        <sphereGeometry args={[0.2]} />
-        <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={5} />
-      </mesh>
+      <sprite position={[0, 1.4, 0]} scale={[2.5, 2.5, 1]}>
+        <spriteMaterial ref={spriteMaterialRef} map={bossTex} color="#ffffff" transparent={true} />
+      </sprite>
     </group>
   );
 }
