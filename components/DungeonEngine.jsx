@@ -77,7 +77,7 @@ function KeycardMesh({ position, texture, color }) {
         </mesh>
       </group>
     );
-  }
+}
 
 function TerminalMesh({ position, texture }) {
     const crtRef = useRef();
@@ -98,7 +98,7 @@ function TerminalMesh({ position, texture }) {
         </mesh>
       </group>
     );
-  }
+}
 
 function CeilingLightMesh({ position, texture }) {
   return (
@@ -189,15 +189,12 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid }) {
     const curY = meshRef.current.position.y;
     const curZ = meshRef.current.position.z;
     
-    // Check Wall collisions via the 2D grid
     const isSolid = grid && [1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(curZ)]?.[Math.floor(curX)]);
 
-    // Check Floor and Ceiling collisions
     const floorY = Math.floor(startPos.y / FLOOR_HT) * FLOOR_HT;
     const ceilY = floorY + FLOOR_HT;
     const hitVertical = curY <= floorY + 0.1 || curY >= ceilY - 0.1;
 
-    // Destroy if it hits a wall, floor, ceiling, OR travels too far
     if (isSolid || hitVertical || meshRef.current.position.distanceTo(startPos) > 20) {
       projObj.active = false;
       meshRef.current.visible = false;
@@ -213,47 +210,63 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid }) {
   );
 }
 
-// 🚨 NEW: Enemy Projectile Component
+// Animated Green Projectile Component
 function EnemyOrb({ startPos, dir, onPlayerHit, grid }) {
-  const meshRef = useRef();
+  const groupRef = useRef();
   const { camera } = useThree();
   const isActive = useRef(true);
 
+  const projTex = useTexture('/green projectile.png');
+
+  useEffect(() => {
+    if (projTex) {
+      projTex.wrapS = projTex.wrapT = THREE.RepeatWrapping;
+      projTex.repeat.set(1/11, 1/12); 
+      projTex.magFilter = THREE.NearestFilter;
+    }
+  }, [projTex]);
+
   useFrame((state, delta) => {
-    if (!isActive.current || !meshRef.current) return;
+    if (!isActive.current || !groupRef.current) return;
     
-    meshRef.current.position.add(dir.clone().multiplyScalar(8 * delta));
+    if (projTex) {
+      const currentFrame = Math.floor(state.clock.elapsedTime * 12) % 8;
+      projTex.offset.x = currentFrame * (1/11);
+      projTex.offset.y = 0; 
+    }
+
+    groupRef.current.position.add(dir.clone().multiplyScalar(8 * delta));
     
-    const curX = meshRef.current.position.x;
-    const curY = meshRef.current.position.y;
-    const curZ = meshRef.current.position.z;
+    const curX = groupRef.current.position.x;
+    const curY = groupRef.current.position.y;
+    const curZ = groupRef.current.position.z;
     
-    // Wall collisions
     const isSolid = grid && [1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(curZ)]?.[Math.floor(curX)]);
     
-    // Player collision
-    if (meshRef.current.position.distanceTo(camera.position) < 0.8) {
+    if (groupRef.current.position.distanceTo(camera.position) < 0.8) {
       isActive.current = false;
-      meshRef.current.visible = false;
+      groupRef.current.visible = false;
       onPlayerHit();
       return;
     }
 
-    if (isSolid || meshRef.current.position.distanceTo(startPos) > 20) {
+    if (isSolid || groupRef.current.position.distanceTo(startPos) > 20) {
       isActive.current = false;
-      meshRef.current.visible = false;
+      groupRef.current.visible = false;
     }
   });
 
   return (
-    <mesh ref={meshRef} position={startPos}>
-      <sphereGeometry args={[0.15]} />
-      <meshBasicMaterial color="#ef4444" />
-      <pointLight color="#ef4444" intensity={2.0} distance={4} decay={2} />
-    </mesh>
+    <group ref={groupRef} position={startPos}>
+      <sprite position={[0, -0.2, 0]} scale={[1.2, 1.2, 1]}>
+        <spriteMaterial map={projTex} color="#ffffff" transparent={true} />
+      </sprite>
+      <pointLight color="#22c55e" intensity={2.0} distance={5} decay={2} />
+    </group>
   );
 }
 
+// Boss Component with Sprite Animation
 function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlayerHit, grid, onSpawnEnemyOrb }) {
   const groupRef = useRef();
   const spriteMaterialRef = useRef();
@@ -263,30 +276,46 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
   const hp = useRef(25); 
   const lastShot = useRef(0);
 
-  const bossTex = useTexture('/Hell Knight.png'); // Must be the edited transparent version
+  const bossTex = useTexture('/Hell Knight_2.png'); 
   
   useEffect(() => {
     if (bossTex) {
       bossTex.wrapS = bossTex.wrapT = THREE.RepeatWrapping;
-      // 🚨 Frame exactly 1/8th of the width and 1/7th of the height
       bossTex.repeat.set(1/8, 1/7); 
       bossTex.magFilter = THREE.NearestFilter; 
     }
   }, [bossTex]);
 
   const checkLoS = (startX, startZ, endX, endZ) => {
-    // ... keep your existing checkLoS logic here
+    if (!grid || isNaN(startX) || isNaN(startZ) || isNaN(endX) || isNaN(endZ)) return false;
+    let x0 = Math.floor(startX);
+    let z0 = Math.floor(startZ);
+    const x1 = Math.floor(endX);
+    const z1 = Math.floor(endZ);
+    const dx = Math.abs(x1 - x0);
+    const dz = -Math.abs(z1 - z0);
+    let sx = x0 < x1 ? 1 : -1;
+    let sz = z0 < z1 ? 1 : -1;
+    let err = dx + dz;
+
+    let loopLimit = 30; 
+    while (loopLimit-- > 0) {
+      if ([1, 2, 12, 22, 7, 3, 4, 32].includes(grid[z0]?.[x0])) return false;
+      if (x0 === x1 && z0 === z1) break;
+      const e2 = 2 * err;
+      if (e2 >= dz) { err += dz; x0 += sx; }
+      if (e2 <= dx) { err += dx; z0 += sz; }
+    }
+    return true;
   };
   
   useFrame((state, delta) => {
     if (!groupRef.current || !bossTex) return;
 
     if (isDead.current) {
-      // 🚨 Handle Death Animation (Bottom row of the sheet)
       const timeSinceDeath = state.clock.elapsedTime - deathTime.current;
-      const deathFrameIndex = Math.min(Math.floor(timeSinceDeath * 8), 6); // 7 death frames
+      const deathFrameIndex = Math.min(Math.floor(timeSinceDeath * 8), 6); 
       
-      // Bottom row is y-offset 0 in WebGL UV coordinates
       bossTex.offset.y = 0;
       bossTex.offset.x = deathFrameIndex * (1/8);
 
@@ -296,12 +325,10 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
       return;
     }
     
-    // 🚨 Handle Walking Animation (Front-facing, Column 0, Rows 1-4)
-    // In WebGL, y=0 is the bottom. Rows 1-4 from the top are y-offsets 6, 5, 4, 3 (out of 7)
     const walkFrames = [6, 5, 4, 3];
     const currentFrame = Math.floor(state.clock.elapsedTime * 6) % 4;
     
-    bossTex.offset.x = 0; // Front facing column
+    bossTex.offset.x = 0; 
     bossTex.offset.y = walkFrames[currentFrame] * (1/7); 
 
     const dx = groupRef.current.position.x - playerCamera.position.x;
@@ -318,7 +345,6 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
         lastShot.current = state.clock.elapsedTime;
         const dir = new THREE.Vector3().subVectors(playerCamera.position, groupRef.current.position).normalize();
         
-        // 🚨 Briefly show the attack frame (Row 5 from top -> y-offset 2)
         bossTex.offset.y = 2 * (1/7);
         
         const spawnPos = groupRef.current.position.clone().add(dir.clone().multiplyScalar(1.0));
@@ -375,14 +401,14 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
 
   return (
     <group ref={groupRef} position={initialPos}>
-      <sprite position={[0, 1.4, 0]} scale={[2.5, 2.5, 1]}>
+      <sprite position={[0, 0.75, 0]} scale={[2.5, 2.5, 1]}>
         <spriteMaterial ref={spriteMaterialRef} map={bossTex} color="#ffffff" transparent={true} />
       </sprite>
     </group>
   );
 }
 
-// 🚨 UPDATED: Shorter & Tougher Shadow Entities
+// Shorter & Tougher Shadow Entities
 function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlayerHit, grid }) {
   const groupRef = useRef();
   const ghostBody = useRef();
@@ -393,7 +419,7 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
   const isDead = useRef(false);
   const isChasing = useRef(false);
   
-  const hp = useRef(2); // 🚨 Takes 2 hits now
+  const hp = useRef(2); 
 
   const checkLoS = (startX, startZ, endX, endZ) => {
     if (!grid || isNaN(startX) || isNaN(startZ) || isNaN(endX) || isNaN(endZ)) return false;
@@ -489,7 +515,7 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
           proj.active = false;            
           proj.mesh.current.visible = false;
           
-          hp.current -= 1; // 🚨 Subtract HP instead of instant death
+          hp.current -= 1; 
           if (hp.current <= 0) {
             isDead.current = true;          
             groupRef.current.visible = false;
@@ -501,7 +527,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
   });
 
   return (
-    // 🚨 ALL Y-COORDINATES REDUCED BY 0.3 TO MAKE THEM SHORTER
     <group ref={groupRef} position={initialPos}>
       <group ref={ghostBody}>
         <mesh position={[0, 1.6, 0]}>
@@ -555,7 +580,7 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
   );
 }
 
-// 🚨 UPDATED: Combat Manager handles the new Bosses and Enemy projectiles
+// Combat Manager
 function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids }) {
   const { camera } = useThree();
   const projectilesRef = useRef([]);
@@ -661,7 +686,7 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
   useEffect(() => {
     if (teleportCoords) {
       camera.position.set(teleportCoords.x, teleportCoords.y, teleportCoords.z);
-      // 🚨 FIX: Instantly sync the floor reference so useFrame doesn't pull the player back down
+      // 🚨 Teleport Fix: Sync the floor immediately so useFrame doesn't pull the player back down
       currentFloorRef.current = Math.max(0, Math.min(2, Math.round(teleportCoords.y / FLOOR_HT)));
       clearTeleport();
     }
@@ -923,7 +948,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
             if (isStoneZone) sWallsBuffs[tIdx].add(dummy); else wWallsBuffs[tIdx].add(dummy);
           }
 
-          if ([2, 8, 9, 13, 12, 18, 22, 28, 7, 17, 3, 10, 4, 5, 15, 25, 6, 32, 38].includes(tile)) { // 🚨 Added 13 to interactives
+          if ([2, 8, 9, 13, 12, 18, 22, 28, 7, 17, 3, 10, 4, 5, 15, 25, 6, 32, 38].includes(tile)) {
             interactives.push({ tile, x, z, fIdx, baseY, isStoneZone, tIdx });
             if (interactives.length > 5000) return { error: "TOO_MANY_ENTITIES", count: interactives.length };
           }
@@ -954,7 +979,6 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
 
   const { wWallsFinal, sWallsFinal, wFloorFinal, sFloorFinal, ceilFinal, interactiveElements } = parsedData;
 
-  // 🚨 UPDATED: Map both Shadow Entities (9) and Boss Entities (13)
   const enemiesData = useMemo(() => {
     return interactiveElements
       .filter(el => el.tile === 9 || el.tile === 13)
@@ -1013,17 +1037,15 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
 
 export default function DungeonEngine({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove, onEradicate, onPlayerHit, isPuzzleActive, currentFloor }) {
   
-  // 🚨 NEW: Dynamic Atmosphere logic
   const isHell = currentFloor === 2;
   const fogColor = isHell ? '#450a0a' : '#000000';
-  const fogFar = isHell ? 12 : 18; // Fog is thicker in hell
+  const fogFar = isHell ? 12 : 18; 
   const lightColor = isHell ? '#ef4444' : '#ffffff';
   const lightIntensity = isHell ? 0.3 : 1.0;
 
   return (
     <div className="w-full h-screen bg-black relative">
       <Canvas camera={{ position: initialSpawn || [5.5, 0.8, 5.5], fov: 80, near: 0.01, far: 50 }} gl={{ antialias: false }}>
-        {/* 🚨 NEW: Reactive fog and lighting */}
         <fog attach="fog" args={[fogColor, 4, fogFar]} />
         <ambientLight intensity={lightIntensity} color={lightColor} />
         
