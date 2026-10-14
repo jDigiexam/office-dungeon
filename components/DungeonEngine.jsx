@@ -263,7 +263,7 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
   const hp = useRef(25); 
   const lastShot = useRef(0);
 
-  const bossTex = useTexture('/Hell Knight_transparent.png'); // Must be the edited transparent version
+  const bossTex = useTexture('/Hell Knight.png'); // Must be the edited transparent version
   
   useEffect(() => {
     if (bossTex) {
