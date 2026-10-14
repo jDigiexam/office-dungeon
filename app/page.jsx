@@ -559,7 +559,7 @@ export default function EscapeRoomPage() {
     loopAudio = true;
   } else if (isDead) {
     activeAudioSrc = ""; // Silence upon death
-  } else if (currentFloor === 2) {
+  } else if (currentFloor === 1) { // 🚨 CHANGED TO FLOOR 1
     activeAudioSrc = "/43 Lambda Core.mp3";
     loopAudio = true;
   } else {
@@ -905,7 +905,7 @@ export default function EscapeRoomPage() {
             <div className="hidden md:flex bg-stone-950 border-2 border-stone-700 px-6 py-2 flex-col items-center justify-center flex-1 mx-2">
               <span className="text-[10px] text-stone-500 font-bold">CURRENT SECTOR</span>
               <span className="text-xs font-bold text-yellow-500 mt-0.5">
-                {currentFloor === 0 ? 'ENTRY CORRIDORS' : currentFloor === 1 ? 'MAINFRAME LABS' : 'THE ABYSS'}
+                {currentFloor === 0 ? 'ENTRY CORRIDORS' : 'THE ABYSS'} {/* 🚨 SIMPLIFIED FOR 2 FLOORS */}
               </span>
             </div>
 
