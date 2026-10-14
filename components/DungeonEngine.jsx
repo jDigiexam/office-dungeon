@@ -213,6 +213,122 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid }) {
   );
 }
 
+// 🚨 NEW: Enemy Projectile Component
+function EnemyOrb({ startPos, dir, onPlayerHit, grid }) {
+  const meshRef = useRef();
+  const { camera } = useThree();
+  const isActive = useRef(true);
+
+  useFrame((state, delta) => {
+    if (!isActive.current || !meshRef.current) return;
+    
+    meshRef.current.position.add(dir.clone().multiplyScalar(8 * delta));
+    
+    const curX = meshRef.current.position.x;
+    const curY = meshRef.current.position.y;
+    const curZ = meshRef.current.position.z;
+    
+    // Wall collisions
+    const isSolid = grid && [1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(curZ)]?.[Math.floor(curX)]);
+    
+    // Player collision
+    if (meshRef.current.position.distanceTo(camera.position) < 0.8) {
+      isActive.current = false;
+      meshRef.current.visible = false;
+      onPlayerHit();
+      return;
+    }
+
+    if (isSolid || meshRef.current.position.distanceTo(startPos) > 20) {
+      isActive.current = false;
+      meshRef.current.visible = false;
+    }
+  });
+
+  return (
+    <mesh ref={meshRef} position={startPos}>
+      <sphereGeometry args={[0.15]} />
+      <meshBasicMaterial color="#ef4444" />
+      <pointLight color="#ef4444" intensity={2.0} distance={4} decay={2} />
+    </mesh>
+  );
+}
+
+// 🚨 NEW: Boss Component
+function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlayerHit, grid, onSpawnEnemyOrb }) {
+  const groupRef = useRef();
+  const isDead = useRef(false);
+  const hp = useRef(10); // Takes 10 hits
+  const lastShot = useRef(0);
+  
+  useFrame((state, delta) => {
+    if (isDead.current || !groupRef.current) return;
+    
+    const dx = groupRef.current.position.x - playerCamera.position.x;
+    const dz = groupRef.current.position.z - playerCamera.position.z;
+    const sqDist = dx * dx + dz * dz;
+    const dist = Math.sqrt(sqDist);
+    
+    // Boss shoots if within range and has line of sight
+    if (dist < 15) {
+      groupRef.current.lookAt(playerCamera.position.x, groupRef.current.position.y, playerCamera.position.z);
+      
+      if (state.clock.elapsedTime - lastShot.current > 2.5) {
+        lastShot.current = state.clock.elapsedTime;
+        const dir = new THREE.Vector3().subVectors(playerCamera.position, groupRef.current.position).normalize();
+        
+        // Spawn slightly in front of the boss
+        const spawnPos = groupRef.current.position.clone().add(dir.clone().multiplyScalar(1.0));
+        spawnPos.y += 1.0; 
+        onSpawnEnemyOrb({ id: Math.random(), startPos: spawnPos, dir });
+      }
+
+      // Slower movement towards player
+      if (dist > 1.5) {
+        const dir = new THREE.Vector3().subVectors(playerCamera.position, groupRef.current.position).normalize();
+        dir.y = 0; 
+        const speed = 1.2 * delta; 
+        groupRef.current.position.add(dir.multiplyScalar(speed));
+      }
+    }
+
+    // Handle incoming player hits
+    projectilesRef.current.forEach(proj => {
+      if (proj.active && proj.mesh?.current) {
+        if (groupRef.current.position.distanceTo(proj.mesh.current.position) < 1.5) {
+          proj.active = false;            
+          proj.mesh.current.visible = false;
+          hp.current -= 1;
+          
+          // Flash effect on hit
+          groupRef.current.children[0].material.emissiveIntensity = 2;
+          setTimeout(() => { if (groupRef.current) groupRef.current.children[0].material.emissiveIntensity = 0; }, 100);
+
+          if (hp.current <= 0) {
+            isDead.current = true;          
+            groupRef.current.visible = false;
+            onEradicate(); // You might want to pass a specific boss defeat message here later
+          }
+        }
+      }
+    });
+  });
+
+  return (
+    <group ref={groupRef} position={initialPos}>
+      <mesh position={[0, 1.2, 0]}>
+        <boxGeometry args={[1.2, 2.4, 1.2]} />
+        <meshStandardMaterial color="#450a0a" emissive="#ef4444" emissiveIntensity={0} roughness={0.8} />
+      </mesh>
+      <mesh position={[0, 2.0, 0.6]}>
+        <sphereGeometry args={[0.2]} />
+        <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={5} />
+      </mesh>
+    </group>
+  );
+}
+
+// 🚨 UPDATED: Shorter & Tougher Shadow Entities
 function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlayerHit, grid }) {
   const groupRef = useRef();
   const ghostBody = useRef();
@@ -222,10 +338,11 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
   const rightLeg = useRef();
   const isDead = useRef(false);
   const isChasing = useRef(false);
+  
+  const hp = useRef(2); // 🚨 Takes 2 hits now
 
   const checkLoS = (startX, startZ, endX, endZ) => {
     if (!grid || isNaN(startX) || isNaN(startZ) || isNaN(endX) || isNaN(endZ)) return false;
-    
     let x0 = Math.floor(startX);
     let z0 = Math.floor(startZ);
     const x1 = Math.floor(endX);
@@ -237,7 +354,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
     let err = dx + dz;
 
     let loopLimit = 30; 
-
     while (loopLimit-- > 0) {
       if ([1, 2, 12, 22, 7, 3, 4, 32].includes(grid[z0]?.[x0])) return false;
       if (x0 === x1 && z0 === z1) break;
@@ -251,7 +367,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
   useFrame((state, delta) => {
     if (isDead.current || !groupRef.current) return;
     
-    // Increased Y-distance check since the monster is much taller now
     const yDist = Math.abs(groupRef.current.position.y - playerCamera.position.y);
     if (yDist > 3.0) return;
 
@@ -275,7 +390,7 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
         const dir = new THREE.Vector3().subVectors(playerCamera.position, groupRef.current.position).normalize();
         dir.y = 0; 
 
-        const speed = 3.0 * safeDelta; // Slightly faster to match their long stride
+        const speed = 3.0 * safeDelta;
         const nextX = groupRef.current.position.x + dir.x * speed;
         const nextZ = groupRef.current.position.z + dir.z * speed;
         const radius = 0.3; 
@@ -292,12 +407,10 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
           groupRef.current.position.z = nextZ;
         }
 
-        // Retain a slight, eerie hovering motion on the main body
         if (ghostBody.current) {
           ghostBody.current.position.y = Math.sin(state.clock.elapsedTime * 3) * 0.08;
         }
 
-        // Long, sweeping stride animations
         const t = state.clock.elapsedTime * 8;
         if (leftArm.current) leftArm.current.rotation.x = Math.sin(t) * 0.7;
         if (rightArm.current) rightArm.current.rotation.x = -Math.sin(t) * 0.7;
@@ -319,83 +432,81 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
     projectilesRef.current.forEach(proj => {
       if (proj.active && proj.mesh?.current) {
         if (groupRef.current.position.distanceTo(proj.mesh.current.position) < 1.0) {
-          isDead.current = true;          
-          groupRef.current.visible = false;
           proj.active = false;            
           proj.mesh.current.visible = false;
-          onEradicate();
+          
+          hp.current -= 1; // 🚨 Subtract HP instead of instant death
+          if (hp.current <= 0) {
+            isDead.current = true;          
+            groupRef.current.visible = false;
+            onEradicate();
+          }
         }
       }
     });
   });
 
   return (
+    // 🚨 ALL Y-COORDINATES REDUCED BY 0.3 TO MAKE THEM SHORTER
     <group ref={groupRef} position={initialPos}>
       <group ref={ghostBody}>
-        
-        {/* Massive Blocky Head */}
-        <mesh position={[0, 1.9, 0]}>
+        <mesh position={[0, 1.6, 0]}>
           <boxGeometry args={[0.4, 0.4, 0.4]} />
           <meshBasicMaterial color="#000000" transparent opacity={0.9} />
         </mesh>
         
-        {/* Piercing Red Eyes */}
-        <mesh position={[0.1, 1.95, 0.21]}>
+        <mesh position={[0.1, 1.65, 0.21]}>
           <sphereGeometry args={[0.035]} />
           <meshStandardMaterial color="#eb1414" emissive="#eb1414" emissiveIntensity={5} />
         </mesh>
-        <mesh position={[-0.1, 1.95, 0.21]}>
+        <mesh position={[-0.1, 1.65, 0.21]}>
           <sphereGeometry args={[0.035]} />
           <meshStandardMaterial color="#eb1414" emissive="#eb1414" emissiveIntensity={5} />
         </mesh>
 
-        {/* Extremely Slim Torso */}
-        <mesh position={[0, 1.3, 0]}>
+        <mesh position={[0, 1.0, 0]}>
           <boxGeometry args={[0.2, 0.8, 0.15]} />
           <meshBasicMaterial color="#000000" transparent opacity={0.9} />
         </mesh>
 
-        {/* Long Spindly Left Arm (Pivot at high shoulder) */}
-        <group ref={leftArm} position={[-0.18, 1.65, 0]}>
-          <mesh position={[0, -0.7, 0]}>
-            <boxGeometry args={[0.08, 1.4, 0.08]} />
+        <group ref={leftArm} position={[-0.18, 1.35, 0]}>
+          <mesh position={[0, -0.6, 0]}>
+            <boxGeometry args={[0.08, 1.2, 0.08]} />
             <meshBasicMaterial color="#000000" transparent opacity={0.9} />
           </mesh>
         </group>
 
-        {/* Long Spindly Right Arm (Pivot at high shoulder) */}
-        <group ref={rightArm} position={[0.18, 1.65, 0]}>
-          <mesh position={[0, -0.7, 0]}>
-            <boxGeometry args={[0.08, 1.4, 0.08]} />
+        <group ref={rightArm} position={[0.18, 1.35, 0]}>
+          <mesh position={[0, -0.6, 0]}>
+            <boxGeometry args={[0.08, 1.2, 0.08]} />
             <meshBasicMaterial color="#000000" transparent opacity={0.9} />
           </mesh>
         </group>
 
-        {/* Long Left Leg (Pivot at base of slim torso) */}
-        <group ref={leftLeg} position={[-0.07, 0.9, 0]}>
-          <mesh position={[0, -0.7, 0]}>
-            <boxGeometry args={[0.08, 1.4, 0.08]} />
+        <group ref={leftLeg} position={[-0.07, 0.6, 0]}>
+          <mesh position={[0, -0.5, 0]}>
+            <boxGeometry args={[0.08, 1.0, 0.08]} />
             <meshBasicMaterial color="#000000" transparent opacity={0.9} />
           </mesh>
         </group>
 
-        {/* Long Right Leg (Pivot at base of slim torso) */}
-        <group ref={rightLeg} position={[0.07, 0.9, 0]}>
-          <mesh position={[0, -0.7, 0]}>
-            <boxGeometry args={[0.08, 1.4, 0.08]} />
+        <group ref={rightLeg} position={[0.07, 0.6, 0]}>
+          <mesh position={[0, -0.5, 0]}>
+            <boxGeometry args={[0.08, 1.0, 0.08]} />
             <meshBasicMaterial color="#000000" transparent opacity={0.9} />
           </mesh>
         </group>
-
       </group>
     </group>
   );
 }
 
+// 🚨 UPDATED: Combat Manager handles the new Bosses and Enemy projectiles
 function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids }) {
   const { camera } = useThree();
   const projectilesRef = useRef([]);
   const [projectiles, setProjectiles] = useState([]);
+  const [enemyProjectiles, setEnemyProjectiles] = useState([]);
   
   const currentFIdx = Math.max(0, Math.min(2, Math.round(camera.position.y / FLOOR_HT)));
 
@@ -428,7 +539,7 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids }) {
     <>
       {projectiles.map(p => (
         <LightOrb 
-          key={p.id} 
+          key={`orb-${p.id}`} 
           projObj={p} 
           startPos={p.startPos} 
           dir={p.dir} 
@@ -436,17 +547,43 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids }) {
           grid={grids?.[currentFIdx]} 
         />
       ))}
-      {enemiesData.map((e, idx) => (
-        <ShadowNPC 
-          key={`enemy-${idx}`} 
-          initialPos={e.pos} 
-          playerCamera={camera} 
-          projectilesRef={projectilesRef} 
-          onEradicate={onEradicate} 
-          onPlayerHit={onPlayerHit}
-          grid={grids?.[e.fIdx]} 
+      {enemyProjectiles.map(ep => (
+        <EnemyOrb 
+          key={`e-orb-${ep.id}`} 
+          startPos={ep.startPos} 
+          dir={ep.dir} 
+          onPlayerHit={onPlayerHit} 
+          grid={grids?.[currentFIdx]} 
         />
       ))}
+      {enemiesData.map((e, idx) => {
+        if (e.type === 13) {
+          return (
+            <BossNPC 
+              key={`boss-${idx}`} 
+              initialPos={e.pos} 
+              playerCamera={camera} 
+              projectilesRef={projectilesRef} 
+              onEradicate={() => { /* Optional: custom boss eradicate logic */ }} 
+              onPlayerHit={onPlayerHit}
+              grid={grids?.[e.fIdx]} 
+              onSpawnEnemyOrb={(orb) => setEnemyProjectiles(prev => [...prev, orb])}
+            />
+          );
+        }
+        
+        return (
+          <ShadowNPC 
+            key={`enemy-${idx}`} 
+            initialPos={e.pos} 
+            playerCamera={camera} 
+            projectilesRef={projectilesRef} 
+            onEradicate={onEradicate} 
+            onPlayerHit={onPlayerHit}
+            grid={grids?.[e.fIdx]} 
+          />
+        );
+      })}
     </>
   );
 }
@@ -470,10 +607,8 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
   useEffect(() => {
     if (teleportCoords) {
       camera.position.set(teleportCoords.x, teleportCoords.y, teleportCoords.z);
-      
       // 🚨 FIX: Instantly sync the floor reference so useFrame doesn't pull the player back down
       currentFloorRef.current = Math.max(0, Math.min(2, Math.round(teleportCoords.y / FLOOR_HT)));
-      
       clearTeleport();
     }
   }, [teleportCoords, camera, clearTeleport]);
@@ -611,7 +746,7 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
         ref={controlsRef} 
         minPolarAngle={Math.PI / 4} 
         maxPolarAngle={Math.PI * 3 / 4} 
-        selector="#engine-wrapper" // 🚨 Binds the click lock exclusively to the 3D wrapper
+        selector="#engine-wrapper"
       />
       <mesh ref={handRef} renderOrder={999}>
         <planeGeometry args={[0.23, 0.23]} />
@@ -734,7 +869,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
             if (isStoneZone) sWallsBuffs[tIdx].add(dummy); else wWallsBuffs[tIdx].add(dummy);
           }
 
-          if ([2, 8, 9, 12, 18, 22, 28, 7, 17, 3, 10, 4, 5, 15, 25, 6, 32, 38].includes(tile)) {
+          if ([2, 8, 9, 13, 12, 18, 22, 28, 7, 17, 3, 10, 4, 5, 15, 25, 6, 32, 38].includes(tile)) { // 🚨 Added 13 to interactives
             interactives.push({ tile, x, z, fIdx, baseY, isStoneZone, tIdx });
             if (interactives.length > 5000) return { error: "TOO_MANY_ENTITIES", count: interactives.length };
           }
@@ -765,10 +900,11 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
 
   const { wWallsFinal, sWallsFinal, wFloorFinal, sFloorFinal, ceilFinal, interactiveElements } = parsedData;
 
+  // 🚨 UPDATED: Map both Shadow Entities (9) and Boss Entities (13)
   const enemiesData = useMemo(() => {
     return interactiveElements
-      .filter(el => el.tile === 9)
-      .map(el => ({ pos: [el.x + 0.5, el.baseY + 0.5, el.z + 0.5], fIdx: el.fIdx }));
+      .filter(el => el.tile === 9 || el.tile === 13)
+      .map(el => ({ pos: [el.x + 0.5, el.baseY + 0.5, el.z + 0.5], fIdx: el.fIdx, type: el.tile }));
   }, [interactiveElements]);
 
   return (
