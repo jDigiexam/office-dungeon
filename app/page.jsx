@@ -124,6 +124,7 @@ function AudioCrossfader({ currentSrc, loopCurrent, onNextTrack }) {
 }
 
 export default function EscapeRoomPage() {
+  const [gameWon, setGameWon] = useState(false); // 🚨 NEW
   const [currentFloor, setCurrentFloor] = useState(0);
   const [inventory, setInventory] = useState([]);
   const [gameStarted, setGameStarted] = useState(false);
@@ -493,6 +494,16 @@ export default function EscapeRoomPage() {
   };
 
   const handleEnterElevator = (fIdx) => {
+    // 🚨 NEW: If they escape the Boss Floor, they win!
+    if (fIdx === 1) {
+      setIsFading(true);
+      setTimeout(() => {
+        setGameWon(true);
+        setIsFading(false);
+      }, 2000);
+      return;
+    }
+
     const targetFloor = fIdx + 1;
     if (targetFloor >= grids.length || !grids[targetFloor]) {
       triggerMessage("MAXIMUM FLOOR REACHED");
@@ -506,7 +517,6 @@ export default function EscapeRoomPage() {
     setTimeout(() => {
       let safeTransit;
 
-      // 🚨 PRIMARY: Use the pre-calculated magenta spawn point if it exists
       if (floorSpawns[targetFloor]) {
         safeTransit = {
           x: floorSpawns[targetFloor][0],
@@ -514,7 +524,6 @@ export default function EscapeRoomPage() {
           z: floorSpawns[targetFloor][2]
         };
       } else {
-        // 🚨 FALLBACK: If no magenta tile exists, find a safe white floor tile
         let foundX = 5.5, foundZ = 5.5;
         for (let z = 2; z < grids[targetFloor].length - 2; z++) {
           for (let x = 2; x < grids[targetFloor][z].length - 2; x++) {
@@ -529,8 +538,6 @@ export default function EscapeRoomPage() {
       }
 
       setTeleportCoords(safeTransit);
-      
-      // Forcefully update the state so the UI and Boss Music trigger instantly
       setCurrentFloor(targetFloor); 
       triggerMessage(`ELEVATOR TRANSIT: FLOOR E1M${targetFloor + 1}`);
       
@@ -550,12 +557,15 @@ export default function EscapeRoomPage() {
 
   if (!systemBooted) {
     activeAudioSrc = "";
+  } else if (gameWon) {
+    activeAudioSrc = "/14 Our Resurrected Teleport.mp3"; // Eerie ambient track for the ending
+    loopAudio = true;
   } else if (!gameStarted) {
     activeAudioSrc = "/In the House, In a Heartbeat.mp3";
     loopAudio = true;
   } else if (isDead) {
-    activeAudioSrc = ""; // Silence upon death
-  } else if (currentFloor === 1) { // 🚨 CHANGED TO FLOOR 1
+    activeAudioSrc = ""; 
+  } else if (currentFloor === 1) { 
     activeAudioSrc = "/43 Lambda Core.mp3";
     loopAudio = true;
   } else {
@@ -651,7 +661,64 @@ export default function EscapeRoomPage() {
             )} 
           </div>
         </div>
-      ) : isDead ? (
+        ) : gameWon ? (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black text-emerald-500">
+            <style>{`
+              @keyframes cinematic-scroll-win {
+                0% { transform: translateY(100%); }
+                100% { transform: translateY(-100%); }
+              }
+              .animate-scroll-text-win {
+                animation: cinematic-scroll-win 40s linear forwards;
+              }
+            `}</style>
+            
+            <div className="border-4 border-emerald-900 bg-stone-950 flex flex-col items-center justify-center w-full max-w-3xl shadow-[0_0_50px_rgba(16,185,129,0.2)] relative overflow-hidden h-[600px]">
+              
+              <div 
+                className="absolute inset-0 z-10 pointer-events-none"
+                style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)' }}
+              >
+                <div className="absolute w-full animate-scroll-text-win flex flex-col gap-10 text-center px-16 h-full mt-32">
+                  <h1 className="text-5xl font-black mb-8 tracking-[0.3em] text-emerald-500 drop-shadow-[0_0_15px_rgba(16,185,129,0.8)]">
+                    SYSTEM BREACHED.
+                  </h1>
+                  
+                  <p className="text-emerald-400 font-bold tracking-widest leading-loose">
+                    YOU DEFEATED THE OMEGA ANOMALY.
+                  </p>
+                  <p className="text-stone-300 font-bold tracking-widest leading-loose">
+                    THE FINAL CONTAINMENT DOORS OPENED, ALLOWING YOU TO ASCEND TO THE SURFACE.
+                  </p>
+                  <p className="text-stone-300 font-bold tracking-widest leading-loose">
+                    BUT AS THE ELEVATOR DOORS PARTED, YOU WERE NOT GREETED BY RESCUE TEAMS.
+                  </p>
+                  <p className="text-stone-300 font-bold tracking-widest leading-loose">
+                    THE SKY IS BURNING. THE CITY IS IN RUINS.
+                  </p>
+                  <p className="text-stone-300 font-bold tracking-widest leading-loose">
+                    THE BIOENGINEERING COMPLEX WAS NOT THE ONLY SECTOR TO FALL.
+                  </p>
+                  <p className="text-emerald-500 font-black tracking-[0.3em] text-2xl mt-12">
+                    MISSION ACCOMPLISHED.
+                  </p>
+                  <p className="text-red-600 font-black tracking-[0.3em] text-3xl mt-4 drop-shadow-[0_0_15px_rgba(220,38,38,0.8)]">
+                    NEW NIGHTMARE BEGUN.
+                  </p>
+                </div>
+              </div>
+  
+              <div className="absolute bottom-6 z-20">
+                <button 
+                  onClick={() => window.location.reload()} 
+                  className="py-3 px-8 bg-stone-900 hover:bg-emerald-800 text-emerald-500 hover:text-black font-black text-sm tracking-[0.3em] transition-colors border border-emerald-900"
+                >
+                  INITIALIZE REBOOT
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : isDead ? (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-red-950 text-red-500">
           <div className="border-4 border-red-900 bg-black p-12 text-center max-w-lg shadow-[0_0_50px_rgba(153,27,27,0.5)]">
             <h1 className="text-6xl font-black mb-4 tracking-widest text-red-600">YOU DIED</h1>
