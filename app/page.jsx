@@ -565,14 +565,15 @@ export default function EscapeRoomPage() {
 
   if (!systemBooted) {
     activeAudioSrc = "/In the House, In a Heartbeat.mp3";
+    loopAudio = true;
   } else if (gameWon) {
-    activeAudioSrc = "/14 Our Resurrected Teleport.mp3"; // Eerie ambient track for the ending
+    activeAudioSrc = "/In the House, In a Heartbeat.mp3";
     loopAudio = true;
   } else if (!gameStarted) {
     activeAudioSrc = "/In the House, In a Heartbeat.mp3";
     loopAudio = true;
   } else if (isDead) {
-    activeAudioSrc = ""; 
+    activeAudioSrc = "/08 Ravenholm Reprise.mp3"; 
   } else if (currentFloor === 1) { 
     activeAudioSrc = "/43 Lambda Core.mp3";
     loopAudio = true;
