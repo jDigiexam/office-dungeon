@@ -176,6 +176,7 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTexture, 
 // COMBAT & HORROR SYSTEM
 // ----------------------------------------------------
 // 🚨 UPDATED: Player Projectile Component (Distance-Based Dissipation)
+// 🚨 UPDATED: Player Projectile Component (10 Frames)
 function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
   const groupRef = useRef();
 
@@ -183,7 +184,8 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
     if (!texture) return null;
     const tex = texture.clone();
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(1/9, 1); // 9 frames in the sprite sheet
+    // 🚨 FIX: 10 frames in the sprite sheet
+    tex.repeat.set(1/10, 1); 
     tex.magFilter = THREE.NearestFilter;
     tex.needsUpdate = true;
     return tex;
@@ -197,16 +199,17 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
   useFrame((state, delta) => {
     if (!projObj.active || !groupRef.current) return;
 
-    // Calculate current distance from the firing point
     const currentDist = groupRef.current.position.distanceTo(startPos);
 
-    // 🚨 FIX: Map the distance traveled directly to the 9 frames of the sprite sheet
     if (projTex) {
-      const maxDist = 20; // The distance at which the orb is destroyed
-      let frameIndex = Math.floor((currentDist / maxDist) * 9);
-      if (frameIndex > 8) frameIndex = 8; // Clamp to the final spark frame
+      const maxDist = 20; 
+      // 🚨 FIX: Multiply by 10 frames
+      let frameIndex = Math.floor((currentDist / maxDist) * 10);
+      // 🚨 FIX: Clamp to the final frame (index 9)
+      if (frameIndex > 9) frameIndex = 9; 
       
-      projTex.offset.x = frameIndex * (1/9);
+      // 🚨 FIX: Offset by 1/10th
+      projTex.offset.x = frameIndex * (1/10);
     }
 
     groupRef.current.position.add(dir.clone().multiplyScalar(15 * delta));
@@ -221,7 +224,6 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
     const ceilY = floorY + FLOOR_HT;
     const hitVertical = curY <= floorY + 0.1 || curY >= ceilY - 0.1;
 
-    // Destroy if it hits a wall, floor, ceiling, or reaches the max distance
     if (isSolid || hitVertical || currentDist > 20) {
       projObj.active = false;
       groupRef.current.visible = false;
@@ -230,7 +232,6 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
 
   return (
     <group ref={groupRef}>
-      {/* 🚨 Removed the manual scaling so it completely relies on the PNG sizes */}
       <sprite scale={[1.0, 1.0, 1]}>
         <spriteMaterial map={projTex || undefined} color="#ffffff" transparent={true} />
       </sprite>
@@ -907,7 +908,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     }
     // 🚨 Configure the player projectile sprite framing
     if (tPlayerProj) {
-      tPlayerProj.repeat.set(1/9, 1);
+      tPlayerProj.repeat.set(1/10, 1);
     }
   }, [woodTexList, stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj]);
 
