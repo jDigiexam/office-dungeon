@@ -629,9 +629,9 @@ export default function EscapeRoomPage() {
   let loopAudio = false;
 
   if (!systemBooted) {
-    activeAudioSrc = ""; 
+    activeAudioSrc = "/In the House, In a Heartbeat.mp3"; 
   } else if (gameWon) {
-    activeAudioSrc = "/14 Our Resurrected Teleport.mp3"; 
+    activeAudioSrc = "/In the House, In a Heartbeat.mp3"; 
     loopAudio = true;
   } else if (!gameStarted) {
     activeAudioSrc = "/In the House, In a Heartbeat.mp3";
