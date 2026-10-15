@@ -303,23 +303,29 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
 
   const checkLoS = (startX, startZ, endX, endZ) => {
     if (!grid || isNaN(startX) || isNaN(startZ) || isNaN(endX) || isNaN(endZ)) return false;
-    let x0 = Math.floor(startX);
-    let z0 = Math.floor(startZ);
-    const x1 = Math.floor(endX);
-    const z1 = Math.floor(endZ);
-    const dx = Math.abs(x1 - x0);
-    const dz = -Math.abs(z1 - z0);
-    let sx = x0 < x1 ? 1 : -1;
-    let sz = z0 < z1 ? 1 : -1;
-    let err = dx + dz;
+    
+    const dx = endX - startX;
+    const dz = endZ - startZ;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    
+    // Step forward in tiny 0.2-unit increments to prevent slipping through corners
+    const steps = Math.ceil(dist * 5); 
+    const stepX = dx / steps;
+    const stepZ = dz / steps;
 
-    let loopLimit = 30; 
-    while (loopLimit-- > 0) {
-      if ([1, 2, 12, 22, 7, 3, 4, 32].includes(grid[z0]?.[x0])) return false;
-      if (x0 === x1 && z0 === z1) break;
-      const e2 = 2 * err;
-      if (e2 >= dz) { err += dz; x0 += sx; }
-      if (e2 <= dx) { err += dx; z0 += sz; }
+    let curX = startX;
+    let curZ = startZ;
+
+    for (let i = 0; i <= steps; i++) {
+      const gridX = Math.floor(curX);
+      const gridZ = Math.floor(curZ);
+      
+      // If the ray hits any wall or door, vision is blocked
+      if ([1, 2, 12, 22, 7, 3, 4, 32].includes(grid[gridZ]?.[gridX])) {
+        return false;
+      }
+      curX += stepX;
+      curZ += stepZ;
     }
     return true;
   };
@@ -457,23 +463,29 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
 
   const checkLoS = (startX, startZ, endX, endZ) => {
     if (!grid || isNaN(startX) || isNaN(startZ) || isNaN(endX) || isNaN(endZ)) return false;
-    let x0 = Math.floor(startX);
-    let z0 = Math.floor(startZ);
-    const x1 = Math.floor(endX);
-    const z1 = Math.floor(endZ);
-    const dx = Math.abs(x1 - x0);
-    const dz = -Math.abs(z1 - z0);
-    let sx = x0 < x1 ? 1 : -1;
-    let sz = z0 < z1 ? 1 : -1;
-    let err = dx + dz;
+    
+    const dx = endX - startX;
+    const dz = endZ - startZ;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    
+    // Step forward in tiny 0.2-unit increments to prevent slipping through corners
+    const steps = Math.ceil(dist * 5); 
+    const stepX = dx / steps;
+    const stepZ = dz / steps;
 
-    let loopLimit = 30; 
-    while (loopLimit-- > 0) {
-      if ([1, 2, 12, 22, 7, 3, 4, 32].includes(grid[z0]?.[x0])) return false;
-      if (x0 === x1 && z0 === z1) break;
-      const e2 = 2 * err;
-      if (e2 >= dz) { err += dz; x0 += sx; }
-      if (e2 <= dx) { err += dx; z0 += sz; }
+    let curX = startX;
+    let curZ = startZ;
+
+    for (let i = 0; i <= steps; i++) {
+      const gridX = Math.floor(curX);
+      const gridZ = Math.floor(curZ);
+      
+      // If the ray hits any wall or door, vision is blocked
+      if ([1, 2, 12, 22, 7, 3, 4, 32].includes(grid[gridZ]?.[gridX])) {
+        return false;
+      }
+      curX += stepX;
+      curZ += stepZ;
     }
     return true;
   };
