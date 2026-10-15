@@ -558,8 +558,8 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
 
   return (
     <group ref={groupRef} position={initialPos}>
-      {/* 🚨 Adjusted Y position and scale so the Imp sits correctly on the floor */}
-      <sprite position={[0, 0.4, 0]} scale={[1.8, 1.8, 1]}>
+      {/* 🚨 Adjusted Y position and scale to unsquash the sprite */}
+      <sprite position={[0, 0.85, 0]} scale={[1.6, 2.2, 1]}>
         <spriteMaterial ref={spriteMaterialRef} map={impTex || undefined} color="#ffffff" transparent={true} />
       </sprite>
     </group>
