@@ -175,7 +175,6 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTexture, 
 // ----------------------------------------------------
 // COMBAT & HORROR SYSTEM
 // ----------------------------------------------------
-// 🚨 UPDATED: Player Projectile Component (Single Static Image)
 function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
   const groupRef = useRef();
   const spriteRef = useRef();
@@ -191,12 +190,10 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
 
     const currentDist = groupRef.current.position.distanceTo(startPos);
     
-    // Rapidly spin the 2D material
     if (materialRef.current) {
       materialRef.current.rotation += delta * 15; 
     }
 
-    // Shrink over distance + pulse scale
     if (spriteRef.current) {
       const distanceScale = Math.max(0.3, 1.0 - (currentDist / 20) * 0.7);
       const pulse = Math.sin(state.clock.elapsedTime * 40) * 0.08;
@@ -217,7 +214,6 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
     const ceilY = floorY + FLOOR_HT;
     const hitVertical = curY <= floorY + 0.1 || curY >= ceilY - 0.1;
 
-    // Instantly destroy on impact
     if (isSolid || hitVertical || currentDist > 20) {
       projObj.active = false;
       groupRef.current.visible = false;
@@ -234,7 +230,6 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
   );
 }
 
-// 🚨 UPDATED: Enemy Projectile Component (Single Static Image)
 function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
   const groupRef = useRef();
   const spriteRef = useRef(); 
@@ -250,7 +245,6 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
     if (!isActive.current || !groupRef.current) return;
 
     if (spriteRef.current && materialRef.current) {
-      // Rapidly spin and pulse the static image
       const pulse = Math.sin(state.clock.elapsedTime * 40) * 0.1;
       const baseScale = 1.5;
       spriteRef.current.scale.set(baseScale + pulse, baseScale + pulse, 1);
@@ -357,7 +351,6 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
     if (dist < 15 && hasLoS) {
       groupRef.current.lookAt(playerCamera.position.x, groupRef.current.position.y, playerCamera.position.z);
       
-      // 🚨 FIX: Greatly increased boss fire rate (every 1.2s instead of 2.5s)
       if (timeSinceShot > 1.2) {
         lastShot.current = state.clock.elapsedTime;
         const dir = new THREE.Vector3().subVectors(playerCamera.position, groupRef.current.position).normalize();
@@ -442,11 +435,12 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
   
   const hp = useRef(2); 
 
+  // Safely clone the pre-loaded Imp texture
   const impTex = useMemo(() => {
     if (!texture) return null;
     const tex = texture.clone();
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(1/7, 1); // 🚨 7 frames horizontally
+    tex.repeat.set(1/7, 1); 
     tex.magFilter = THREE.NearestFilter;
     tex.needsUpdate = true;
     return tex;
@@ -518,7 +512,7 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
           groupRef.current.position.z = nextZ;
         }
 
-        // 🚨 Walk Animation (Cycle through first 4 frames)
+        // Loop through the first 4 frames for the walking animation
         if (impTex) {
           const walkFrame = Math.floor(state.clock.elapsedTime * 6) % 4;
           impTex.offset.x = walkFrame * (1/7);
@@ -530,7 +524,7 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
         onPlayerHit();
       }
     } else {
-       // Idle state locks to frame 0
+       // Lock to the idle frame when not chasing
        if (impTex) {
          impTex.offset.x = 0;
        }
@@ -544,7 +538,7 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
           
           hp.current -= 1; 
 
-          // Flash Red when hit
+          // Flash red when hit
           if (spriteMaterialRef.current) {
             spriteMaterialRef.current.color.setHex(0xff0000);
             setTimeout(() => { 
@@ -564,15 +558,17 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
 
   return (
     <group ref={groupRef} position={initialPos}>
-      {/* Set Y to 0.4 so the imp's feet rest on the floor */}
-      <sprite position={[0, 0.4, 0]} scale={[1.4, 1.4, 1]}>
+      {/* 🚨 Adjusted Y position and scale so the Imp sits correctly on the floor */}
+      <sprite position={[0, 0.4, 0]} scale={[1.8, 1.8, 1]}>
         <spriteMaterial ref={spriteMaterialRef} map={impTex || undefined} color="#ffffff" transparent={true} />
       </sprite>
     </group>
   );
 }
 
-function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTexture, orbTexture, playerProjTexture, impTexture }) {  const { camera } = useThree();
+// 🚨 UPDATED: Added impTexture to props
+function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTexture, orbTexture, playerProjTexture, impTexture }) {
+  const { camera } = useThree();
   const projectilesRef = useRef([]);
   const [projectiles, setProjectiles] = useState([]);
   const [enemyProjectiles, setEnemyProjectiles] = useState([]);
@@ -614,7 +610,7 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTextu
           dir={p.dir} 
           projectilesRef={projectilesRef} 
           grid={grids?.[currentFIdx]} 
-          texture={playerProjTexture} // 🚨 Pass the texture here
+          texture={playerProjTexture} 
         />
       ))}
       {enemyProjectiles.map(ep => (
@@ -653,7 +649,7 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTextu
             onEradicate={() => onEradicate(false)} 
             onPlayerHit={onPlayerHit}
             grid={grids?.[e.fIdx]} 
-            texture={impTexture} // 🚨 Pass the texture here
+            texture={impTexture} // 🚨 Pass the Imp texture here
           />
         );
       })}
@@ -844,8 +840,8 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     '/wall_stone_depth.png', '/wall_stone.png'
   ]);
 
-  // 🚨 Add tPlayerProj to the end of the destructuring and useTexture array
-  const [tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj] = useTexture([
+  // 🚨 Add tImp to the end of the destructuring array and texture paths
+  const [tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp] = useTexture([
     '/floor_stone_pattern.png', '/floor_tiles_tan_large.png', '/door_wood.png', '/door_metal_gate.png',
     '/door_metal_frame.png', '/window_round_pane_lit.png', '/hand.png',
     '/red_keycard.png', '/blue_keycard.png', '/yellow_keycard.png', '/right_handed_crt.png',
