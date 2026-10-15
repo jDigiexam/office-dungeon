@@ -175,22 +175,40 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTexture, 
 // ----------------------------------------------------
 // COMBAT & HORROR SYSTEM
 // ----------------------------------------------------
-function LightOrb({ projObj, startPos, dir, projectilesRef, grid }) {
-  const meshRef = useRef();
+// 🚨 UPDATED: Player Projectile Component (Sprite-based)
+function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
+  const groupRef = useRef();
+
+  const projTex = useMemo(() => {
+    if (!texture) return null;
+    const tex = texture.clone();
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(1/9, 1); // 9 frames in the sprite sheet
+    tex.magFilter = THREE.NearestFilter;
+    tex.needsUpdate = true;
+    return tex;
+  }, [texture]);
   
   useEffect(() => { 
-    projObj.mesh = meshRef; 
-    if (meshRef.current) meshRef.current.position.copy(startPos);
+    projObj.mesh = groupRef; 
+    if (groupRef.current) groupRef.current.position.copy(startPos);
   }, [projObj, startPos]);
 
   useFrame((state, delta) => {
-    if (!projObj.active || !meshRef.current) return;
+    if (!projObj.active || !groupRef.current) return;
+
+    // Loop through the first 4 large energy frames
+    if (projTex) {
+      const currentFrame = Math.floor(state.clock.elapsedTime * 15) % 4;
+      projTex.offset.x = currentFrame * (1/9);
+    }
     
-    meshRef.current.position.add(dir.clone().multiplyScalar(12 * delta));
+    // Matched projectile speed to the enemy (15)
+    groupRef.current.position.add(dir.clone().multiplyScalar(15 * delta));
     
-    const curX = meshRef.current.position.x;
-    const curY = meshRef.current.position.y;
-    const curZ = meshRef.current.position.z;
+    const curX = groupRef.current.position.x;
+    const curY = groupRef.current.position.y;
+    const curZ = groupRef.current.position.z;
     
     const isSolid = grid && [1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(curZ)]?.[Math.floor(curX)]);
 
@@ -198,18 +216,19 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid }) {
     const ceilY = floorY + FLOOR_HT;
     const hitVertical = curY <= floorY + 0.1 || curY >= ceilY - 0.1;
 
-    if (isSolid || hitVertical || meshRef.current.position.distanceTo(startPos) > 20) {
+    if (isSolid || hitVertical || groupRef.current.position.distanceTo(startPos) > 20) {
       projObj.active = false;
-      meshRef.current.visible = false;
+      groupRef.current.visible = false;
     }
   });
 
   return (
-    <mesh ref={meshRef}>
-      <sphereGeometry args={[0.08]} />
-      <meshBasicMaterial color="#fef08a" />
-      <pointLight color="#fef08a" intensity={2.0} distance={4} decay={2} />
-    </mesh>
+    <group ref={groupRef}>
+      <sprite scale={[1.0, 1.0, 1]}>
+        <spriteMaterial map={projTex || undefined} color="#ffffff" transparent={true} />
+      </sprite>
+      <pointLight color="#a3e635" intensity={2.0} distance={5} decay={2} />
+    </group>
   );
 }
 
@@ -589,7 +608,7 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
   );
 }
 
-function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTexture, orbTexture }) {
+function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTexture, orbTexture, playerProjTexture }) {
   const { camera } = useThree();
   const projectilesRef = useRef([]);
   const [projectiles, setProjectiles] = useState([]);
@@ -632,6 +651,7 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTextu
           dir={p.dir} 
           projectilesRef={projectilesRef} 
           grid={grids?.[currentFIdx]} 
+          texture={playerProjTexture} // 🚨 Pass the texture here
         />
       ))}
       {enemyProjectiles.map(ep => (
@@ -860,26 +880,29 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     '/wall_stone_depth.png', '/wall_stone.png'
   ]);
 
-  const [tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj] = useTexture([
+  // 🚨 Add tPlayerProj to the end of the destructuring and useTexture array
+  const [tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj] = useTexture([
     '/floor_stone_pattern.png', '/floor_tiles_tan_large.png', '/door_wood.png', '/door_metal_gate.png',
     '/door_metal_frame.png', '/window_round_pane_lit.png', '/hand.png',
     '/red_keycard.png', '/blue_keycard.png', '/yellow_keycard.png', '/right_handed_crt.png',
-    '/Hell Knight.png', '/green projectile.png' 
+    '/Hell Knight.png', '/green projectile_2.png', '/hand_projectile.png'
   ]);
 
   useEffect(() => {
-    [...woodTexList, ...stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj].forEach(t => {
+    [...woodTexList, ...stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj].forEach(t => {
       if(t) { t.magFilter = t.minFilter = THREE.NearestFilter; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.needsUpdate = true; }
     });
     woodTexList.forEach(t => t.repeat.set(1, 3.2));
     stoneTexList.forEach(t => t.repeat.set(1, 3.2));
     
     if (tEnemyProj) {
-      // 🚨 FIX: Changed vertical repeat to 1
       tEnemyProj.repeat.set(1/11, 1); 
     }
-
-  }, [woodTexList, stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj]);
+    // 🚨 Configure the player projectile sprite framing
+    if (tPlayerProj) {
+      tPlayerProj.repeat.set(1/9, 1);
+    }
+  }, [woodTexList, stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj]);
 
   const parsedData = useMemo(() => {
     const dummy = new THREE.Object3D();
@@ -1045,7 +1068,8 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         return null;
       })}
       
-      <CombatManager enemiesData={enemiesData} grids={grids} onEradicate={onEradicate} onPlayerHit={onPlayerHit} bossTexture={tBoss} orbTexture={tEnemyProj} />
+      {/* 🚨 Pass the new tPlayerProj texture into playerProjTexture */}
+      <CombatManager enemiesData={enemiesData} grids={grids} onEradicate={onEradicate} onPlayerHit={onPlayerHit} bossTexture={tBoss} orbTexture={tEnemyProj} playerProjTexture={tPlayerProj} />
       <PlayerControls grids={grids} handTexture={tHand} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} onPlayerMove={onPlayerMove} isPuzzleActive={isPuzzleActive} />
     </>
   );

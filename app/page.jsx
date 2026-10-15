@@ -564,10 +564,10 @@ export default function EscapeRoomPage() {
   let loopAudio = false;
 
   if (!systemBooted) {
-    activeAudioSrc = "/In the House, In a Heartbeat.mp3";
-    loopAudio = true;
+    // 🚨 FIX: Must be empty. Browsers will block audio if it tries to play before a user clicks.
+    activeAudioSrc = ""; 
   } else if (gameWon) {
-    activeAudioSrc = "/In the House, In a Heartbeat.mp3";
+    activeAudioSrc = "/In the House, In a Heartbeat.mp3"; 
     loopAudio = true;
   } else if (!gameStarted) {
     activeAudioSrc = "/In the House, In a Heartbeat.mp3";
