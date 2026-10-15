@@ -570,6 +570,10 @@ export default function EscapeRoomPage() {
 
       setTeleportCoords(safeTransit);
       setCurrentFloor(targetFloor); 
+      
+      // 🚨 FIX: Update the base spawn coordinates so the engine knows where to mount
+      setSpawnCoords([safeTransit.x, safeTransit.y, safeTransit.z]); 
+      
       triggerMessage(`ELEVATOR TRANSIT: FLOOR E1M${targetFloor + 1}`);
       
       const newGrids = [...grids];
@@ -604,6 +608,9 @@ export default function EscapeRoomPage() {
       }
       safeTransit = { x: foundX, y: currentFloor * 3.2 + 0.8, z: foundZ };
     }
+
+    // 🚨 FIX: Update the base spawn coordinates before remounting the 3D engine
+    setSpawnCoords([safeTransit.x, safeTransit.y, safeTransit.z]);
 
     setTeleportCoords(safeTransit);
     setHp(100);
