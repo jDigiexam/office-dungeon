@@ -433,17 +433,24 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
   );
 }
 
-function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlayerHit, grid }) {
+// 🚨 UPDATED: Imp Sprite Entity (Replaces the 3D Shadow NPC)
+function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlayerHit, grid, texture }) {
   const groupRef = useRef();
-  const ghostBody = useRef();
-  const leftArm = useRef();
-  const rightArm = useRef();
-  const leftLeg = useRef();
-  const rightLeg = useRef();
+  const spriteMaterialRef = useRef();
   const isDead = useRef(false);
   const isChasing = useRef(false);
   
   const hp = useRef(2); 
+
+  const impTex = useMemo(() => {
+    if (!texture) return null;
+    const tex = texture.clone();
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(1/7, 1); // 🚨 7 frames horizontally
+    tex.magFilter = THREE.NearestFilter;
+    tex.needsUpdate = true;
+    return tex;
+  }, [texture]);
 
   const checkLoS = (startX, startZ, endX, endZ) => {
     if (!grid || isNaN(startX) || isNaN(startZ) || isNaN(endX) || isNaN(endZ)) return false;
@@ -511,15 +518,11 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
           groupRef.current.position.z = nextZ;
         }
 
-        if (ghostBody.current) {
-          ghostBody.current.position.y = Math.sin(state.clock.elapsedTime * 3) * 0.08;
+        // 🚨 Walk Animation (Cycle through first 4 frames)
+        if (impTex) {
+          const walkFrame = Math.floor(state.clock.elapsedTime * 6) % 4;
+          impTex.offset.x = walkFrame * (1/7);
         }
-
-        const t = state.clock.elapsedTime * 8;
-        if (leftArm.current) leftArm.current.rotation.x = Math.sin(t) * 0.7;
-        if (rightArm.current) rightArm.current.rotation.x = -Math.sin(t) * 0.7;
-        if (leftLeg.current) leftLeg.current.rotation.x = -Math.sin(t) * 0.7;
-        if (rightLeg.current) rightLeg.current.rotation.x = Math.sin(t) * 0.7;
 
       } else if (dist <= 0.6) {
         isDead.current = true;
@@ -527,10 +530,10 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
         onPlayerHit();
       }
     } else {
-       if (leftArm.current) leftArm.current.rotation.x = 0;
-       if (rightArm.current) rightArm.current.rotation.x = 0;
-       if (leftLeg.current) leftLeg.current.rotation.x = 0;
-       if (rightLeg.current) rightLeg.current.rotation.x = 0;
+       // Idle state locks to frame 0
+       if (impTex) {
+         impTex.offset.x = 0;
+       }
     }
     
     projectilesRef.current.forEach(proj => {
@@ -540,6 +543,15 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
           proj.mesh.current.visible = false;
           
           hp.current -= 1; 
+
+          // Flash Red when hit
+          if (spriteMaterialRef.current) {
+            spriteMaterialRef.current.color.setHex(0xff0000);
+            setTimeout(() => { 
+              if (spriteMaterialRef.current) spriteMaterialRef.current.color.setHex(0xffffff); 
+            }, 100);
+          }
+
           if (hp.current <= 0) {
             isDead.current = true;          
             groupRef.current.visible = false;
@@ -552,60 +564,15 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
 
   return (
     <group ref={groupRef} position={initialPos}>
-      <group ref={ghostBody}>
-        <mesh position={[0, 1.6, 0]}>
-          <boxGeometry args={[0.4, 0.4, 0.4]} />
-          <meshBasicMaterial color="#000000" transparent opacity={0.9} />
-        </mesh>
-        
-        <mesh position={[0.1, 1.65, 0.21]}>
-          <sphereGeometry args={[0.035]} />
-          <meshStandardMaterial color="#eb1414" emissive="#eb1414" emissiveIntensity={5} />
-        </mesh>
-        <mesh position={[-0.1, 1.65, 0.21]}>
-          <sphereGeometry args={[0.035]} />
-          <meshStandardMaterial color="#eb1414" emissive="#eb1414" emissiveIntensity={5} />
-        </mesh>
-
-        <mesh position={[0, 1.0, 0]}>
-          <boxGeometry args={[0.2, 0.8, 0.15]} />
-          <meshBasicMaterial color="#000000" transparent opacity={0.9} />
-        </mesh>
-
-        <group ref={leftArm} position={[-0.18, 1.35, 0]}>
-          <mesh position={[0, -0.6, 0]}>
-            <boxGeometry args={[0.08, 1.2, 0.08]} />
-            <meshBasicMaterial color="#000000" transparent opacity={0.9} />
-          </mesh>
-        </group>
-
-        <group ref={rightArm} position={[0.18, 1.35, 0]}>
-          <mesh position={[0, -0.6, 0]}>
-            <boxGeometry args={[0.08, 1.2, 0.08]} />
-            <meshBasicMaterial color="#000000" transparent opacity={0.9} />
-          </mesh>
-        </group>
-
-        <group ref={leftLeg} position={[-0.07, 0.6, 0]}>
-          <mesh position={[0, -0.5, 0]}>
-            <boxGeometry args={[0.08, 1.0, 0.08]} />
-            <meshBasicMaterial color="#000000" transparent opacity={0.9} />
-          </mesh>
-        </group>
-
-        <group ref={rightLeg} position={[0.07, 0.6, 0]}>
-          <mesh position={[0, -0.5, 0]}>
-            <boxGeometry args={[0.08, 1.0, 0.08]} />
-            <meshBasicMaterial color="#000000" transparent opacity={0.9} />
-          </mesh>
-        </group>
-      </group>
+      {/* Set Y to 0.4 so the imp's feet rest on the floor */}
+      <sprite position={[0, 0.4, 0]} scale={[1.4, 1.4, 1]}>
+        <spriteMaterial ref={spriteMaterialRef} map={impTex || undefined} color="#ffffff" transparent={true} />
+      </sprite>
     </group>
   );
 }
 
-function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTexture, orbTexture, playerProjTexture }) {
-  const { camera } = useThree();
+function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTexture, orbTexture, playerProjTexture, impTexture }) {  const { camera } = useThree();
   const projectilesRef = useRef([]);
   const [projectiles, setProjectiles] = useState([]);
   const [enemyProjectiles, setEnemyProjectiles] = useState([]);
@@ -686,6 +653,7 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTextu
             onEradicate={() => onEradicate(false)} 
             onPlayerHit={onPlayerHit}
             grid={grids?.[e.fIdx]} 
+            texture={impTexture} // 🚨 Pass the texture here
           />
         );
       })}
@@ -881,18 +849,16 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     '/floor_stone_pattern.png', '/floor_tiles_tan_large.png', '/door_wood.png', '/door_metal_gate.png',
     '/door_metal_frame.png', '/window_round_pane_lit.png', '/hand.png',
     '/red_keycard.png', '/blue_keycard.png', '/yellow_keycard.png', '/right_handed_crt.png',
-    '/Hell Knight.png', '/green projectile 2.png', '/hand_projectile 2.png'
+    '/Hell Knight.png', '/green projectile 2.png', '/hand_projectile 2.png', '/imp.png'
   ]);
 
   useEffect(() => {
-    [...woodTexList, ...stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj].forEach(t => {
+    [...woodTexList, ...stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp].forEach(t => {
       if(t) { t.magFilter = t.minFilter = THREE.NearestFilter; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.needsUpdate = true; }
     });
     woodTexList.forEach(t => t.repeat.set(1, 3.2));
     stoneTexList.forEach(t => t.repeat.set(1, 3.2));
-    
-    // 🚨 ALL projectile repeat.set logic has been deleted here
-  }, [woodTexList, stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj]);
+  }, [woodTexList, stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp]);
 
   const parsedData = useMemo(() => {
     const dummy = new THREE.Object3D();
@@ -1058,8 +1024,17 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         return null;
       })}
       
-      {/* 🚨 Pass the new tPlayerProj texture into playerProjTexture */}
-      <CombatManager enemiesData={enemiesData} grids={grids} onEradicate={onEradicate} onPlayerHit={onPlayerHit} bossTexture={tBoss} orbTexture={tEnemyProj} playerProjTexture={tPlayerProj} />
+      {/* 🚨 Pass the impTexture into the CombatManager */}
+      <CombatManager 
+        enemiesData={enemiesData} 
+        grids={grids} 
+        onEradicate={onEradicate} 
+        onPlayerHit={onPlayerHit} 
+        bossTexture={tBoss} 
+        orbTexture={tEnemyProj} 
+        playerProjTexture={tPlayerProj} 
+        impTexture={tImp} 
+      />
       <PlayerControls grids={grids} handTexture={tHand} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} onPlayerMove={onPlayerMove} isPuzzleActive={isPuzzleActive} />
     </>
   );
