@@ -240,16 +240,18 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
   );
 }
 
+// 🚨 UPDATED: 2.5D Directional Enemy Projectile Component
 function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
   const groupRef = useRef();
   const { camera } = useThree();
   const isActive = useRef(true);
+  const impactTime = useRef(null); // Tracks when the projectile hits something
 
   const projTex = useMemo(() => {
     if (!texture) return null;
     const tex = texture.clone();
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    // 🚨 FIX: Changed vertical repeat to 1 since the image is now tightly cropped
+    // 11 total frames in the sprite sheet
     tex.repeat.set(1/11, 1); 
     tex.magFilter = THREE.NearestFilter;
     tex.needsUpdate = true;
@@ -263,12 +265,43 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
   useFrame((state, delta) => {
     if (!isActive.current || !groupRef.current) return;
     
-    if (projTex) {
-      const currentFrame = Math.floor(state.clock.elapsedTime * 12) % 8;
-      projTex.offset.x = currentFrame * (1/11);
-      projTex.offset.y = 0; 
+    // 🚨 IMPACT ANIMATION LOGIC
+    if (impactTime.current !== null) {
+      const timeSinceImpact = state.clock.elapsedTime - impactTime.current;
+      // Cycle through the final 3 frames (indices 8, 9, 10) very quickly
+      const impactFrameIndex = 8 + Math.floor(timeSinceImpact * 15);
+      
+      if (impactFrameIndex > 10) {
+        isActive.current = false;
+        groupRef.current.visible = false;
+        return;
+      }
+      
+      if (projTex) projTex.offset.x = impactFrameIndex * (1/11);
+      return; // Halt movement while exploding
     }
 
+    // 🚨 2.5D DIRECTIONAL LOGIC
+    if (projTex) {
+      // Calculate the vector pointing from the orb to the camera
+      const camDir = new THREE.Vector3().subVectors(camera.position, groupRef.current.position).normalize();
+      
+      // The dot product compares the orb's flight direction to the camera direction
+      // A value near 1 means it's flying directly at us
+      const dot = dir.dot(camDir);
+
+      if (dot > 0.8) {
+        // Straight-on shot: loop indices 0 and 1
+        const currentFrame = Math.floor(state.clock.elapsedTime * 8) % 2;
+        projTex.offset.x = currentFrame * (1/11);
+      } else {
+        // Side shot: loop indices 2 through 7 (6 frames total)
+        const currentFrame = 2 + (Math.floor(state.clock.elapsedTime * 12) % 6);
+        projTex.offset.x = currentFrame * (1/11);
+      }
+    }
+
+    // Movement
     groupRef.current.position.add(dir.clone().multiplyScalar(15 * delta));
     
     const curX = groupRef.current.position.x;
@@ -276,16 +309,16 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
     
     const isSolid = grid && [1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(curZ)]?.[Math.floor(curX)]);
     
+    // Player Hit
     if (groupRef.current.position.distanceTo(camera.position) < 0.8) {
-      isActive.current = false;
-      groupRef.current.visible = false;
       onPlayerHit();
+      impactTime.current = state.clock.elapsedTime; // Trigger impact explosion
       return;
     }
 
+    // Wall Hit or Range Limit
     if (isSolid || groupRef.current.position.distanceTo(startPos) > 20) {
-      isActive.current = false;
-      groupRef.current.visible = false;
+      impactTime.current = state.clock.elapsedTime; // Trigger impact explosion
     }
   });
 
