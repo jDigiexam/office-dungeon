@@ -175,16 +175,16 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTexture, 
 // ----------------------------------------------------
 // COMBAT & HORROR SYSTEM
 // ----------------------------------------------------
-// 🚨 UPDATED: Player Projectile Component (Distance-Based Dissipation)
-// 🚨 UPDATED: Player Projectile Component (10 Frames)
+// 🚨 UPDATED: Player Projectile Component (Animated Flight + Distance Scaling + Impact)
 function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
   const groupRef = useRef();
+  const spriteRef = useRef();
+  const impactTime = useRef(null);
 
   const projTex = useMemo(() => {
     if (!texture) return null;
     const tex = texture.clone();
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    // 🚨 FIX: 10 frames in the sprite sheet
     tex.repeat.set(1/10, 1); 
     tex.magFilter = THREE.NearestFilter;
     tex.needsUpdate = true;
@@ -199,17 +199,35 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
   useFrame((state, delta) => {
     if (!projObj.active || !groupRef.current) return;
 
+    // 🚨 IMPACT ANIMATION
+    if (impactTime.current !== null) {
+      const timeSinceImpact = state.clock.elapsedTime - impactTime.current;
+      // Rapidly play the tiny spark frames (indices 6 through 9)
+      const impactFrame = 6 + Math.floor(timeSinceImpact * 20);
+      
+      if (impactFrame > 9) {
+        projObj.active = false;
+        groupRef.current.visible = false;
+        return;
+      }
+      
+      if (projTex) projTex.offset.x = impactFrame * (1/10);
+      return; // Halt forward movement while sparking out
+    }
+
     const currentDist = groupRef.current.position.distanceTo(startPos);
 
+    // 🚨 FLIGHT ANIMATION: Rapidly cycle the first 4 core fireball frames for a crackling effect
     if (projTex) {
-      const maxDist = 20; 
-      // 🚨 FIX: Multiply by 10 frames
-      let frameIndex = Math.floor((currentDist / maxDist) * 10);
-      // 🚨 FIX: Clamp to the final frame (index 9)
-      if (frameIndex > 9) frameIndex = 9; 
-      
-      // 🚨 FIX: Offset by 1/10th
-      projTex.offset.x = frameIndex * (1/10);
+      const flightFrame = Math.floor(state.clock.elapsedTime * 15) % 4;
+      projTex.offset.x = flightFrame * (1/10);
+    }
+
+    // 🚨 DISTANCE SCALING: Smoothly shrink the physical sprite as it travels further away
+    if (spriteRef.current) {
+      // Scales down from 1.0 at the player's hand to 0.3 at max distance
+      const scale = Math.max(0.3, 1.0 - (currentDist / 20) * 0.7);
+      spriteRef.current.scale.set(scale, scale, 1);
     }
 
     groupRef.current.position.add(dir.clone().multiplyScalar(15 * delta));
@@ -224,15 +242,15 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
     const ceilY = floorY + FLOOR_HT;
     const hitVertical = curY <= floorY + 0.1 || curY >= ceilY - 0.1;
 
+    // 🚨 Trigger the impact sparks if it hits a wall, ceiling, floor, or max range
     if (isSolid || hitVertical || currentDist > 20) {
-      projObj.active = false;
-      groupRef.current.visible = false;
+      impactTime.current = state.clock.elapsedTime;
     }
   });
 
   return (
     <group ref={groupRef}>
-      <sprite scale={[1.0, 1.0, 1]}>
+      <sprite ref={spriteRef} position={[0, -0.1, 0]} scale={[1.0, 1.0, 1]}>
         <spriteMaterial map={projTex || undefined} color="#ffffff" transparent={true} />
       </sprite>
       <pointLight color="#a3e635" intensity={2.0} distance={5} decay={2} />
