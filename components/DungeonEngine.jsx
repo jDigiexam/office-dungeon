@@ -952,7 +952,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     '/floor_stone_pattern.png', '/floor_tiles_tan_large.png', '/door_wood.png', '/door_metal_gate.png',
     '/door_metal_frame.png', '/window_round_pane_lit.png', '/hand.png',
     '/red_keycard.png', '/blue_keycard.png', '/yellow_keycard.png', '/right_handed_crt.png',
-    '/Hell Knight.png', '/green projectile.png', '/hand_projectile.png'
+    '/Hell Knight.png', '/green projectile 2.png', '/hand_projectile 2.png'
   ]);
 
   useEffect(() => {
