@@ -175,10 +175,11 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTexture, 
 // ----------------------------------------------------
 // COMBAT & HORROR SYSTEM
 // ----------------------------------------------------
-// 🚨 UPDATED: Player Projectile Component (Animated Flight + Distance Scaling + Impact)
+// 🚨 UPDATED: Player Projectile Component (Spinning Orb Technique)
 function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
   const groupRef = useRef();
   const spriteRef = useRef();
+  const materialRef = useRef(); // 🚨 NEW: Reference to directly rotate the sprite material
   const impactTime = useRef(null);
 
   const projTex = useMemo(() => {
@@ -199,10 +200,9 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
   useFrame((state, delta) => {
     if (!projObj.active || !groupRef.current) return;
 
-    // 🚨 IMPACT ANIMATION
+    // IMPACT ANIMATION
     if (impactTime.current !== null) {
       const timeSinceImpact = state.clock.elapsedTime - impactTime.current;
-      // Rapidly play the tiny spark frames (indices 6 through 9)
       const impactFrame = 6 + Math.floor(timeSinceImpact * 20);
       
       if (impactFrame > 9) {
@@ -212,22 +212,30 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
       }
       
       if (projTex) projTex.offset.x = impactFrame * (1/10);
-      return; // Halt forward movement while sparking out
+      // Stop the spinning when it hits a wall
+      if (materialRef.current) materialRef.current.rotation = 0; 
+      return; 
     }
 
     const currentDist = groupRef.current.position.distanceTo(startPos);
 
-    // 🚨 FLIGHT ANIMATION: Rapidly cycle the first 4 core fireball frames for a crackling effect
+    // 🚨 FIX: Lock to Frame 0 (the perfect orb) 
     if (projTex) {
-      const flightFrame = Math.floor(state.clock.elapsedTime * 15) % 4;
-      projTex.offset.x = flightFrame * (1/10);
+      projTex.offset.x = 0; 
+    }
+    
+    // 🚨 FIX: Rapidly spin the 2D material on the Z-axis to simulate crackling energy
+    if (materialRef.current) {
+      materialRef.current.rotation += delta * 15; 
     }
 
-    // 🚨 DISTANCE SCALING: Smoothly shrink the physical sprite as it travels further away
     if (spriteRef.current) {
-      // Scales down from 1.0 at the player's hand to 0.3 at max distance
-      const scale = Math.max(0.3, 1.0 - (currentDist / 20) * 0.7);
-      spriteRef.current.scale.set(scale, scale, 1);
+      const distanceScale = Math.max(0.3, 1.0 - (currentDist / 20) * 0.7);
+      // 🚨 FIX: Add a rapid, tiny math-based pulse to make it feel unstable and alive
+      const pulse = Math.sin(state.clock.elapsedTime * 40) * 0.08;
+      const finalScale = distanceScale + pulse;
+      
+      spriteRef.current.scale.set(finalScale, finalScale, 1);
     }
 
     groupRef.current.position.add(dir.clone().multiplyScalar(15 * delta));
@@ -242,7 +250,6 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
     const ceilY = floorY + FLOOR_HT;
     const hitVertical = curY <= floorY + 0.1 || curY >= ceilY - 0.1;
 
-    // 🚨 Trigger the impact sparks if it hits a wall, ceiling, floor, or max range
     if (isSolid || hitVertical || currentDist > 20) {
       impactTime.current = state.clock.elapsedTime;
     }
@@ -251,19 +258,22 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
   return (
     <group ref={groupRef}>
       <sprite ref={spriteRef} position={[0, -0.1, 0]} scale={[1.0, 1.0, 1]}>
-        <spriteMaterial map={projTex || undefined} color="#ffffff" transparent={true} />
+        {/* 🚨 Attached the materialRef so we can spin it */}
+        <spriteMaterial ref={materialRef} map={projTex || undefined} color="#ffffff" transparent={true} />
       </sprite>
       <pointLight color="#a3e635" intensity={2.0} distance={5} decay={2} />
     </group>
   );
 }
 
-// 🚨 UPDATED: 2.5D Directional Enemy Projectile Component
+// 🚨 UPDATED: 2.5D Enemy Projectile Component (Spinning + Pulsating Fix)
 function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
   const groupRef = useRef();
+  const spriteRef = useRef(); // 🚨 NEW: For scale pulsing
+  const materialRef = useRef(); // 🚨 NEW: For rotation
   const { camera } = useThree();
   const isActive = useRef(true);
-  const impactTime = useRef(null); // Tracks when the projectile hits something
+  const impactTime = useRef(null);
 
   const projTex = useMemo(() => {
     if (!texture) return null;
@@ -283,10 +293,9 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
   useFrame((state, delta) => {
     if (!isActive.current || !groupRef.current) return;
     
-    // 🚨 IMPACT ANIMATION LOGIC
+    // IMPACT ANIMATION
     if (impactTime.current !== null) {
       const timeSinceImpact = state.clock.elapsedTime - impactTime.current;
-      // Cycle through the final 3 frames (indices 8, 9, 10) very quickly
       const impactFrameIndex = 8 + Math.floor(timeSinceImpact * 15);
       
       if (impactFrameIndex > 10) {
@@ -296,30 +305,31 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
       }
       
       if (projTex) projTex.offset.x = impactFrameIndex * (1/11);
-      return; // Halt movement while exploding
+      if (materialRef.current) materialRef.current.rotation = 0; 
+      return; 
     }
 
-    // 🚨 2.5D DIRECTIONAL LOGIC
-    if (projTex) {
-      // Calculate the vector pointing from the orb to the camera
+    // 2.5D FLIGHT LOGIC
+    if (projTex && spriteRef.current && materialRef.current) {
       const camDir = new THREE.Vector3().subVectors(camera.position, groupRef.current.position).normalize();
-      
-      // The dot product compares the orb's flight direction to the camera direction
-      // A value near 1 means it's flying directly at us
       const dot = dir.dot(camDir);
+      
+      // Add the rapid, tiny math-based pulse to make it feel unstable
+      const pulse = Math.sin(state.clock.elapsedTime * 40) * 0.1;
+      const baseScale = 1.5;
+      spriteRef.current.scale.set(baseScale + pulse, baseScale + pulse, 1);
 
-      if (dot > 0.8) {
-        // Straight-on shot: loop indices 0 and 1
-        const currentFrame = Math.floor(state.clock.elapsedTime * 8) % 2;
-        projTex.offset.x = currentFrame * (1/11);
+      if (dot > 0.7) {
+        // Straight-on: Lock to Frame 0 and spin
+        projTex.offset.x = 0;
+        materialRef.current.rotation += delta * 15;
       } else {
-        // Side shot: loop indices 2 through 7 (6 frames total)
-        const currentFrame = 2 + (Math.floor(state.clock.elapsedTime * 12) % 6);
-        projTex.offset.x = currentFrame * (1/11);
+        // Side shot: Lock to Frame 2 (clean side profile) and keep horizontal
+        projTex.offset.x = 2 * (1/11);
+        materialRef.current.rotation = 0; 
       }
     }
 
-    // Movement
     groupRef.current.position.add(dir.clone().multiplyScalar(15 * delta));
     
     const curX = groupRef.current.position.x;
@@ -327,23 +337,21 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
     
     const isSolid = grid && [1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(curZ)]?.[Math.floor(curX)]);
     
-    // Player Hit
     if (groupRef.current.position.distanceTo(camera.position) < 0.8) {
       onPlayerHit();
-      impactTime.current = state.clock.elapsedTime; // Trigger impact explosion
+      impactTime.current = state.clock.elapsedTime; 
       return;
     }
 
-    // Wall Hit or Range Limit
     if (isSolid || groupRef.current.position.distanceTo(startPos) > 20) {
-      impactTime.current = state.clock.elapsedTime; // Trigger impact explosion
+      impactTime.current = state.clock.elapsedTime; 
     }
   });
 
   return (
     <group ref={groupRef}>
-      <sprite position={[0, 0, 0]} scale={[1.5, 1.5, 1]}>
-        <spriteMaterial map={projTex || undefined} color="#ffffff" transparent={true} />
+      <sprite ref={spriteRef} position={[0, 0, 0]} scale={[1.5, 1.5, 1]}>
+        <spriteMaterial ref={materialRef} map={projTex || undefined} color="#ffffff" transparent={true} />
       </sprite>
       <pointLight color="#22c55e" intensity={2.0} distance={5} decay={2} />
     </group>
