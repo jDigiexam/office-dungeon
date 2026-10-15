@@ -11,21 +11,18 @@ const FALLBACK_GRID = Array(10).fill(Array(10).fill(0)).map((row, z) =>
   row.map((col, x) => (x === 0 || x === 9 || z === 0 || z === 9 ? 1 : 0))
 );
 
-// 🚨 NEW: Time Formatter Helper
 const formatTime = (totalSeconds) => {
   const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
   const s = (totalSeconds % 60).toString().padStart(2, '0');
   return `${m}:${s}`;
 };
 
-// 🚨 UPGRADED: Audio Crossfader Component
 function AudioCrossfader({ currentSrc, loopCurrent, onNextTrack }) {
   const audio1 = useRef(null);
   const audio2 = useRef(null);
   const activeIdx = useRef(0);
   const faderRef = useRef(null);
   
-  // Track the exact string request to avoid browser URI encoding (%20) mismatch bugs
   const playingSrc = useRef("");
 
   useEffect(() => {
@@ -35,7 +32,6 @@ function AudioCrossfader({ currentSrc, loopCurrent, onNextTrack }) {
 
     if (faderRef.current) clearInterval(faderRef.current);
 
-    // If no track is supposed to play, fade both to 0
     if (!currentSrc) {
       playingSrc.current = "";
       [a1, a2].forEach(a => {
@@ -50,14 +46,12 @@ function AudioCrossfader({ currentSrc, loopCurrent, onNextTrack }) {
       return;
     }
 
-    // If the requested track is already playing, just update its loop state and exit
     if (playingSrc.current === currentSrc) {
       const activeAudio = activeIdx.current === 0 ? a1 : a2;
       activeAudio.loop = loopCurrent;
       return;
     }
 
-    // A new track was requested, initiate crossfade
     playingSrc.current = currentSrc;
     
     const oldAudio = activeIdx.current === 0 ? a1 : a2;
@@ -68,14 +62,13 @@ function AudioCrossfader({ currentSrc, loopCurrent, onNextTrack }) {
     newAudio.loop = loopCurrent;
     newAudio.currentTime = 0;
     newAudio.volume = 0;
-    newAudio.dataset.fadingOut = "false"; // Reset the transition lock
+    newAudio.dataset.fadingOut = "false"; 
     
     const playPromise = newAudio.play();
     if (playPromise !== undefined) {
       playPromise.catch((err) => console.log('Autoplay prevented by browser', err));
     }
 
-    // Smoothly blend the volumes over 2 seconds
     let fadeVol = 0;
     faderRef.current = setInterval(() => {
       fadeVol += 0.05;
@@ -103,16 +96,14 @@ function AudioCrossfader({ currentSrc, loopCurrent, onNextTrack }) {
     if (loopCurrent) return;
     const audio = e.target;
     
-    // Trigger transition 2.5 seconds early so the 2-second crossfade fully completes before the file stops
     if (audio.duration && audio.currentTime > 5 && (audio.duration - audio.currentTime <= 2.5)) {
       if (audio.dataset.fadingOut !== "true") {
-        audio.dataset.fadingOut = "true"; // Lock the transition so it can't fire twice
+        audio.dataset.fadingOut = "true"; 
         if (onNextTrack) onNextTrack();
       }
     }
   };
 
-  // Fallback in case timeUpdate misses the window
   const handleEnded = (e) => {
     if (loopCurrent) return;
     const audio = e.target;
@@ -138,7 +129,6 @@ export default function EscapeRoomPage() {
   const [message, setMessage] = useState('');
   const [teleportCoords, setTeleportCoords] = useState(null);
   
-  // 🚨 NEW: Death and Time States
   const [deathCount, setDeathCount] = useState(0);
   const [playTime, setPlayTime] = useState(0);
 
@@ -179,7 +169,6 @@ export default function EscapeRoomPage() {
 
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   
-  // MP3 playlist for level 1
   const gameplayPlaylist = [
     '/17 Triage at Dawn.mp3', 
     '/05 Dark Energy.mp3',
@@ -190,7 +179,6 @@ export default function EscapeRoomPage() {
     '/14 Our Resurrected Teleport.mp3'
   ];
 
-  // 🚨 NEW: Load persistent stats on mount
   useEffect(() => {
     const storedDeaths = parseInt(sessionStorage.getItem('zeroDay_deaths') || '0', 10);
     const storedTime = parseInt(sessionStorage.getItem('zeroDay_time') || '0', 10);
@@ -198,7 +186,6 @@ export default function EscapeRoomPage() {
     setPlayTime(storedTime);
   }, []);
 
-  // 🚨 NEW: Game timer loop (Runs every second while alive and playing)
   useEffect(() => {
     let interval;
     if (gameStarted && !isDead && !gameWon) {
@@ -275,7 +262,6 @@ export default function EscapeRoomPage() {
         setScreenFlash('bg-red-900/90');
         setTimeout(() => {
           setIsDead(true);
-          // 🚨 NEW: Increment and save death count locally
           setDeathCount((prev) => {
             const newCount = prev + 1;
             sessionStorage.setItem('zeroDay_deaths', newCount.toString());
@@ -595,6 +581,36 @@ export default function EscapeRoomPage() {
     }, 2000);
   };
 
+  // 🚨 NEW: Floor Respawn Logic
+  const handleRespawn = () => {
+    let safeTransit;
+
+    if (floorSpawns[currentFloor]) {
+      safeTransit = {
+        x: floorSpawns[currentFloor][0],
+        y: currentFloor * 3.2 + 0.8,
+        z: floorSpawns[currentFloor][2]
+      };
+    } else {
+      let foundX = 5.5, foundZ = 5.5;
+      for (let z = 2; z < grids[currentFloor].length - 2; z++) {
+        for (let x = 2; x < grids[currentFloor][z].length - 2; x++) {
+          if (grids[currentFloor][z][x] === 0) {
+            foundX = x + 0.5;
+            foundZ = z + 0.5;
+            break;
+          }
+        }
+      }
+      safeTransit = { x: foundX, y: currentFloor * 3.2 + 0.8, z: foundZ };
+    }
+
+    setTeleportCoords(safeTransit);
+    setHp(100);
+    setIsDead(false);
+    setScreenFlash('');
+  };
+
   let activeAudioSrc = "";
   let loopAudio = false;
 
@@ -745,7 +761,6 @@ export default function EscapeRoomPage() {
                     MISSION ACCOMPLISHED.
                   </p>
 
-                  {/* 🚨 NEW: Display final run stats on the win screen */}
                   <p className="text-emerald-400 font-bold tracking-[0.2em] text-sm mt-2">
                     TOTAL TIME: {formatTime(playTime)} | SYSTEM REBOOTS: {deathCount}
                   </p>
@@ -771,16 +786,16 @@ export default function EscapeRoomPage() {
             </div>
           </div>
         ) : isDead ? (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-red-950 text-red-500">
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-red-950 text-red-500 pointer-events-auto">
           <div className="border-4 border-red-900 bg-black p-12 text-center max-w-lg shadow-[0_0_50px_rgba(153,27,27,0.5)]">
             <h1 className="text-6xl font-black mb-4 tracking-widest text-red-600">YOU DIED</h1>
             <p className="mb-2 text-red-400 text-sm tracking-widest">VITAL SIGNS LOST. ENTITY OVERRUN.</p>
             
-            {/* 🚨 NEW: Display current stats on the death screen */}
             <p className="mb-12 text-red-800 font-bold text-xs tracking-widest">TIME ACTIVE: {formatTime(playTime)} | TOTAL DEATHS: {deathCount}</p>
             
+            {/* 🚨 UPDATED: Now calls handleRespawn instead of a full reload */}
             <button 
-              onClick={() => window.location.reload()} 
+              onClick={handleRespawn} 
               className="w-full py-4 bg-red-800 hover:bg-red-600 text-black font-extrabold text-xl transition-colors uppercase tracking-widest"
             >
               REBOOT SYSTEM
@@ -806,10 +821,7 @@ export default function EscapeRoomPage() {
             />
           </div>
 
-        {/* Existing fast red flash for damage */}
         <div className={`absolute inset-0 z-40 pointer-events-none transition-colors duration-100 ${screenFlash}`} />
-
-        {/* Slow black fade for the elevator */}
         <div className={`absolute inset-0 z-40 pointer-events-none transition-opacity duration-[2000ms] bg-black ${isFading ? 'opacity-100' : 'opacity-0'}`} />
 
           <div className="absolute top-4 right-4 z-40 bg-stone-900/90 border-2 border-stone-600 p-2 pointer-events-none shadow-2xl backdrop-blur-sm">
@@ -1057,7 +1069,6 @@ export default function EscapeRoomPage() {
             </div>
           )}
 
-          {/* 🚨 UPDATED HUD with Time and Death Count */}
           <div className="absolute bottom-0 left-0 right-0 z-40 bg-stone-900 border-t-4 border-stone-600 p-2 flex items-center justify-between text-stone-200 h-20 pointer-events-none">
             
             <div className="bg-stone-950 border-2 border-stone-700 px-4 py-1 flex flex-col items-center justify-center min-w-[120px]">
