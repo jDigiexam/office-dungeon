@@ -705,7 +705,7 @@ export default function EscapeRoomPage() {
                     THE SKY IS BURNING. THE CITY IS IN RUINS.
                   </p>
                   <p className="text-stone-300 font-bold tracking-widest leading-loose">
-                    THE BIOENGINEERING COMPLEX WAS NOT JUST THE BEGINNING.
+                    THE BIOENGINEERING COMPLEX WAS JUST THE BEGINNING.
                   </p>
                   <p className="text-emerald-500 font-black tracking-[0.3em] text-2xl mt-12">
                     LIFE ON THE SURFACE CRAWLS WITH SHADES AND HELLISH FIGURES.

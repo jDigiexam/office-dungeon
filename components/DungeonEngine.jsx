@@ -218,6 +218,17 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
   const { camera } = useThree();
   const isActive = useRef(true);
 
+  const projTex = useMemo(() => {
+    if (!texture) return null;
+    const tex = texture.clone();
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    // 🚨 FIX: Changed vertical repeat to 1 since the image is now tightly cropped
+    tex.repeat.set(1/11, 1); 
+    tex.magFilter = THREE.NearestFilter;
+    tex.needsUpdate = true;
+    return tex;
+  }, [texture]);
+
   useEffect(() => {
     if (groupRef.current) groupRef.current.position.copy(startPos);
   }, [startPos]);
@@ -225,14 +236,12 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
   useFrame((state, delta) => {
     if (!isActive.current || !groupRef.current) return;
     
-    // 🚨 FIX: We map the texture globally to avoid clone wiping
-    if (texture) {
+    if (projTex) {
       const currentFrame = Math.floor(state.clock.elapsedTime * 12) % 8;
-      texture.offset.x = currentFrame * (1/11);
-      texture.offset.y = 0; 
+      projTex.offset.x = currentFrame * (1/11);
+      projTex.offset.y = 0; 
     }
 
-    // 🚨 Increased projectile speed from 8 to 15
     groupRef.current.position.add(dir.clone().multiplyScalar(15 * delta));
     
     const curX = groupRef.current.position.x;
@@ -255,9 +264,8 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
 
   return (
     <group ref={groupRef}>
-      {/* 🚨 Centered the sprite perfectly on the light source */}
       <sprite position={[0, 0, 0]} scale={[1.5, 1.5, 1]}>
-        <spriteMaterial map={texture || undefined} color="#ffffff" transparent={true} />
+        <spriteMaterial map={projTex || undefined} color="#ffffff" transparent={true} />
       </sprite>
       <pointLight color="#22c55e" intensity={2.0} distance={5} decay={2} />
     </group>
@@ -856,7 +864,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     '/floor_stone_pattern.png', '/floor_tiles_tan_large.png', '/door_wood.png', '/door_metal_gate.png',
     '/door_metal_frame.png', '/window_round_pane_lit.png', '/hand.png',
     '/red_keycard.png', '/blue_keycard.png', '/yellow_keycard.png', '/right_handed_crt.png',
-    '/Hell Knight.png', '/green projectile.png'
+    '/Hell Knight.png', '/green projectile.png' 
   ]);
 
   useEffect(() => {
@@ -866,10 +874,11 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     woodTexList.forEach(t => t.repeat.set(1, 3.2));
     stoneTexList.forEach(t => t.repeat.set(1, 3.2));
     
-    // 🚨 FIX: Configure the projectile texture grid format correctly
     if (tEnemyProj) {
-      tEnemyProj.repeat.set(1/11, 1/11); 
+      // 🚨 FIX: Changed vertical repeat to 1
+      tEnemyProj.repeat.set(1/11, 1); 
     }
+
   }, [woodTexList, stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj]);
 
   const parsedData = useMemo(() => {
