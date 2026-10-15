@@ -70,6 +70,8 @@ function AudioCrossfader({ currentSrc, loopCurrent, onNextTrack }) {
     }
 
     let fadeVol = 0;
+    const MAX_BGM_VOL = 0.4; // 🚨 Capped background music volume
+
     faderRef.current = setInterval(() => {
       fadeVol += 0.05;
       if (fadeVol >= 1) {
@@ -440,7 +442,7 @@ export default function EscapeRoomPage() {
     const openDoor = (targetType) => {
     // 🚨 NEW: Play the mechanical door sound
     const doorSfx = new Audio('/door.mp3');
-    doorSfx.volume = 0.6;
+    doorSfx.volume = 1.0;
     doorSfx.play().catch((e) => console.log('Audio blocked by browser', e));
 
     const newGrids = [...grids];

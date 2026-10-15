@@ -354,7 +354,7 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
       if (!hasAggroed.current) {
         hasAggroed.current = true;
         const bossSfx = new Audio('/boss_roar.mp3');
-        bossSfx.volume = 0.8;
+        bossSfx.volume = 1.0;
         bossSfx.play().catch(() => {});
       }
       groupRef.current.lookAt(playerCamera.position.x, groupRef.current.position.y, playerCamera.position.z);
@@ -498,7 +498,7 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
       if (!hasAggroed.current) {
         hasAggroed.current = true;
         const impSfx = new Audio('/imp_sight.mp3');
-        impSfx.volume = 0.5;
+        impSfx.volume = 1.0;
         impSfx.play().catch(() => {});
       }
     }
