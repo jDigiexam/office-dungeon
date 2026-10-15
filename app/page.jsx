@@ -11,6 +11,13 @@ const FALLBACK_GRID = Array(10).fill(Array(10).fill(0)).map((row, z) =>
   row.map((col, x) => (x === 0 || x === 9 || z === 0 || z === 9 ? 1 : 0))
 );
 
+// 🚨 NEW: Time Formatter Helper
+const formatTime = (totalSeconds) => {
+  const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+  const s = (totalSeconds % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+};
+
 // 🚨 UPGRADED: Audio Crossfader Component
 function AudioCrossfader({ currentSrc, loopCurrent, onNextTrack }) {
   const audio1 = useRef(null);
@@ -124,16 +131,20 @@ function AudioCrossfader({ currentSrc, loopCurrent, onNextTrack }) {
 }
 
 export default function EscapeRoomPage() {
-  const [gameWon, setGameWon] = useState(false); // 🚨 NEW
+  const [gameWon, setGameWon] = useState(false); 
   const [currentFloor, setCurrentFloor] = useState(0);
   const [inventory, setInventory] = useState([]);
   const [gameStarted, setGameStarted] = useState(false);
   const [message, setMessage] = useState('');
   const [teleportCoords, setTeleportCoords] = useState(null);
   
+  // 🚨 NEW: Death and Time States
+  const [deathCount, setDeathCount] = useState(0);
+  const [playTime, setPlayTime] = useState(0);
+
   const [grids, setGrids] = useState(null);
   const [spawnCoords, setSpawnCoords] = useState([5.5, 0.8, 5.5]);
-  const [floorSpawns, setFloorSpawns] = useState([]); // 🚨 NEW: Store spawn points for all floors
+  const [floorSpawns, setFloorSpawns] = useState([]); 
   const [mapsLoading, setMapsLoading] = useState(true);
 
   const [activePuzzle, setActivePuzzle] = useState(null);
@@ -160,7 +171,7 @@ export default function EscapeRoomPage() {
   const [hp, setHp] = useState(100);
   const [isDead, setIsDead] = useState(false);
   const [screenFlash, setScreenFlash] = useState('');
-  const [isFading, setIsFading] = useState(false); // 🚨 NEW: Elevator fade state
+  const [isFading, setIsFading] = useState(false); 
 
   const [signalValues, setSignalValues] = useState({ freq: 1, amp: 1, phase: 0 });
 
@@ -177,8 +188,30 @@ export default function EscapeRoomPage() {
     '/08 Ravenholm Reprise.mp3',
     '/12 Apprehension and Evasion.mp3',
     '/14 Our Resurrected Teleport.mp3'
-   
   ];
+
+  // 🚨 NEW: Load persistent stats on mount
+  useEffect(() => {
+    const storedDeaths = parseInt(sessionStorage.getItem('zeroDay_deaths') || '0', 10);
+    const storedTime = parseInt(sessionStorage.getItem('zeroDay_time') || '0', 10);
+    setDeathCount(storedDeaths);
+    setPlayTime(storedTime);
+  }, []);
+
+  // 🚨 NEW: Game timer loop (Runs every second while alive and playing)
+  useEffect(() => {
+    let interval;
+    if (gameStarted && !isDead && !gameWon) {
+      interval = setInterval(() => {
+        setPlayTime((prev) => {
+          const nextTime = prev + 1;
+          sessionStorage.setItem('zeroDay_time', nextTime.toString());
+          return nextTime;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [gameStarted, isDead, gameWon]);
 
   useEffect(() => {
     const fetchMaps = async () => {
@@ -189,7 +222,6 @@ export default function EscapeRoomPage() {
 
         setGrids([floor0.grid, floor1.grid, floor2.grid]);
         
-        // 🚨 NEW: Save all extracted spawn points
         setFloorSpawns([floor0.spawnPoint, floor1.spawnPoint, floor2.spawnPoint]);
         
         if (floor0.spawnPoint) setSpawnCoords(floor0.spawnPoint);
@@ -197,7 +229,7 @@ export default function EscapeRoomPage() {
       } catch (err) {
         console.error("Failed to load map images", err);
         setGrids([FALLBACK_GRID, FALLBACK_GRID, FALLBACK_GRID]);
-        setFloorSpawns([null, null, null]); // 🚨 NEW: Fallback
+        setFloorSpawns([null, null, null]); 
         setMapsLoading(false);
       }
     };
@@ -241,7 +273,15 @@ export default function EscapeRoomPage() {
       const newHp = Math.max(0, prevHp - 20); 
       if (newHp === 0) {
         setScreenFlash('bg-red-900/90');
-        setTimeout(() => setIsDead(true), 800);
+        setTimeout(() => {
+          setIsDead(true);
+          // 🚨 NEW: Increment and save death count locally
+          setDeathCount((prev) => {
+            const newCount = prev + 1;
+            sessionStorage.setItem('zeroDay_deaths', newCount.toString());
+            return newCount;
+          });
+        }, 800);
       } else {
         triggerMessage("CRITICAL WARNING: ENTITY CONTACT.");
         setScreenFlash('bg-red-600/60');
@@ -398,7 +438,7 @@ export default function EscapeRoomPage() {
 
     if (bulls === 4) {
       setTimeout(() => handlePuzzleSuccess(activePuzzle), 500);
-    } else if (newGuesses.length >= 8) { // 🚨 CHANGED FROM 6 TO 8
+    } else if (newGuesses.length >= 8) { 
       setPuzzleError(`LOCKOUT. THE CODE WAS: ${mastermindCode}`);
       setTimeout(() => {
         let newCode = '';
@@ -502,7 +542,6 @@ export default function EscapeRoomPage() {
   };
 
   const handleEnterElevator = (fIdx) => {
-    // 🚨 NEW: If they escape the Boss Floor, they win!
     if (fIdx === 1) {
       setIsFading(true);
       setTimeout(() => {
@@ -518,10 +557,8 @@ export default function EscapeRoomPage() {
       return;
     }
     
-    // 1. Trigger the screen fade out
     setIsFading(true);
 
-    // 2. Wait 2 seconds for the screen to go completely black before teleporting
     setTimeout(() => {
       let safeTransit;
 
@@ -553,21 +590,18 @@ export default function EscapeRoomPage() {
       newGrids[fIdx] = grids[fIdx].map(row => row.map(cell => cell === 10 ? 3 : cell));
       setGrids(newGrids);
 
-      // 3. Fade back in
       setTimeout(() => setIsFading(false), 500);
 
     }, 2000);
   };
 
-  // 🚨 Determine which audio track should be playing right now
   let activeAudioSrc = "";
   let loopAudio = false;
 
   if (!systemBooted) {
-    // 🚨 FIX: Must be empty. Browsers will block audio if it tries to play before a user clicks.
     activeAudioSrc = ""; 
   } else if (gameWon) {
-    activeAudioSrc = "/In the House, In a Heartbeat.mp3"; 
+    activeAudioSrc = "/14 Our Resurrected Teleport.mp3"; 
     loopAudio = true;
   } else if (!gameStarted) {
     activeAudioSrc = "/In the House, In a Heartbeat.mp3";
@@ -585,7 +619,6 @@ export default function EscapeRoomPage() {
   return (
     <main className="relative w-full h-screen overflow-hidden bg-black font-mono select-none">
       
-      {/* 🚨 This component handles all the heavy lifting for fading music in and out */}
       <AudioCrossfader 
         currentSrc={activeAudioSrc} 
         loopCurrent={loopAudio} 
@@ -690,36 +723,46 @@ export default function EscapeRoomPage() {
               >
                 <div className="absolute w-full animate-scroll-text-win flex flex-col gap-10 text-center px-16 h-full mt-32">
                   <h1 className="text-5xl font-black mb-8 tracking-[0.3em] text-emerald-500 drop-shadow-[0_0_15px_rgba(16,185,129,0.8)]">
-                    SYSTEM BREACHED
+                    SYSTEM BREACHED.
                   </h1>
                   
                   <p className="text-emerald-400 font-bold tracking-widest leading-loose">
                     YOU DEFEATED THE OMEGA ANOMALY.
                   </p>
                   <p className="text-stone-300 font-bold tracking-widest leading-loose">
-                    THE FINAL CONTAINMENT DOORS OPEN, ALLOWING YOU TO ASCEND TO THE SURFACE.
+                    THE FINAL CONTAINMENT DOORS OPENED, ALLOWING YOU TO ASCEND TO THE SURFACE.
                   </p>
                   <p className="text-stone-300 font-bold tracking-widest leading-loose">
-                    BUT AS THE ELEVATOR DOORS PART, YOU ARE NOT GREETED BY RESCUE TEAMS.
+                    BUT AS THE ELEVATOR DOORS PARTED, YOU WERE NOT GREETED BY RESCUE TEAMS.
                   </p>
                   <p className="text-stone-300 font-bold tracking-widest leading-loose">
                     THE SKY IS BURNING. THE CITY IS IN RUINS.
                   </p>
                   <p className="text-stone-300 font-bold tracking-widest leading-loose">
-                    THE BIOENGINEERING COMPLEX WAS JUST THE BEGINNING.
+                    THE BIOENGINEERING COMPLEX WAS NOT THE ONLY SECTOR TO FALL.
                   </p>
                   <p className="text-emerald-500 font-black tracking-[0.3em] text-2xl mt-12">
-                    LIFE ON THE SURFACE CRAWLS WITH SHADES AND HELLISH FIGURES.
+                    MISSION ACCOMPLISHED.
                   </p>
+
+                  {/* 🚨 NEW: Display final run stats on the win screen */}
+                  <p className="text-emerald-400 font-bold tracking-[0.2em] text-sm mt-2">
+                    TOTAL TIME: {formatTime(playTime)} | SYSTEM REBOOTS: {deathCount}
+                  </p>
+
                   <p className="text-red-600 font-black tracking-[0.3em] text-3xl mt-4 drop-shadow-[0_0_15px_rgba(220,38,38,0.8)]">
-                    THE REAL NIGHTMARE BEGINS.
+                    NEW NIGHTMARE BEGUN.
                   </p>
                 </div>
               </div>
   
               <div className="absolute bottom-6 z-20">
                 <button 
-                  onClick={() => window.location.reload()} 
+                  onClick={() => {
+                    sessionStorage.removeItem('zeroDay_time');
+                    sessionStorage.removeItem('zeroDay_deaths');
+                    window.location.reload();
+                  }}
                   className="py-3 px-8 bg-stone-900 hover:bg-emerald-800 text-emerald-500 hover:text-black font-black text-sm tracking-[0.3em] transition-colors border border-emerald-900"
                 >
                   INITIALIZE REBOOT
@@ -731,7 +774,11 @@ export default function EscapeRoomPage() {
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-red-950 text-red-500">
           <div className="border-4 border-red-900 bg-black p-12 text-center max-w-lg shadow-[0_0_50px_rgba(153,27,27,0.5)]">
             <h1 className="text-6xl font-black mb-4 tracking-widest text-red-600">YOU DIED</h1>
-            <p className="mb-12 text-red-400 text-sm tracking-widest">VITAL SIGNS LOST. ENTITY OVERRUN.</p>
+            <p className="mb-2 text-red-400 text-sm tracking-widest">VITAL SIGNS LOST. ENTITY OVERRUN.</p>
+            
+            {/* 🚨 NEW: Display current stats on the death screen */}
+            <p className="mb-12 text-red-800 font-bold text-xs tracking-widest">TIME ACTIVE: {formatTime(playTime)} | TOTAL DEATHS: {deathCount}</p>
+            
             <button 
               onClick={() => window.location.reload()} 
               className="w-full py-4 bg-red-800 hover:bg-red-600 text-black font-extrabold text-xl transition-colors uppercase tracking-widest"
@@ -762,7 +809,7 @@ export default function EscapeRoomPage() {
         {/* Existing fast red flash for damage */}
         <div className={`absolute inset-0 z-40 pointer-events-none transition-colors duration-100 ${screenFlash}`} />
 
-        {/* 🚨 NEW: Slow black fade for the elevator */}
+        {/* Slow black fade for the elevator */}
         <div className={`absolute inset-0 z-40 pointer-events-none transition-opacity duration-[2000ms] bg-black ${isFading ? 'opacity-100' : 'opacity-0'}`} />
 
           <div className="absolute top-4 right-4 z-40 bg-stone-900/90 border-2 border-stone-600 p-2 pointer-events-none shadow-2xl backdrop-blur-sm">
@@ -834,21 +881,21 @@ export default function EscapeRoomPage() {
                         value={mastermindInput}
                         onChange={(e) => { setMastermindInput(e.target.value.replace(/\D/g, '')); setPuzzleError(''); }}
                         onKeyDown={(e) => e.key === 'Enter' && handleMastermindSubmit()}
-                        disabled={mastermindGuesses.length >= 8} // 🚨 CHANGED TO 8
+                        disabled={mastermindGuesses.length >= 8} 
                         className="flex-1 bg-black border-2 border-stone-600 text-emerald-400 p-3 font-mono text-xl focus:border-emerald-500 outline-none tracking-widest text-center"
                         placeholder="0000"
                         autoFocus
                       />
                       <button 
                         onClick={handleMastermindSubmit} 
-                        disabled={mastermindGuesses.length >= 8} // 🚨 CHANGED TO 8
+                        disabled={mastermindGuesses.length >= 8} 
                         className="bg-emerald-700 hover:bg-emerald-500 text-black px-6 font-extrabold uppercase tracking-widest transition-colors"
                       >
                         RUN
                       </button>
                     </div>
                     <p className="text-xs text-stone-500 text-right">
-                      ATTEMPTS REMAINING: {8 - mastermindGuesses.length} {/* 🚨 CHANGED TO 8 */}
+                      ATTEMPTS REMAINING: {8 - mastermindGuesses.length} 
                     </p>
                   </div>
                 ) : activePuzzle.type === 'memory-match' ? (
@@ -920,18 +967,14 @@ export default function EscapeRoomPage() {
 ) : activePuzzle.type === 'signal-sync' ? (
   <div className="flex flex-col gap-6 w-full mx-auto">
     
-    {/* Oscilloscope Display */}
     <div className="bg-stone-950 border-2 border-stone-700 w-full h-40 relative overflow-hidden flex items-center justify-center shadow-[inset_0_0_20px_rgba(0,0,0,1)]">
-      {/* Grid Lines */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(16,185,129,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.1)_1px,transparent_1px)] bg-[size:20px_20px]" />
       
       <svg viewBox="0 0 300 150" className="w-full h-full absolute inset-0 drop-shadow-[0_0_5px_rgba(16,185,129,0.8)]">
-        {/* Target Wave (Red / Dim) */}
         <path 
           d={`M ${Array.from({length: 61}).map((_, i) => `${i * 5},${75 + Math.sin((i * 5 * 0.02 * activePuzzle.target.freq) + (activePuzzle.target.phase * 0.5)) * (activePuzzle.target.amp * 12)}`).join(' L ')}`} 
           fill="none" stroke="#991b1b" strokeWidth="3" opacity="0.5" strokeDasharray="4 4" 
         />
-        {/* Player Wave (Emerald / Bright) */}
         <path 
           d={`M ${Array.from({length: 61}).map((_, i) => `${i * 5},${75 + Math.sin((i * 5 * 0.02 * signalValues.freq) + (signalValues.phase * 0.5)) * (signalValues.amp * 12)}`).join(' L ')}`} 
           fill="none" stroke="#10b981" strokeWidth="3" 
@@ -939,7 +982,6 @@ export default function EscapeRoomPage() {
       </svg>
     </div>
 
-    {/* Calibration Sliders */}
     <div className="flex flex-col gap-4 bg-stone-950 border border-stone-800 p-4">
       {[
         { label: 'FREQUENCY (Hz)', key: 'freq', min: 1, max: 5 },
@@ -961,7 +1003,6 @@ export default function EscapeRoomPage() {
               const newVals = { ...signalValues, [slider.key]: parseInt(e.target.value) };
               setSignalValues(newVals);
               
-              // Check Win Condition
               if (newVals.freq === activePuzzle.target.freq && 
                   newVals.amp === activePuzzle.target.amp && 
                   newVals.phase === activePuzzle.target.phase) {
@@ -1016,10 +1057,14 @@ export default function EscapeRoomPage() {
             </div>
           )}
 
+          {/* 🚨 UPDATED HUD with Time and Death Count */}
           <div className="absolute bottom-0 left-0 right-0 z-40 bg-stone-900 border-t-4 border-stone-600 p-2 flex items-center justify-between text-stone-200 h-20 pointer-events-none">
+            
             <div className="bg-stone-950 border-2 border-stone-700 px-4 py-1 flex flex-col items-center justify-center min-w-[120px]">
-              <span className="text-[10px] text-stone-500 font-bold">LEVEL</span>
-              <span className="text-red-500 font-black mt-1">LEVEL 1</span>
+              <span className="text-[10px] text-stone-500 font-bold">LEVEL {currentFloor + 1}</span>
+              <span className="text-[10px] text-red-500 font-black mt-1">
+                {formatTime(playTime)} | {deathCount} DEATHS
+              </span>
             </div>
             
             <div className="bg-stone-950 border-2 border-stone-700 px-4 py-1 flex flex-col items-center justify-center min-w-[160px] mx-2">
@@ -1035,7 +1080,7 @@ export default function EscapeRoomPage() {
             <div className="hidden md:flex bg-stone-950 border-2 border-stone-700 px-6 py-2 flex-col items-center justify-center flex-1 mx-2">
               <span className="text-[10px] text-stone-500 font-bold">CURRENT SECTOR</span>
               <span className="text-xs font-bold text-yellow-500 mt-0.5">
-                {currentFloor === 0 ? 'ENTRY CORRIDORS' : 'THE ABYSS'} {/* 🚨 SIMPLIFIED FOR 2 FLOORS */}
+                {currentFloor === 0 ? 'ENTRY CORRIDORS' : 'THE ABYSS'} 
               </span>
             </div>
 
