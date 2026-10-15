@@ -690,7 +690,7 @@ export default function EscapeRoomPage() {
               >
                 <div className="absolute w-full animate-scroll-text-win flex flex-col gap-10 text-center px-16 h-full mt-32">
                   <h1 className="text-5xl font-black mb-8 tracking-[0.3em] text-emerald-500 drop-shadow-[0_0_15px_rgba(16,185,129,0.8)]">
-                    SYSTEM BREACHED.
+                    SYSTEM BREACHED
                   </h1>
                   
                   <p className="text-emerald-400 font-bold tracking-widest leading-loose">

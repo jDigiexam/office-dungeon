@@ -175,15 +175,16 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTexture, 
 // ----------------------------------------------------
 // COMBAT & HORROR SYSTEM
 // ----------------------------------------------------
-// 🚨 UPDATED: Player Projectile Component (Sprite-based)
+// 🚨 UPDATED: Player Projectile Component (Pulsating)
 function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
   const groupRef = useRef();
+  const spriteRef = useRef(); // 🚨 NEW: Reference to directly scale the sprite
 
   const projTex = useMemo(() => {
     if (!texture) return null;
     const tex = texture.clone();
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(1/9, 1); // 9 frames in the sprite sheet
+    tex.repeat.set(1/9, 1); 
     tex.magFilter = THREE.NearestFilter;
     tex.needsUpdate = true;
     return tex;
@@ -197,13 +198,19 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
   useFrame((state, delta) => {
     if (!projObj.active || !groupRef.current) return;
 
-    // Loop through the first 4 large energy frames
+    // 🚨 FIX: Ping-pong back and forth through the frames (0,1,2,3,2,1) instead of jumping 3 -> 0
     if (projTex) {
-      const currentFrame = Math.floor(state.clock.elapsedTime * 15) % 4;
+      const pulseFrames = [0, 1, 2, 3, 2, 1];
+      const currentFrame = pulseFrames[Math.floor(state.clock.elapsedTime * 15) % pulseFrames.length];
       projTex.offset.x = currentFrame * (1/9);
     }
     
-    // Matched projectile speed to the enemy (15)
+    // 🚨 FIX: Dynamically scale the sprite up and down using a sine wave
+    if (spriteRef.current) {
+      const scalePulse = 1.0 + Math.sin(state.clock.elapsedTime * 15) * 0.3;
+      spriteRef.current.scale.set(scalePulse, scalePulse, 1);
+    }
+
     groupRef.current.position.add(dir.clone().multiplyScalar(15 * delta));
     
     const curX = groupRef.current.position.x;
@@ -224,7 +231,8 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
 
   return (
     <group ref={groupRef}>
-      <sprite scale={[1.0, 1.0, 1]}>
+      {/* 🚨 Attached the spriteRef here */}
+      <sprite ref={spriteRef} scale={[1.0, 1.0, 1]}>
         <spriteMaterial map={projTex || undefined} color="#ffffff" transparent={true} />
       </sprite>
       <pointLight color="#a3e635" intensity={2.0} distance={5} decay={2} />
