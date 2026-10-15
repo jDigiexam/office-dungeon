@@ -175,16 +175,15 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTexture, 
 // ----------------------------------------------------
 // COMBAT & HORROR SYSTEM
 // ----------------------------------------------------
-// 🚨 UPDATED: Player Projectile Component (Pulsating)
+// 🚨 UPDATED: Player Projectile Component (Distance-Based Dissipation)
 function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
   const groupRef = useRef();
-  const spriteRef = useRef(); // 🚨 NEW: Reference to directly scale the sprite
 
   const projTex = useMemo(() => {
     if (!texture) return null;
     const tex = texture.clone();
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(1/9, 1); 
+    tex.repeat.set(1/9, 1); // 9 frames in the sprite sheet
     tex.magFilter = THREE.NearestFilter;
     tex.needsUpdate = true;
     return tex;
@@ -198,17 +197,16 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
   useFrame((state, delta) => {
     if (!projObj.active || !groupRef.current) return;
 
-    // 🚨 FIX: Ping-pong back and forth through the frames (0,1,2,3,2,1) instead of jumping 3 -> 0
+    // Calculate current distance from the firing point
+    const currentDist = groupRef.current.position.distanceTo(startPos);
+
+    // 🚨 FIX: Map the distance traveled directly to the 9 frames of the sprite sheet
     if (projTex) {
-      const pulseFrames = [0, 1, 2, 3, 2, 1];
-      const currentFrame = pulseFrames[Math.floor(state.clock.elapsedTime * 15) % pulseFrames.length];
-      projTex.offset.x = currentFrame * (1/9);
-    }
-    
-    // 🚨 FIX: Dynamically scale the sprite up and down using a sine wave
-    if (spriteRef.current) {
-      const scalePulse = 1.0 + Math.sin(state.clock.elapsedTime * 15) * 0.3;
-      spriteRef.current.scale.set(scalePulse, scalePulse, 1);
+      const maxDist = 20; // The distance at which the orb is destroyed
+      let frameIndex = Math.floor((currentDist / maxDist) * 9);
+      if (frameIndex > 8) frameIndex = 8; // Clamp to the final spark frame
+      
+      projTex.offset.x = frameIndex * (1/9);
     }
 
     groupRef.current.position.add(dir.clone().multiplyScalar(15 * delta));
@@ -223,7 +221,8 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
     const ceilY = floorY + FLOOR_HT;
     const hitVertical = curY <= floorY + 0.1 || curY >= ceilY - 0.1;
 
-    if (isSolid || hitVertical || groupRef.current.position.distanceTo(startPos) > 20) {
+    // Destroy if it hits a wall, floor, ceiling, or reaches the max distance
+    if (isSolid || hitVertical || currentDist > 20) {
       projObj.active = false;
       groupRef.current.visible = false;
     }
@@ -231,8 +230,8 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
 
   return (
     <group ref={groupRef}>
-      {/* 🚨 Attached the spriteRef here */}
-      <sprite ref={spriteRef} scale={[1.0, 1.0, 1]}>
+      {/* 🚨 Removed the manual scaling so it completely relies on the PNG sizes */}
+      <sprite scale={[1.0, 1.0, 1]}>
         <spriteMaterial map={projTex || undefined} color="#ffffff" transparent={true} />
       </sprite>
       <pointLight color="#a3e635" intensity={2.0} distance={5} decay={2} />
