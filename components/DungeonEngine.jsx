@@ -175,23 +175,12 @@ function DoorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTexture, 
 // ----------------------------------------------------
 // COMBAT & HORROR SYSTEM
 // ----------------------------------------------------
-// 🚨 UPDATED: Player Projectile Component (Spinning Orb Technique)
+// 🚨 UPDATED: Player Projectile Component (Single Static Image)
 function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
   const groupRef = useRef();
   const spriteRef = useRef();
-  const materialRef = useRef(); // 🚨 NEW: Reference to directly rotate the sprite material
-  const impactTime = useRef(null);
+  const materialRef = useRef();
 
-  const projTex = useMemo(() => {
-    if (!texture) return null;
-    const tex = texture.clone();
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(1/10, 1); 
-    tex.magFilter = THREE.NearestFilter;
-    tex.needsUpdate = true;
-    return tex;
-  }, [texture]);
-  
   useEffect(() => { 
     projObj.mesh = groupRef; 
     if (groupRef.current) groupRef.current.position.copy(startPos);
@@ -200,38 +189,16 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
   useFrame((state, delta) => {
     if (!projObj.active || !groupRef.current) return;
 
-    // IMPACT ANIMATION
-    if (impactTime.current !== null) {
-      const timeSinceImpact = state.clock.elapsedTime - impactTime.current;
-      const impactFrame = 6 + Math.floor(timeSinceImpact * 20);
-      
-      if (impactFrame > 9) {
-        projObj.active = false;
-        groupRef.current.visible = false;
-        return;
-      }
-      
-      if (projTex) projTex.offset.x = impactFrame * (1/10);
-      // Stop the spinning when it hits a wall
-      if (materialRef.current) materialRef.current.rotation = 0; 
-      return; 
-    }
-
     const currentDist = groupRef.current.position.distanceTo(startPos);
-
-    // 🚨 FIX: Lock to Frame 0 (the perfect orb) 
-    if (projTex) {
-      projTex.offset.x = 0; 
-    }
     
-    // 🚨 FIX: Rapidly spin the 2D material on the Z-axis to simulate crackling energy
+    // Rapidly spin the 2D material
     if (materialRef.current) {
       materialRef.current.rotation += delta * 15; 
     }
 
+    // Shrink over distance + pulse scale
     if (spriteRef.current) {
       const distanceScale = Math.max(0.3, 1.0 - (currentDist / 20) * 0.7);
-      // 🚨 FIX: Add a rapid, tiny math-based pulse to make it feel unstable and alive
       const pulse = Math.sin(state.clock.elapsedTime * 40) * 0.08;
       const finalScale = distanceScale + pulse;
       
@@ -250,41 +217,30 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
     const ceilY = floorY + FLOOR_HT;
     const hitVertical = curY <= floorY + 0.1 || curY >= ceilY - 0.1;
 
+    // Instantly destroy on impact
     if (isSolid || hitVertical || currentDist > 20) {
-      impactTime.current = state.clock.elapsedTime;
+      projObj.active = false;
+      groupRef.current.visible = false;
     }
   });
 
   return (
     <group ref={groupRef}>
       <sprite ref={spriteRef} position={[0, -0.1, 0]} scale={[1.0, 1.0, 1]}>
-        {/* 🚨 Attached the materialRef so we can spin it */}
-        <spriteMaterial ref={materialRef} map={projTex || undefined} color="#ffffff" transparent={true} />
+        <spriteMaterial ref={materialRef} map={texture || undefined} color="#ffffff" transparent={true} />
       </sprite>
       <pointLight color="#a3e635" intensity={2.0} distance={5} decay={2} />
     </group>
   );
 }
 
-// 🚨 UPDATED: 2.5D Enemy Projectile Component (Spinning + Pulsating Fix)
+// 🚨 UPDATED: Enemy Projectile Component (Single Static Image)
 function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
   const groupRef = useRef();
-  const spriteRef = useRef(); // 🚨 NEW: For scale pulsing
-  const materialRef = useRef(); // 🚨 NEW: For rotation
+  const spriteRef = useRef(); 
+  const materialRef = useRef(); 
   const { camera } = useThree();
   const isActive = useRef(true);
-  const impactTime = useRef(null);
-
-  const projTex = useMemo(() => {
-    if (!texture) return null;
-    const tex = texture.clone();
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    // 11 total frames in the sprite sheet
-    tex.repeat.set(1/11, 1); 
-    tex.magFilter = THREE.NearestFilter;
-    tex.needsUpdate = true;
-    return tex;
-  }, [texture]);
 
   useEffect(() => {
     if (groupRef.current) groupRef.current.position.copy(startPos);
@@ -292,42 +248,13 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
 
   useFrame((state, delta) => {
     if (!isActive.current || !groupRef.current) return;
-    
-    // IMPACT ANIMATION
-    if (impactTime.current !== null) {
-      const timeSinceImpact = state.clock.elapsedTime - impactTime.current;
-      const impactFrameIndex = 8 + Math.floor(timeSinceImpact * 15);
-      
-      if (impactFrameIndex > 10) {
-        isActive.current = false;
-        groupRef.current.visible = false;
-        return;
-      }
-      
-      if (projTex) projTex.offset.x = impactFrameIndex * (1/11);
-      if (materialRef.current) materialRef.current.rotation = 0; 
-      return; 
-    }
 
-    // 2.5D FLIGHT LOGIC
-    if (projTex && spriteRef.current && materialRef.current) {
-      const camDir = new THREE.Vector3().subVectors(camera.position, groupRef.current.position).normalize();
-      const dot = dir.dot(camDir);
-      
-      // Add the rapid, tiny math-based pulse to make it feel unstable
+    if (spriteRef.current && materialRef.current) {
+      // Rapidly spin and pulse the static image
       const pulse = Math.sin(state.clock.elapsedTime * 40) * 0.1;
       const baseScale = 1.5;
       spriteRef.current.scale.set(baseScale + pulse, baseScale + pulse, 1);
-
-      if (dot > 0.7) {
-        // Straight-on: Lock to Frame 0 and spin
-        projTex.offset.x = 0;
-        materialRef.current.rotation += delta * 15;
-      } else {
-        // Side shot: Lock to Frame 2 (clean side profile) and keep horizontal
-        projTex.offset.x = 2 * (1/11);
-        materialRef.current.rotation = 0; 
-      }
+      materialRef.current.rotation += delta * 15;
     }
 
     groupRef.current.position.add(dir.clone().multiplyScalar(15 * delta));
@@ -339,19 +266,21 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
     
     if (groupRef.current.position.distanceTo(camera.position) < 0.8) {
       onPlayerHit();
-      impactTime.current = state.clock.elapsedTime; 
+      isActive.current = false;
+      groupRef.current.visible = false;
       return;
     }
 
     if (isSolid || groupRef.current.position.distanceTo(startPos) > 20) {
-      impactTime.current = state.clock.elapsedTime; 
+      isActive.current = false;
+      groupRef.current.visible = false;
     }
   });
 
   return (
     <group ref={groupRef}>
       <sprite ref={spriteRef} position={[0, 0, 0]} scale={[1.5, 1.5, 1]}>
-        <spriteMaterial ref={materialRef} map={projTex || undefined} color="#ffffff" transparent={true} />
+        <spriteMaterial ref={materialRef} map={texture || undefined} color="#ffffff" transparent={true} />
       </sprite>
       <pointLight color="#22c55e" intensity={2.0} distance={5} decay={2} />
     </group>
@@ -962,13 +891,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     woodTexList.forEach(t => t.repeat.set(1, 3.2));
     stoneTexList.forEach(t => t.repeat.set(1, 3.2));
     
-    if (tEnemyProj) {
-      tEnemyProj.repeat.set(1/11, 1); 
-    }
-    // 🚨 Configure the player projectile sprite framing
-    if (tPlayerProj) {
-      tPlayerProj.repeat.set(1/10, 1);
-    }
+    // 🚨 ALL projectile repeat.set logic has been deleted here
   }, [woodTexList, stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj]);
 
   const parsedData = useMemo(() => {
