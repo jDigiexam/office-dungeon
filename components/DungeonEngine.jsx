@@ -286,6 +286,7 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
   const spriteMaterialRef = useRef();
   const isDead = useRef(false);
   const deathTime = useRef(0);
+  const hasAggroed = useRef(false); // 🚨 NEW: Tracks if the boss has roared
   
   const hp = useRef(25); 
   const lastShot = useRef(0);
@@ -349,6 +350,13 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
     const timeSinceShot = state.clock.elapsedTime - lastShot.current;
 
     if (dist < 15 && hasLoS) {
+      // 🚨 NEW: Play Boss roar when it spots you
+      if (!hasAggroed.current) {
+        hasAggroed.current = true;
+        const bossSfx = new Audio('/boss_roar.mp3');
+        bossSfx.volume = 0.8;
+        bossSfx.play().catch(() => {});
+      }
       groupRef.current.lookAt(playerCamera.position.x, groupRef.current.position.y, playerCamera.position.z);
       
       if (timeSinceShot > 1.2) {
@@ -432,8 +440,9 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
   const spriteMaterialRef = useRef();
   const isDead = useRef(false);
   const isChasing = useRef(false);
+  const hasAggroed = useRef(false); // 🚨 NEW: Tracks if the imp has growled
   
-  const hp = useRef(2); 
+  const hp = useRef(2);
 
   // Safely clone the pre-loaded Imp texture
   const impTex = useMemo(() => {
@@ -481,9 +490,17 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
     
     if (sqDist > 64) {
       isChasing.current = false;
+      hasAggroed.current = false; // 🚨 NEW: Reset so it can growl again if you run away
     } else {
       const hasLoS = checkLoS(groupRef.current.position.x, groupRef.current.position.z, playerCamera.position.x, playerCamera.position.z);
       if (hasLoS) isChasing.current = true;
+      // 🚨 NEW: Play Imp growl when it spots you
+      if (!hasAggroed.current) {
+        hasAggroed.current = true;
+        const impSfx = new Audio('/imp_sight.mp3');
+        impSfx.volume = 0.5;
+        impSfx.play().catch(() => {});
+      }
     }
 
     const safeDelta = Math.min(delta, 0.1);

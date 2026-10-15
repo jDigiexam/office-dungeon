@@ -438,12 +438,17 @@ export default function EscapeRoomPage() {
 
   const handleInteract = (tileType, x, z, fIdx) => {
     const openDoor = (targetType) => {
-      const newGrids = [...grids];
-      newGrids[fIdx] = grids[fIdx].map((row, rIdx) =>
-        row.map((col, cIdx) => (rIdx === z && cIdx === x ? targetType : col))
-      );
-      setGrids(newGrids);
-    };
+    // 🚨 NEW: Play the mechanical door sound
+    const doorSfx = new Audio('/door.mp3');
+    doorSfx.volume = 0.6;
+    doorSfx.play().catch((e) => console.log('Audio blocked by browser', e));
+
+    const newGrids = [...grids];
+    newGrids[fIdx] = grids[fIdx].map((row, rIdx) =>
+      row.map((col, cIdx) => (rIdx === z && cIdx === x ? targetType : col))
+    );
+    setGrids(newGrids);
+  };
 
     const pickupKey = (keyName) => {
       triggerMessage(`ACQUIRED ${keyName}`);
