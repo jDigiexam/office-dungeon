@@ -129,10 +129,10 @@ function FakePresentation({ onGlitchComplete }) {
 
   // Added the 4th slide image[cite: 10, 11, 12, 13]
   const slideImages = [
-    "/Murder Mystery @ Digiexam 1.jpg",
-    "/Murder Mystery @ Digiexam 2.jpg",
-    "/Murder Mystery @ Digiexam 3.jpg",
-    "/Murder Mystery @ Digiexam 4.jpg"
+    "/Murder Mystery 1.jpg",
+    "/Murder Mystery 2.jpg",
+    "/Murder Mystery 3.jpg",
+    "/Murder Mystery 4.jpg"
   ];
 
   const handleNext = () => {
@@ -141,7 +141,7 @@ function FakePresentation({ onGlitchComplete }) {
     } else {
       setIsGlitching(true);
       
-      const audio = new Audio('/boss_roar.mp3'); 
+      const audio = new Audio('/static.mp3'); 
       audio.volume = 1.0;
       audio.play().catch(() => {});
 
