@@ -127,26 +127,16 @@ function FakePresentation({ onGlitchComplete }) {
   const [slide, setSlide] = useState(0);
   const [isGlitching, setIsGlitching] = useState(false);
 
-  const slides = [
-    {
-      title: "MURDER @ DIGIEXAM", /*[cite: 9] */
-      content: "Annual Team Event 2026",
-      button: "Start Investigation"
-    },
-    {
-      title: "THE MIDNIGHT MURDER", /*[cite: 9] */
-      content: "In a quiet mansion on the outskirts of town, a wealthy art collector, Mr. Arthur Hargrave, has been found murdered in his study. His sudden death sends shockwaves through the mansion, and everyone who was present that night becomes a suspect. As the detectives, you’ve been called to investigate.\n\nThe guests at Hargrave Mansion are each hiding something, and it’s up to you to unravel their secrets.", /*[cite: 9] */
-      button: "Continue"
-    },
-    {
-      title: "The Investigation Begins…", /*[cite: 9] */
-      content: "As you begin your investigation, you quickly realize…\n\nEach suspect had both the means and opportunity to commit the crime. However, the true motive remains hidden. Was it greed, revenge, or something even more sinister?\n\nYou’ll need to examine the crime scene, interview the suspects, and collect evidence. Be warned: not every path will lead you to the truth, and one wrong choice could send you down a dead-end, forcing you to restart the investigation. Only your sharp detective skills will uncover the identity of the killer and bring justice to Mr. Hargrave.", /*[cite: 9] */
-      button: "Load Case Files..."
-    }
+  // Added the 4th slide image[cite: 10, 11, 12, 13]
+  const slideImages = [
+    "/Murder Mystery @ Digiexam 1.jpg",
+    "/Murder Mystery @ Digiexam 2.jpg",
+    "/Murder Mystery @ Digiexam 3.jpg",
+    "/Murder Mystery @ Digiexam 4.jpg"
   ];
 
   const handleNext = () => {
-    if (slide < slides.length - 1) {
+    if (slide < slideImages.length - 1) {
       setSlide(slide + 1);
     } else {
       setIsGlitching(true);
@@ -162,37 +152,62 @@ function FakePresentation({ onGlitchComplete }) {
   };
 
   return (
-    <div className={`absolute inset-0 z-[100] flex flex-col bg-white text-black font-sans transition-all ${isGlitching ? 'glitch-active bg-stone-900 invert' : ''}`}>
-      <div className="flex items-center gap-4 border-b border-gray-300 p-4 bg-gray-50 shadow-sm">
-        <div className="w-8 h-8 bg-yellow-400 rounded-sm flex items-center justify-center font-bold text-white">S</div>
-        <div>
-          <h1 className="text-lg font-medium text-gray-700">Halloween Mystery 2026.pptx</h1>
-          <div className="flex gap-4 text-xs text-gray-500 mt-1">
-            <span>File</span><span>Edit</span><span>View</span><span>Present</span>
-          </div>
+    <div className={`absolute inset-0 z-[100] flex flex-col bg-[#111111] text-stone-200 font-sans transition-all select-none ${isGlitching ? 'glitch-active bg-black invert' : ''}`}>
+      
+      {/* Main Slide Area - 16:9 Aspect Ratio Container */}
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div 
+          className="relative w-full max-w-6xl aspect-video bg-black shadow-[0_0_50px_rgba(0,0,0,0.9)] border border-stone-800 flex flex-col items-center justify-center overflow-hidden cursor-pointer"
+          onClick={!isGlitching ? handleNext : undefined}
+        >
+          <img 
+            src={slideImages[slide]} 
+            alt={`Slide ${slide + 1}`} 
+            className={`w-full h-full object-cover transition-opacity duration-300 ${isGlitching ? 'opacity-50 mix-blend-difference' : 'opacity-100'}`}
+          />
+          
+          {isGlitching && (
+            <div className="absolute inset-0 flex items-center justify-center bg-red-900/40 mix-blend-overlay">
+              <h1 className="text-6xl md:text-8xl font-black text-white tracking-[0.2em] animate-pulse text-center font-mono">
+                SYSTEM BREACH<br/>0x00000FF
+              </h1>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center p-12 text-center max-w-4xl mx-auto">
-        <h2 className={`text-5xl font-bold mb-8 text-gray-800 ${isGlitching ? 'tracking-[2em] text-red-600' : ''}`}>
-          {slides[slide].title}
-        </h2>
-        <p className="text-xl text-gray-600 whitespace-pre-wrap leading-relaxed mb-12">
-          {isGlitching ? 'FATAL EXCEPTION: SYSTEM BREACH DETECTED 0x00000FF' : slides[slide].content}
-        </p>
-        
-        <button 
-          onClick={handleNext}
-          disabled={isGlitching}
-          className="px-8 py-3 bg-blue-600 text-white rounded shadow hover:bg-blue-700 transition-colors text-lg font-medium cursor-pointer relative z-50"
-        >
-          {isGlitching ? 'CRITICAL FAILURE' : slides[slide].button}
-        </button>
-      </div>
-      
-      <div className="absolute bottom-4 left-4 text-sm text-gray-400">
-        Slide {slide + 1} of 29
-      </div>
+      {/* Fake Presentation Toolbar */}
+      {!isGlitching && (
+        <div className="h-14 bg-[#141414] flex items-center justify-between px-6 border-t border-stone-900 text-stone-500">
+          <div className="flex items-center gap-4">
+            <span className="text-xs tracking-widest uppercase">Slide {slide + 1}</span>
+          </div>
+          
+          <div className="flex items-center gap-6">
+            <button 
+              onClick={(e) => { e.stopPropagation(); setSlide(Math.max(0, slide - 1)); }} 
+              className={`transition-colors ${slide === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:text-stone-300 cursor-pointer'}`}
+              disabled={slide === 0}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
+            </button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); handleNext(); }} 
+              className={`transition-colors ${slide === slideImages.length - 1 ? 'opacity-30 cursor-not-allowed' : 'hover:text-stone-300 cursor-pointer'}`}
+              disabled={slide === slideImages.length - 1}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
+            </button>
+            <div className="w-px h-5 bg-stone-800 mx-2"></div>
+            <div className="flex gap-4">
+              <svg className="w-4 h-4 hover:text-stone-300 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
+              <svg className="w-4 h-4 hover:text-stone-300 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+            </div>
+          </div>
+          
+          <div className="text-[10px] tracking-[0.2em] uppercase font-bold text-stone-600">DigiExam 2026</div>
+        </div>
+      )}
     </div>
   );
 }
