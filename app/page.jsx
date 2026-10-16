@@ -289,6 +289,14 @@ export default function EscapeRoomPage() {
     setSolvedPuzzles([...solvedPuzzles, puzzle.key]);
     triggerMessage(puzzle.successMessage);
     setActivePuzzle(null);
+
+    // 🚨 FIX: Check if the puzzle reward was an opened door (tiles 8, 18, 28, 17, or 38)
+    // and play the door opening sound!
+    if ([8, 18, 28, 17, 38].includes(reward.newTile)) {
+      const doorSfx = new Audio('/door_slide.mp3');
+      doorSfx.volume = 1.0;
+      doorSfx.play().catch((e) => console.log('Audio blocked by browser', e));
+    }
   };
 
   const handlePuzzleSubmit = (submittedAnswer) => {
