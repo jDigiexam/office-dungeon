@@ -281,7 +281,8 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
   );
 }
 
-function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlayerHit, grid, onSpawnEnemyOrb, texture }) {
+// 🚨 FIX: Pass playSFX via props
+function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlayerHit, grid, onSpawnEnemyOrb, texture, playSFX }) {
   const groupRef = useRef();
   const spriteMaterialRef = useRef();
   const isDead = useRef(false);
@@ -290,9 +291,6 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
   
   const hp = useRef(25); 
   const lastShot = useRef(0);
-
-  // 🚨 FIX: Keep the audio object safely in memory
-  const bossSfx = useMemo(() => typeof window !== 'undefined' ? new Audio('/doom_baron_of_hell.mp3') : null, []);
 
   const bossTex = useMemo(() => {
     if (!texture) return null;
@@ -364,12 +362,8 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
     if (dist < 15 && hasLoS) {
       if (!hasAggroed.current) {
         hasAggroed.current = true;
-        // 🚨 FIX: Play the safely stored audio object
-        if (bossSfx) {
-          bossSfx.volume = 1.0;
-          bossSfx.currentTime = 0;
-          bossSfx.play().catch((e) => console.log("Audio play blocked", e));
-        }
+        // 🚨 FIX: Call the DOM element
+        playSFX('sfx-boss', 1.0);
       }
       groupRef.current.lookAt(playerCamera.position.x, groupRef.current.position.y, playerCamera.position.z);
       
@@ -448,7 +442,8 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
   );
 }
 
-function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlayerHit, grid, texture }) {
+// 🚨 FIX: Pass playSFX via props
+function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlayerHit, grid, texture, playSFX }) {
   const groupRef = useRef();
   const spriteMaterialRef = useRef();
   const isDead = useRef(false);
@@ -456,9 +451,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
   const hasAggroed = useRef(false); 
   
   const hp = useRef(2);
-
-  // 🚨 FIX: Keep the audio object safely in memory
-  const impSfx = useMemo(() => typeof window !== 'undefined' ? new Audio('/imp.mp3') : null, []);
 
   const impTex = useMemo(() => {
     if (!texture) return null;
@@ -509,7 +501,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
     const dz = groupRef.current.position.z - playerCamera.position.z;
     const sqDist = dx * dx + dz * dz;
     
-    // 🚨 FIX: Increased aggro drop distance from 64 to 144 (12 tiles away) so they track you better
     if (sqDist > 144) {
       isChasing.current = false;
       hasAggroed.current = false; 
@@ -520,12 +511,8 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
         isChasing.current = true;
         if (!hasAggroed.current) {
           hasAggroed.current = true;
-          // 🚨 FIX: Play the safely stored audio object
-          if (impSfx) {
-            impSfx.volume = 1.0;
-            impSfx.currentTime = 0;
-            impSfx.play().catch((e) => console.log("Audio play blocked", e));
-          }
+          // 🚨 FIX: Call the DOM element
+          playSFX('sfx-imp', 1.0);
         }
       } else {
         isChasing.current = false;
@@ -608,8 +595,8 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
   );
 }
 
-// 🚨 UPDATED: Added impTexture to props
-function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTexture, orbTexture, playerProjTexture, impTexture }) {
+// 🚨 FIX: Accept and drill playSFX down
+function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTexture, orbTexture, playerProjTexture, impTexture, playSFX }) {
   const { camera } = useThree();
   const projectilesRef = useRef([]);
   const [projectiles, setProjectiles] = useState([]);
@@ -678,6 +665,7 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTextu
               grid={grids?.[e.fIdx]} 
               onSpawnEnemyOrb={(orb) => setEnemyProjectiles(prev => [...prev, orb])}
               texture={bossTexture}
+              playSFX={playSFX} // 🚨 FIX
             />
           );
         }
@@ -691,7 +679,8 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTextu
             onEradicate={() => onEradicate(false)} 
             onPlayerHit={onPlayerHit}
             grid={grids?.[e.fIdx]} 
-            texture={impTexture} // 🚨 Pass the Imp texture here
+            texture={impTexture} 
+            playSFX={playSFX} // 🚨 FIX
           />
         );
       })}
@@ -870,7 +859,8 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
 // ----------------------------------------------------
 // 5. MAIN SCENE RENDERING
 // ----------------------------------------------------
-function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove, onEradicate, onPlayerHit, isPuzzleActive }) {
+// 🚨 FIX: Accept playSFX and pass it to CombatManager
+function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove, onEradicate, onPlayerHit, isPuzzleActive, playSFX }) {
   const woodTexList = useTexture([
     '/wall_timber_structure_cross.png', '/wall_timber_structure_diagonal.png',
     '/wall_timber_structure_vertical.png', '/wall_timber_structure.png'
@@ -882,7 +872,6 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     '/wall_stone_depth.png', '/wall_stone.png'
   ]);
 
-  // 🚨 Add tImp to the end of the destructuring array and texture paths
   const [tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp] = useTexture([
     '/floor_stone_pattern.png', '/floor_tiles_tan_large.png', '/door_wood.png', '/door_metal_gate.png',
     '/door_metal_frame.png', '/window_round_pane_lit.png', '/hand.png',
@@ -1062,7 +1051,6 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         return null;
       })}
       
-      {/* 🚨 Pass the impTexture into the CombatManager */}
       <CombatManager 
         enemiesData={enemiesData} 
         grids={grids} 
@@ -1072,13 +1060,15 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         orbTexture={tEnemyProj} 
         playerProjTexture={tPlayerProj} 
         impTexture={tImp} 
+        playSFX={playSFX} // 🚨 FIX
       />
       <PlayerControls grids={grids} handTexture={tHand} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} onPlayerMove={onPlayerMove} isPuzzleActive={isPuzzleActive} />
     </>
   );
 }
 
-export default function DungeonEngine({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove, onEradicate, onPlayerHit, isPuzzleActive, currentFloor }) {
+// 🚨 FIX: Accept playSFX and pass it down
+export default function DungeonEngine({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove, onEradicate, onPlayerHit, isPuzzleActive, currentFloor, playSFX }) {
   
   const isHell = currentFloor === 2;
   const fogColor = isHell ? '#450a0a' : '#000000';
@@ -1093,7 +1083,7 @@ export default function DungeonEngine({ grids, initialSpawn, onInteract, telepor
         <ambientLight intensity={lightIntensity} color={lightColor} />
         
         <Suspense fallback={null}>
-        <DungeonScene grids={grids} initialSpawn={initialSpawn} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} onPlayerMove={onPlayerMove} onEradicate={onEradicate} onPlayerHit={onPlayerHit} isPuzzleActive={isPuzzleActive} />
+        <DungeonScene grids={grids} initialSpawn={initialSpawn} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} onPlayerMove={onPlayerMove} onEradicate={onEradicate} onPlayerHit={onPlayerHit} isPuzzleActive={isPuzzleActive} playSFX={playSFX} />
         </Suspense>
       </Canvas>
     </div>

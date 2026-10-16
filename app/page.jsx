@@ -70,21 +70,21 @@ function AudioCrossfader({ currentSrc, loopCurrent, onNextTrack }) {
     }
 
     let fadeVol = 0;
-    const MAX_BGM_VOL = 0.4; // 🚨 Capped background music volume
+    const MAX_BGM_VOL = 0.4; 
 
     faderRef.current = setInterval(() => {
       fadeVol += 0.05;
       if (fadeVol >= 1) {
-        newAudio.volume = 1;
+        newAudio.volume = MAX_BGM_VOL;
         if (oldAudio && !oldAudio.paused) { 
           oldAudio.volume = 0; 
           oldAudio.pause(); 
         }
         clearInterval(faderRef.current);
       } else {
-        newAudio.volume = Math.min(1, fadeVol);
+        newAudio.volume = Math.min(MAX_BGM_VOL, fadeVol * MAX_BGM_VOL);
         if (oldAudio && !oldAudio.paused) {
-          oldAudio.volume = Math.max(0, 1 - fadeVol);
+          oldAudio.volume = Math.max(0, (1 - fadeVol) * MAX_BGM_VOL);
         }
       }
     }, 100);
@@ -180,6 +180,19 @@ export default function EscapeRoomPage() {
     '/12 Apprehension and Evasion.mp3',
     '/14 Our Resurrected Teleport.mp3'
   ];
+
+  // 🚨 NEW: Global SFX trigger using DOM elements
+  const playSFX = (id, vol = 1.0) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.volume = vol;
+      el.currentTime = 0;
+      const playPromise = el.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((e) => console.warn(`SFX ${id} blocked:`, e));
+      }
+    }
+  };
 
   useEffect(() => {
     const storedDeaths = parseInt(sessionStorage.getItem('zeroDay_deaths') || '0', 10);
@@ -290,12 +303,9 @@ export default function EscapeRoomPage() {
     triggerMessage(puzzle.successMessage);
     setActivePuzzle(null);
 
-    // 🚨 FIX: Check if the puzzle reward was an opened door (tiles 8, 18, 28, 17, or 38)
-    // and play the door opening sound!
+    // 🚨 FIX: Play the DOM audio element
     if ([8, 18, 28, 17, 38].includes(reward.newTile)) {
-      const doorSfx = new Audio('/door_slide.mp3');
-      doorSfx.volume = 1.0;
-      doorSfx.play().catch((e) => console.log('Audio blocked by browser', e));
+      playSFX('sfx-door', 1.0);
     }
   };
 
@@ -448,17 +458,15 @@ export default function EscapeRoomPage() {
 
   const handleInteract = (tileType, x, z, fIdx) => {
     const openDoor = (targetType) => {
-    // 🚨 NEW: Play the mechanical door sound
-    const doorSfx = new Audio('/door.mp3');
-    doorSfx.volume = 1.0;
-    doorSfx.play().catch((e) => console.log('Audio blocked by browser', e));
+      // 🚨 FIX: Play the DOM audio element
+      playSFX('sfx-door', 1.0);
 
-    const newGrids = [...grids];
-    newGrids[fIdx] = grids[fIdx].map((row, rIdx) =>
-      row.map((col, cIdx) => (rIdx === z && cIdx === x ? targetType : col))
-    );
-    setGrids(newGrids);
-  };
+      const newGrids = [...grids];
+      newGrids[fIdx] = grids[fIdx].map((row, rIdx) =>
+        row.map((col, cIdx) => (rIdx === z && cIdx === x ? targetType : col))
+      );
+      setGrids(newGrids);
+    };
 
     const pickupKey = (keyName) => {
       triggerMessage(`ACQUIRED ${keyName}`);
@@ -585,8 +593,6 @@ export default function EscapeRoomPage() {
 
       setTeleportCoords(safeTransit);
       setCurrentFloor(targetFloor); 
-      
-      // 🚨 FIX: Update the base spawn coordinates so the engine knows where to mount
       setSpawnCoords([safeTransit.x, safeTransit.y, safeTransit.z]); 
       
       triggerMessage(`ELEVATOR TRANSIT: FLOOR E1M${targetFloor + 1}`);
@@ -600,7 +606,6 @@ export default function EscapeRoomPage() {
     }, 2000);
   };
 
-  // 🚨 NEW: Floor Respawn Logic
   const handleRespawn = () => {
     let safeTransit;
 
@@ -624,9 +629,7 @@ export default function EscapeRoomPage() {
       safeTransit = { x: foundX, y: currentFloor * 3.2 + 0.8, z: foundZ };
     }
 
-    // 🚨 FIX: Update the base spawn coordinates before remounting the 3D engine
     setSpawnCoords([safeTransit.x, safeTransit.y, safeTransit.z]);
-
     setTeleportCoords(safeTransit);
     setHp(100);
     setIsDead(false);
@@ -637,8 +640,7 @@ export default function EscapeRoomPage() {
   let loopAudio = false;
 
   if (!systemBooted) {
-    // 🚨 FIX: Must be empty. Browsers will block audio if it tries to play before a user clicks.
-    activeAudioSrc = "";
+    activeAudioSrc = ""; 
   } else if (gameWon) {
     activeAudioSrc = "/In the House, In a Heartbeat.mp3"; 
     loopAudio = true;
@@ -658,6 +660,11 @@ export default function EscapeRoomPage() {
   return (
     <main className="relative w-full h-screen overflow-hidden bg-black font-mono select-none">
       
+      {/* 🚨 NEW: Hidden DOM Audio tags ensure the browser grants playback permission globally */}
+      <audio id="sfx-door" src="/door.mp3" preload="auto" />
+      <audio id="sfx-imp" src="/imp_sight.mp3" preload="auto" />
+      <audio id="sfx-boss" src="/boss_roar.mp3" preload="auto" />
+
       <AudioCrossfader 
         currentSrc={activeAudioSrc} 
         loopCurrent={loopAudio} 
@@ -816,7 +823,6 @@ export default function EscapeRoomPage() {
             
             <p className="mb-12 text-red-800 font-bold text-xs tracking-widest">TIME ACTIVE: {formatTime(playTime)} | TOTAL DEATHS: {deathCount}</p>
             
-            {/* 🚨 UPDATED: Now calls handleRespawn instead of a full reload */}
             <button 
               onClick={handleRespawn} 
               className="w-full py-4 bg-red-800 hover:bg-red-600 text-black font-extrabold text-xl transition-colors uppercase tracking-widest"
@@ -841,6 +847,7 @@ export default function EscapeRoomPage() {
               onPlayerHit={handlePlayerHit}
               isPuzzleActive={!!activePuzzle} 
               currentFloor={currentFloor}
+              playSFX={playSFX} // 🚨 FIX: Pass the audio helper down to the engine
             />
           </div>
 
