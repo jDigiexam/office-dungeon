@@ -355,16 +355,21 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
     
     const timeSinceShot = state.clock.elapsedTime - lastShot.current;
 
-    if (dist < 15 && hasLoS) {
-      // 🚨 NEW: Play Boss roar when it spots you
-      if (!hasAggroed.current) {
-        hasAggroed.current = true;
-        const bossSfx = new Audio('/boss_roar.mp3');
-        bossSfx.volume = 1.0;
-        bossSfx.play().catch(() => {});
-      }
-      groupRef.current.lookAt(playerCamera.position.x, groupRef.current.position.y, playerCamera.position.z);
-      
+    // 🚨 Reset aggro immediately if line-of-sight is lost
+    if (!hasLoS) {
+  hasAggroed.current = false;
+    }
+
+if (dist < 15 && hasLoS) {
+  // Play Boss roar when it spots you
+  if (!hasAggroed.current) {
+    hasAggroed.current = true;
+    const bossSfx = new Audio('/doom_baron_of_hell.mp3');
+    bossSfx.volume = 1.0;
+    bossSfx.play().catch(() => {});
+  }
+  groupRef.current.lookAt(playerCamera.position.x, groupRef.current.position.y, playerCamera.position.z);
+
       if (timeSinceShot > 1.2) {
         lastShot.current = state.clock.elapsedTime;
         const dir = new THREE.Vector3().subVectors(playerCamera.position, groupRef.current.position).normalize();
@@ -505,13 +510,21 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
       hasAggroed.current = false; // 🚨 NEW: Reset so it can growl again if you run away
     } else {
       const hasLoS = checkLoS(groupRef.current.position.x, groupRef.current.position.z, playerCamera.position.x, playerCamera.position.z);
-      if (hasLoS) isChasing.current = true;
-      // 🚨 NEW: Play Imp growl when it spots you
-      if (!hasAggroed.current) {
-        hasAggroed.current = true;
-        const impSfx = new Audio('/imp_sight.mp3');
-        impSfx.volume = 1.0;
-        impSfx.play().catch(() => {});
+     
+      // 🚨 FIX: Explicitly toggle chase state based on LoS
+      if (hasLoS) {
+        isChasing.current = true;
+        // Play Imp growl when it spots you
+        if (!hasAggroed.current) {
+          hasAggroed.current = true;
+          const impSfx = new Audio('/imp.mp3');
+          impSfx.volume = 1.0;
+          impSfx.play().catch(() => {});
+        }
+      } else {
+        // 🚨 ADD THIS: Stop chasing and reset aggro immediately when LoS breaks
+        isChasing.current = false;
+        hasAggroed.current = false; 
       }
     }
 
