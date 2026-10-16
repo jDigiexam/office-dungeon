@@ -171,7 +171,7 @@ function FakePresentation({ onGlitchComplete }) {
   };
 
   return (
-    <div className={`absolute inset-0 z-[100] flex flex-col bg-[#111111] text-stone-200 font-sans transition-all select-none ${isGlitching ? 'glitch-active bg-black invert' : ''}`}>
+    <div className={`absolute inset-0 z-[100] flex flex-col bg-[#111111] text-stone-200 font-sans transition-all select-none ${isGlitching ? 'glitch-static bg-stone-900' : ''}`}>
       
       {/* Main Slide Area - 16:9 Aspect Ratio Container */}
       <div className="flex-1 flex items-center justify-center p-8">
@@ -182,13 +182,14 @@ function FakePresentation({ onGlitchComplete }) {
           <img 
             src={slideImages[slide]} 
             alt={`Slide ${slide + 1}`} 
-            className={`w-full h-full object-cover transition-opacity duration-300 ${isGlitching ? 'opacity-50 mix-blend-difference' : 'opacity-100'}`}
+            className={`w-full h-full object-cover transition-opacity duration-300 ${isGlitching ? 'opacity-20' : 'opacity-100'}`}
           />
           
           {isGlitching && (
-            <div className="absolute inset-0 flex items-center justify-center bg-red-900/40 mix-blend-overlay">
-              <h1 className="text-6xl md:text-8xl font-black text-white tracking-[0.2em] animate-pulse text-center font-mono">
-                SYSTEM BREACH<br/>0x00000FF
+            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+              <h1 className="text-4xl md:text-6xl font-black text-stone-300 tracking-[0.2em] font-mono text-center leading-relaxed">
+                SIGNAL LOST<br/>
+                <span className="text-xl md:text-2xl text-stone-500 animate-pulse">RE-ROUTING TO LOCAL TERMINAL...</span>
               </h1>
             </div>
           )}
@@ -220,7 +221,7 @@ function FakePresentation({ onGlitchComplete }) {
             <div className="w-px h-5 bg-stone-800 mx-2"></div>
             <div className="flex gap-4">
               <svg className="w-4 h-4 hover:text-stone-300 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
-              <svg className="w-4 h-4 hover:text-stone-300 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l-5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+              <svg className="w-4 h-4 hover:text-stone-300 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
             </div>
           </div>
           
