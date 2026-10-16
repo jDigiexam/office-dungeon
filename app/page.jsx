@@ -278,8 +278,6 @@ export default function EscapeRoomPage() {
 
   const [signalValues, setSignalValues] = useState({ freq: 1, amp: 1, phase: 0 });
 
-  const [systemBooted, setSystemBooted] = useState(false); 
-
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   
   const gameplayPlaylist = [
@@ -747,7 +745,7 @@ export default function EscapeRoomPage() {
   let activeAudioSrc = "";
   let loopAudio = false;
 
-  if (showBait || !systemBooted) {
+  if (showBait) {
     activeAudioSrc = ""; 
   } else if (gameWon) {
     activeAudioSrc = "/In the House, In a Heartbeat.mp3"; 
@@ -768,10 +766,6 @@ export default function EscapeRoomPage() {
   return (
     <main className="relative w-full h-screen overflow-hidden bg-black font-mono select-none">
       
-      {showBait && (
-        <FakePresentation onGlitchComplete={() => setShowBait(false)} />
-      )}
-
       <audio id="sfx-door" src="/door.mp3" preload="auto" />
       <audio id="sfx-imp" src="/imp_sight.mp3" preload="auto" />
       <audio id="sfx-boss" src="/boss_roar.mp3" preload="auto" />
@@ -782,15 +776,8 @@ export default function EscapeRoomPage() {
         onNextTrack={() => setCurrentTrackIndex((prev) => (prev + 1) % gameplayPlaylist.length)} 
       />
 
-      {!systemBooted ? (
-        <div 
-          className="absolute inset-0 z-[60] flex items-center justify-center bg-black cursor-pointer hover:bg-stone-900 transition-colors duration-500" 
-          onClick={() => setSystemBooted(true)}
-        >
-          <div className="text-red-600 animate-pulse font-bold tracking-widest text-xl border-2 border-red-900 p-8 shadow-[0_0_30px_rgba(153,27,27,0.5)]">
-            CLICK TO INITIALIZE TERMINAL...
-          </div>
-        </div>
+      {showBait ? (
+        <FakePresentation onGlitchComplete={() => setShowBait(false)} />
       ) : !gameStarted ? (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black text-red-600">
           
