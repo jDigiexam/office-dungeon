@@ -286,7 +286,7 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
   const spriteMaterialRef = useRef();
   const isDead = useRef(false);
   const deathTime = useRef(0);
-  const hasAggroed = useRef(false); // 🚨 NEW: Tracks if the boss has roared
+  const hasAggroed = useRef(false);
   
   const hp = useRef(25); 
   const lastShot = useRef(0);
@@ -308,7 +308,9 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
     const dz = endZ - startZ;
     const dist = Math.sqrt(dx * dx + dz * dz);
     
-    // Step forward in tiny 0.2-unit increments to prevent slipping through corners
+    // Prevent NaN if positions perfectly overlap
+    if (dist === 0) return true;
+    
     const steps = Math.ceil(dist * 5); 
     const stepX = dx / steps;
     const stepZ = dz / steps;
@@ -320,7 +322,6 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
       const gridX = Math.floor(curX);
       const gridZ = Math.floor(curZ);
       
-      // If the ray hits any wall or door, vision is blocked
       if ([1, 2, 12, 22, 7, 3, 4, 32].includes(grid[gridZ]?.[gridX])) {
         return false;
       }
@@ -352,24 +353,22 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
     const dist = Math.sqrt(sqDist);
     
     const hasLoS = checkLoS(groupRef.current.position.x, groupRef.current.position.z, playerCamera.position.x, playerCamera.position.z);
-    
     const timeSinceShot = state.clock.elapsedTime - lastShot.current;
 
-    // 🚨 Reset aggro immediately if line-of-sight is lost
-    if (!hasLoS) {
-  hasAggroed.current = false;
+    // 🚨 FIX: Only reset aggro if the player runs extremely far away (distance > 20)
+    if (sqDist > 400) {
+      hasAggroed.current = false;
     }
 
-if (dist < 15 && hasLoS) {
-  // Play Boss roar when it spots you
-  if (!hasAggroed.current) {
-    hasAggroed.current = true;
-    const bossSfx = new Audio('/doom_baron_of_hell.mp3');
-    bossSfx.volume = 1.0;
-    bossSfx.play().catch(() => {});
-  }
-  groupRef.current.lookAt(playerCamera.position.x, groupRef.current.position.y, playerCamera.position.z);
-
+    if (dist < 15 && hasLoS) {
+      if (!hasAggroed.current) {
+        hasAggroed.current = true;
+        const bossSfx = new Audio('/doom_baron_of_hell.mp3');
+        bossSfx.volume = 1.0;
+        bossSfx.play().catch(() => {});
+      }
+      groupRef.current.lookAt(playerCamera.position.x, groupRef.current.position.y, playerCamera.position.z);
+      
       if (timeSinceShot > 1.2) {
         lastShot.current = state.clock.elapsedTime;
         const dir = new THREE.Vector3().subVectors(playerCamera.position, groupRef.current.position).normalize();
@@ -445,17 +444,15 @@ if (dist < 15 && hasLoS) {
   );
 }
 
-// 🚨 UPDATED: Imp Sprite Entity (Replaces the 3D Shadow NPC)
 function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlayerHit, grid, texture }) {
   const groupRef = useRef();
   const spriteMaterialRef = useRef();
   const isDead = useRef(false);
   const isChasing = useRef(false);
-  const hasAggroed = useRef(false); // 🚨 NEW: Tracks if the imp has growled
+  const hasAggroed = useRef(false); 
   
   const hp = useRef(2);
 
-  // Safely clone the pre-loaded Imp texture
   const impTex = useMemo(() => {
     if (!texture) return null;
     const tex = texture.clone();
@@ -473,7 +470,8 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
     const dz = endZ - startZ;
     const dist = Math.sqrt(dx * dx + dz * dz);
     
-    // Step forward in tiny 0.2-unit increments to prevent slipping through corners
+    if (dist === 0) return true;
+    
     const steps = Math.ceil(dist * 5); 
     const stepX = dx / steps;
     const stepZ = dz / steps;
@@ -485,7 +483,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
       const gridX = Math.floor(curX);
       const gridZ = Math.floor(curZ);
       
-      // If the ray hits any wall or door, vision is blocked
       if ([1, 2, 12, 22, 7, 3, 4, 32].includes(grid[gridZ]?.[gridX])) {
         return false;
       }
@@ -507,14 +504,13 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
     
     if (sqDist > 64) {
       isChasing.current = false;
-      hasAggroed.current = false; // 🚨 NEW: Reset so it can growl again if you run away
+      // 🚨 FIX: Aggro is strictly reset only when the player runs far out of range (distance > 8)
+      hasAggroed.current = false; 
     } else {
       const hasLoS = checkLoS(groupRef.current.position.x, groupRef.current.position.z, playerCamera.position.x, playerCamera.position.z);
      
-      // 🚨 FIX: Explicitly toggle chase state based on LoS
       if (hasLoS) {
         isChasing.current = true;
-        // Play Imp growl when it spots you
         if (!hasAggroed.current) {
           hasAggroed.current = true;
           const impSfx = new Audio('/imp.mp3');
@@ -522,9 +518,8 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
           impSfx.play().catch(() => {});
         }
       } else {
-        // 🚨 ADD THIS: Stop chasing and reset aggro immediately when LoS breaks
+        // 🚨 FIX: Stop chasing when line-of-sight breaks, but DO NOT reset aggro.
         isChasing.current = false;
-        hasAggroed.current = false; 
       }
     }
 
@@ -554,7 +549,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
           groupRef.current.position.z = nextZ;
         }
 
-        // Loop through the first 4 frames for the walking animation
         if (impTex) {
           const walkFrame = Math.floor(state.clock.elapsedTime * 6) % 4;
           impTex.offset.x = walkFrame * (1/7);
@@ -566,7 +560,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
         onPlayerHit();
       }
     } else {
-       // Lock to the idle frame when not chasing
        if (impTex) {
          impTex.offset.x = 0;
        }
@@ -580,7 +573,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
           
           hp.current -= 1; 
 
-          // Flash red when hit
           if (spriteMaterialRef.current) {
             spriteMaterialRef.current.color.setHex(0xff0000);
             setTimeout(() => { 
@@ -600,7 +592,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
 
   return (
     <group ref={groupRef} position={initialPos}>
-      {/* 🚨 Lowered Y position to 0.6 so the taller sprite touches the floor */}
       <sprite position={[0, 0.6, 0]} scale={[1.6, 2.2, 1]}>
         <spriteMaterial ref={spriteMaterialRef} map={impTex || undefined} color="#ffffff" transparent={true} />
       </sprite>
