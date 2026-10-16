@@ -126,14 +126,27 @@ function AudioCrossfader({ currentSrc, loopCurrent, onNextTrack }) {
 function FakePresentation({ onGlitchComplete }) {
   const [slide, setSlide] = useState(0);
   const [isGlitching, setIsGlitching] = useState(false);
+  
+  // Create a ref to hold the audio object so we can stop it later
+  const glitchAudioRef = useRef(null);
 
-  // Added the 4th slide image[cite: 10, 11, 12, 13]
+  // URL-encode spaces (%20) so the browser correctly fetches from the public folder
   const slideImages = [
-    "/Murder Mystery 1.jpg",
-    "/Murder Mystery 2.jpg",
-    "/Murder Mystery 3.jpg",
-    "/Murder Mystery 4.jpg"
+    "/Murder%20Mystery%20@%20Digiexam%201.jpg",
+    "/Murder%20Mystery%20@%20Digiexam%202.jpg",
+    "/Murder%20Mystery%20@%20Digiexam%203.jpg",
+    "/Murder%20Mystery%20@%20Digiexam%204.jpg"
   ];
+
+  // Cleanup function to ensure audio stops if the component unmounts
+  useEffect(() => {
+    return () => {
+      if (glitchAudioRef.current) {
+        glitchAudioRef.current.pause();
+        glitchAudioRef.current.currentTime = 0;
+      }
+    };
+  }, []);
 
   const handleNext = () => {
     if (slide < slideImages.length - 1) {
@@ -141,11 +154,17 @@ function FakePresentation({ onGlitchComplete }) {
     } else {
       setIsGlitching(true);
       
-      const audio = new Audio('/static.mp3'); 
-      audio.volume = 1.0;
-      audio.play().catch(() => {});
+      // Store the audio in the ref and play it
+      glitchAudioRef.current = new Audio('/boss_roar.mp3'); 
+      glitchAudioRef.current.volume = 1.0;
+      glitchAudioRef.current.play().catch(() => {});
 
       setTimeout(() => {
+        // Cut the audio completely before dropping into the game
+        if (glitchAudioRef.current) {
+          glitchAudioRef.current.pause();
+          glitchAudioRef.current.currentTime = 0;
+        }
         onGlitchComplete();
       }, 2500); 
     }
@@ -201,7 +220,7 @@ function FakePresentation({ onGlitchComplete }) {
             <div className="w-px h-5 bg-stone-800 mx-2"></div>
             <div className="flex gap-4">
               <svg className="w-4 h-4 hover:text-stone-300 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
-              <svg className="w-4 h-4 hover:text-stone-300 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+              <svg className="w-4 h-4 hover:text-stone-300 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l-5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
             </div>
           </div>
           
