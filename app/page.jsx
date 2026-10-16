@@ -123,7 +123,83 @@ function AudioCrossfader({ currentSrc, loopCurrent, onNextTrack }) {
   );
 }
 
+function FakePresentation({ onGlitchComplete }) {
+  const [slide, setSlide] = useState(0);
+  const [isGlitching, setIsGlitching] = useState(false);
+
+  const slides = [
+    {
+      title: "MURDER @ DIGIEXAM", /*[cite: 9] */
+      content: "Annual Team Event 2026",
+      button: "Start Investigation"
+    },
+    {
+      title: "THE MIDNIGHT MURDER", /*[cite: 9] */
+      content: "In a quiet mansion on the outskirts of town, a wealthy art collector, Mr. Arthur Hargrave, has been found murdered in his study. His sudden death sends shockwaves through the mansion, and everyone who was present that night becomes a suspect. As the detectives, you’ve been called to investigate.\n\nThe guests at Hargrave Mansion are each hiding something, and it’s up to you to unravel their secrets.", /*[cite: 9] */
+      button: "Continue"
+    },
+    {
+      title: "The Investigation Begins…", /*[cite: 9] */
+      content: "As you begin your investigation, you quickly realize…\n\nEach suspect had both the means and opportunity to commit the crime. However, the true motive remains hidden. Was it greed, revenge, or something even more sinister?\n\nYou’ll need to examine the crime scene, interview the suspects, and collect evidence. Be warned: not every path will lead you to the truth, and one wrong choice could send you down a dead-end, forcing you to restart the investigation. Only your sharp detective skills will uncover the identity of the killer and bring justice to Mr. Hargrave.", /*[cite: 9] */
+      button: "Load Case Files..."
+    }
+  ];
+
+  const handleNext = () => {
+    if (slide < slides.length - 1) {
+      setSlide(slide + 1);
+    } else {
+      setIsGlitching(true);
+      
+      const audio = new Audio('/boss_roar.mp3'); 
+      audio.volume = 1.0;
+      audio.play().catch(() => {});
+
+      setTimeout(() => {
+        onGlitchComplete();
+      }, 2500); 
+    }
+  };
+
+  return (
+    <div className={`absolute inset-0 z-[100] flex flex-col bg-white text-black font-sans transition-all ${isGlitching ? 'glitch-active bg-stone-900 invert' : ''}`}>
+      <div className="flex items-center gap-4 border-b border-gray-300 p-4 bg-gray-50 shadow-sm">
+        <div className="w-8 h-8 bg-yellow-400 rounded-sm flex items-center justify-center font-bold text-white">S</div>
+        <div>
+          <h1 className="text-lg font-medium text-gray-700">Halloween Mystery 2026.pptx</h1>
+          <div className="flex gap-4 text-xs text-gray-500 mt-1">
+            <span>File</span><span>Edit</span><span>View</span><span>Present</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 flex flex-col items-center justify-center p-12 text-center max-w-4xl mx-auto">
+        <h2 className={`text-5xl font-bold mb-8 text-gray-800 ${isGlitching ? 'tracking-[2em] text-red-600' : ''}`}>
+          {slides[slide].title}
+        </h2>
+        <p className="text-xl text-gray-600 whitespace-pre-wrap leading-relaxed mb-12">
+          {isGlitching ? 'FATAL EXCEPTION: SYSTEM BREACH DETECTED 0x00000FF' : slides[slide].content}
+        </p>
+        
+        <button 
+          onClick={handleNext}
+          disabled={isGlitching}
+          className="px-8 py-3 bg-blue-600 text-white rounded shadow hover:bg-blue-700 transition-colors text-lg font-medium cursor-pointer relative z-50"
+        >
+          {isGlitching ? 'CRITICAL FAILURE' : slides[slide].button}
+        </button>
+      </div>
+      
+      <div className="absolute bottom-4 left-4 text-sm text-gray-400">
+        Slide {slide + 1} of 29
+      </div>
+    </div>
+  );
+}
+
 export default function EscapeRoomPage() {
+  const [showBait, setShowBait] = useState(true);
+  
   const [gameWon, setGameWon] = useState(false); 
   const [currentFloor, setCurrentFloor] = useState(0);
   const [inventory, setInventory] = useState([]);
@@ -181,7 +257,6 @@ export default function EscapeRoomPage() {
     '/14 Our Resurrected Teleport.mp3'
   ];
 
-  // 🚨 NEW: Global SFX trigger using DOM elements
   const playSFX = (id, vol = 1.0) => {
     const el = document.getElementById(id);
     if (el) {
@@ -303,7 +378,6 @@ export default function EscapeRoomPage() {
     triggerMessage(puzzle.successMessage);
     setActivePuzzle(null);
 
-    // 🚨 FIX: Play the DOM audio element
     if ([8, 18, 28, 17, 38].includes(reward.newTile)) {
       playSFX('sfx-door', 1.0);
     }
@@ -458,7 +532,6 @@ export default function EscapeRoomPage() {
 
   const handleInteract = (tileType, x, z, fIdx) => {
     const openDoor = (targetType) => {
-      // 🚨 FIX: Play the DOM audio element
       playSFX('sfx-door', 1.0);
 
       const newGrids = [...grids];
@@ -639,7 +712,7 @@ export default function EscapeRoomPage() {
   let activeAudioSrc = "";
   let loopAudio = false;
 
-  if (!systemBooted) {
+  if (showBait || !systemBooted) {
     activeAudioSrc = ""; 
   } else if (gameWon) {
     activeAudioSrc = "/In the House, In a Heartbeat.mp3"; 
@@ -660,7 +733,10 @@ export default function EscapeRoomPage() {
   return (
     <main className="relative w-full h-screen overflow-hidden bg-black font-mono select-none">
       
-      {/* 🚨 NEW: Hidden DOM Audio tags ensure the browser grants playback permission globally */}
+      {showBait && (
+        <FakePresentation onGlitchComplete={() => setShowBait(false)} />
+      )}
+
       <audio id="sfx-door" src="/door.mp3" preload="auto" />
       <audio id="sfx-imp" src="/imp_sight.mp3" preload="auto" />
       <audio id="sfx-boss" src="/boss_roar.mp3" preload="auto" />
@@ -850,7 +926,7 @@ export default function EscapeRoomPage() {
               onPlayerHit={handlePlayerHit}
               isPuzzleActive={!!activePuzzle} 
               currentFloor={currentFloor}
-              playSFX={playSFX} // 🚨 FIX: Pass the audio helper down to the engine
+              playSFX={playSFX} 
             />
           </div>
 

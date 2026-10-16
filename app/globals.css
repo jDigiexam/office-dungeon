@@ -5,3 +5,34 @@ body {
   overflow: hidden;
   background-color: black;
 }
+
+@keyframes glitch-anim {
+  0% { clip-path: inset(10% 0 80% 0); transform: translate(-2px, 2px); }
+  20% { clip-path: inset(80% 0 1% 0); transform: translate(2px, -2px); }
+  40% { clip-path: inset(40% 0 40% 0); transform: translate(-2px, 2px); }
+  60% { clip-path: inset(10% 0 60% 0); transform: translate(2px, -2px); filter: hue-rotate(90deg); }
+  80% { clip-path: inset(30% 0 20% 0); transform: translate(-2px, 2px); filter: invert(1); }
+  100% { clip-path: inset(50% 0 30% 0); transform: translate(2px, -2px); }
+}
+
+.glitch-active {
+  animation: glitch-anim 0.2s infinite;
+  position: relative;
+}
+.glitch-active::before, .glitch-active::after {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: inherit;
+  z-index: -1;
+}
+.glitch-active::before {
+  animation: glitch-anim 0.3s infinite reverse;
+  transform: translate(-5px, 0);
+  filter: drop-shadow(5px 0 0 red);
+}
+.glitch-active::after {
+  animation: glitch-anim 0.4s infinite forwards;
+  transform: translate(5px, 0);
+  filter: drop-shadow(-5px 0 0 blue);
+}
