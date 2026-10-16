@@ -695,7 +695,7 @@ export default function EscapeRoomPage() {
 
           <div className="border-4 border-stone-800 bg-stone-900 p-8 flex flex-col items-center justify-center w-full max-w-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] relative">
             <h1 className="text-6xl font-black mb-4 tracking-widest text-red-600 drop-shadow-[0_0_10px_rgba(220,38,38,0.5)]">
-              ZERO-DAY ESCAPE ROOM
+              ZERO-DAY
             </h1>
             
             <div 
@@ -740,11 +740,11 @@ export default function EscapeRoomPage() {
             
             {mapsLoading ? (
               <button disabled className="w-full py-4 bg-stone-800 text-stone-500 font-extrabold tracking-widest animate-pulse border-2 border-stone-700">
-                INITIALIZING LINK...
+                INITIALIZING...
               </button>
             ) : (
               <button onClick={() => setGameStarted(true)} className="w-full py-4 bg-red-800 hover:bg-red-600 text-black font-black text-xl tracking-[0.3em] transition-colors border-2 border-red-900 shadow-[0_0_15px_rgba(153,27,27,0.8)]">
-                INITIATE ESCAPE.
+                BEGIN THE ESCAPE.
               </button> 
             )} 
           </div>
@@ -779,16 +779,19 @@ export default function EscapeRoomPage() {
                     THE FINAL CONTAINMENT DOORS OPENED, ALLOWING YOU TO ASCEND TO THE SURFACE.
                   </p>
                   <p className="text-stone-300 font-bold tracking-widest leading-loose">
-                    BUT AS THE ELEVATOR DOORS PARTED, YOU WERE NOT GREETED BY RESCUE TEAMS.
+                    BUT AS THE ELEVATOR DOORS PART, YOU ARE NOT GREETED BY RESCUE TEAMS.
                   </p>
                   <p className="text-stone-300 font-bold tracking-widest leading-loose">
                     THE SKY IS BURNING. THE CITY IS IN RUINS.
                   </p>
                   <p className="text-stone-300 font-bold tracking-widest leading-loose">
-                    THE BIOENGINEERING COMPLEX WAS NOT THE ONLY SECTOR TO FALL.
+                    THE BIOENGINEERING COMPLEX WAS JUST THE FIRST TO FALL.
+                  </p>
+                  <p className="text-stone-300 font-bold tracking-widest leading-loose">
+                    FIGURES LOOM OMINOUSLY IN THE SHADOWS. THE SMELL OF DEATH IN THE AIR.
                   </p>
                   <p className="text-emerald-500 font-black tracking-[0.3em] text-2xl mt-12">
-                    MISSION ACCOMPLISHED.
+                    ARE YOU ALL THAT IS LEFT OF HUMANITY?
                   </p>
 
                   <p className="text-emerald-400 font-bold tracking-[0.2em] text-sm mt-2">
@@ -796,7 +799,7 @@ export default function EscapeRoomPage() {
                   </p>
 
                   <p className="text-red-600 font-black tracking-[0.3em] text-3xl mt-4 drop-shadow-[0_0_15px_rgba(220,38,38,0.8)]">
-                    NEW NIGHTMARE BEGUN.
+                    THE TRUE NIGHTMARE BEGINS.
                   </p>
                 </div>
               </div>
