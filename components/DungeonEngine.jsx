@@ -286,10 +286,13 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
   const spriteMaterialRef = useRef();
   const isDead = useRef(false);
   const deathTime = useRef(0);
-  const hasAggroed = useRef(false);
+  const hasAggroed = useRef(false); 
   
   const hp = useRef(25); 
   const lastShot = useRef(0);
+
+  // 🚨 FIX: Keep the audio object safely in memory
+  const bossSfx = useMemo(() => typeof window !== 'undefined' ? new Audio('/doom_baron_of_hell.mp3') : null, []);
 
   const bossTex = useMemo(() => {
     if (!texture) return null;
@@ -308,7 +311,6 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
     const dz = endZ - startZ;
     const dist = Math.sqrt(dx * dx + dz * dz);
     
-    // Prevent NaN if positions perfectly overlap
     if (dist === 0) return true;
     
     const steps = Math.ceil(dist * 5); 
@@ -355,7 +357,6 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
     const hasLoS = checkLoS(groupRef.current.position.x, groupRef.current.position.z, playerCamera.position.x, playerCamera.position.z);
     const timeSinceShot = state.clock.elapsedTime - lastShot.current;
 
-    // 🚨 FIX: Only reset aggro if the player runs extremely far away (distance > 20)
     if (sqDist > 400) {
       hasAggroed.current = false;
     }
@@ -363,9 +364,12 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
     if (dist < 15 && hasLoS) {
       if (!hasAggroed.current) {
         hasAggroed.current = true;
-        const bossSfx = new Audio('/doom_baron_of_hell.mp3');
-        bossSfx.volume = 1.0;
-        bossSfx.play().catch(() => {});
+        // 🚨 FIX: Play the safely stored audio object
+        if (bossSfx) {
+          bossSfx.volume = 1.0;
+          bossSfx.currentTime = 0;
+          bossSfx.play().catch((e) => console.log("Audio play blocked", e));
+        }
       }
       groupRef.current.lookAt(playerCamera.position.x, groupRef.current.position.y, playerCamera.position.z);
       
@@ -453,6 +457,9 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
   
   const hp = useRef(2);
 
+  // 🚨 FIX: Keep the audio object safely in memory
+  const impSfx = useMemo(() => typeof window !== 'undefined' ? new Audio('/imp.mp3') : null, []);
+
   const impTex = useMemo(() => {
     if (!texture) return null;
     const tex = texture.clone();
@@ -502,9 +509,9 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
     const dz = groupRef.current.position.z - playerCamera.position.z;
     const sqDist = dx * dx + dz * dz;
     
-    if (sqDist > 64) {
+    // 🚨 FIX: Increased aggro drop distance from 64 to 144 (12 tiles away) so they track you better
+    if (sqDist > 144) {
       isChasing.current = false;
-      // 🚨 FIX: Aggro is strictly reset only when the player runs far out of range (distance > 8)
       hasAggroed.current = false; 
     } else {
       const hasLoS = checkLoS(groupRef.current.position.x, groupRef.current.position.z, playerCamera.position.x, playerCamera.position.z);
@@ -513,12 +520,14 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
         isChasing.current = true;
         if (!hasAggroed.current) {
           hasAggroed.current = true;
-          const impSfx = new Audio('/imp.mp3');
-          impSfx.volume = 1.0;
-          impSfx.play().catch(() => {});
+          // 🚨 FIX: Play the safely stored audio object
+          if (impSfx) {
+            impSfx.volume = 1.0;
+            impSfx.currentTime = 0;
+            impSfx.play().catch((e) => console.log("Audio play blocked", e));
+          }
         }
       } else {
-        // 🚨 FIX: Stop chasing when line-of-sight breaks, but DO NOT reset aggro.
         isChasing.current = false;
       }
     }
