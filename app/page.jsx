@@ -132,10 +132,10 @@ function FakePresentation({ onGlitchComplete }) {
 
   // URL-encode spaces (%20) so the browser correctly fetches from the public folder
   const slideImages = [
-    "/Murder%20Mystery%201.jpg",
-    "/Murder%20Mystery%202.jpg",
-    "/Murder%20Mystery%203.jpg",
-    "/Murder%20Mystery%204.jpg"
+    "/Murder_Mystery_1.jpg",
+    "/Murder_Mystery_2.jpg",
+    "/Murder_Mystery_3.jpg",
+    "/Murder_Mystery_4.jpg"
   ];
 
   // Cleanup function to ensure audio stops if the component unmounts
@@ -155,7 +155,7 @@ function FakePresentation({ onGlitchComplete }) {
       setIsGlitching(true);
       
       // Store the audio in the ref and play it
-      glitchAudioRef.current = new Audio('/boss_roar.mp3'); 
+      glitchAudioRef.current = new Audio('/static.mp3'); 
       glitchAudioRef.current.volume = 1.0;
       glitchAudioRef.current.play().catch(() => {});
 
