@@ -132,10 +132,10 @@ function FakePresentation({ onGlitchComplete }) {
 
   // URL-encode spaces (%20) so the browser correctly fetches from the public folder
   const slideImages = [
-    "/Murder%20Mystery%20@%20Digiexam%201.jpg",
-    "/Murder%20Mystery%20@%20Digiexam%202.jpg",
-    "/Murder%20Mystery%20@%20Digiexam%203.jpg",
-    "/Murder%20Mystery%20@%20Digiexam%204.jpg"
+    "/Murder%20Mystery%201.jpg",
+    "/Murder%20Mystery%202.jpg",
+    "/Murder%20Mystery%203.jpg",
+    "/Murder%20Mystery%204.jpg"
   ];
 
   // Cleanup function to ensure audio stops if the component unmounts
