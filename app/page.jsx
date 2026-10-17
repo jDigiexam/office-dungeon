@@ -1197,87 +1197,94 @@ export default function EscapeRoomPage() {
                     ))}
                   </div>
                   ) : activePuzzle.type === 'word-hacker' ? (
-                    <div className="flex flex-col gap-4 w-full max-w-3xl mx-auto font-mono text-emerald-500 selection:bg-emerald-500 selection:text-black">
-                      <div className="flex justify-between items-end border-b border-emerald-900 pb-2">
-                        <p className="text-sm tracking-widest">{activePuzzle.title}<br/>{activePuzzle.question}</p>
+                    <div className="flex flex-col gap-6 w-full max-w-3xl mx-auto font-mono text-emerald-500">
+                      
+                      {/* Header with Attempts */}
+                      <div className="flex justify-between items-center border-b border-emerald-900 pb-2">
+                        <span className="text-xs tracking-widest text-emerald-700 uppercase">Sys_Hack_v2.0</span>
                         <div className="flex gap-2 items-center">
-                          <span className="text-xs">ATTEMPTS REMAINING:</span>
+                          <span className="text-xs font-bold text-emerald-400">ATTEMPTS REMAINING:</span>
                           <div className="flex gap-1">
                             {Array.from({ length: 4 }).map((_, i) => (
-                              <div key={i} className={`w-3 h-4 ${i < (4 - hackerGuesses.length) ? 'bg-emerald-500' : 'bg-stone-800'}`} />
+                              <div key={i} className={`w-3 h-4 ${i < (4 - hackerGuesses.length) ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-stone-800'}`} />
                             ))}
                           </div>
                         </div>
                       </div>
                       
-                      <div className="flex flex-col md:flex-row gap-8 text-sm md:text-base leading-tight tracking-[0.2em]">
-                        {/* Main Hex Board */}
-                        <div className="flex-1 flex gap-6">
-                          {/* Column 1 */}
-                          <div className="flex flex-col flex-1">
-                            {hackerBoard.map((row, i) => (
-                              <div key={`r1-${i}`} className="flex gap-3">
-                                <span className="text-emerald-800">{row.hex1}</span>
-                                <span className="flex flex-1">
-                                  {row.col1.type === 'word' ? (
-                                    <>
-                                      <span className="text-emerald-700">{row.col1.pre}</span>
-                                      <button 
-                                        onClick={() => !hackerGuesses.some(g => g.word === row.col1.word) && handleHackerClick(row.col1.word)}
-                                        className={`hover:bg-emerald-500 hover:text-black transition-colors ${hackerGuesses.some(g => g.word === row.col1.word) ? 'line-through text-emerald-900' : 'text-emerald-400'}`}
-                                      >
-                                        {row.col1.word}
-                                      </button>
-                                      <span className="text-emerald-700">{row.col1.post}</span>
-                                    </>
-                                  ) : (
-                                    <span className="text-emerald-700">{row.col1.str}</span>
-                                  )}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                          {/* Column 2 */}
-                          <div className="flex flex-col flex-1 hidden sm:flex">
-                            {hackerBoard.map((row, i) => (
-                              <div key={`r2-${i}`} className="flex gap-3">
-                                <span className="text-emerald-800">{row.hex2}</span>
-                                <span className="flex flex-1">
-                                  {row.col2.type === 'word' ? (
-                                    <>
-                                      <span className="text-emerald-700">{row.col2.pre}</span>
-                                      <button 
-                                        onClick={() => !hackerGuesses.some(g => g.word === row.col2.word) && handleHackerClick(row.col2.word)}
-                                        className={`hover:bg-emerald-500 hover:text-black transition-colors ${hackerGuesses.some(g => g.word === row.col2.word) ? 'line-through text-emerald-900' : 'text-emerald-400'}`}
-                                      >
-                                        {row.col2.word}
-                                      </button>
-                                      <span className="text-emerald-700">{row.col2.post}</span>
-                                    </>
-                                  ) : (
-                                    <span className="text-emerald-700">{row.col2.str}</span>
-                                  )}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
+                      {/* Main Hex Board */}
+                      <div className="flex gap-4 md:gap-8 text-xs md:text-sm leading-tight tracking-[0.2em] justify-center">
+                        {/* Column 1 */}
+                        <div className="flex flex-col">
+                          {hackerBoard.map((row, i) => (
+                            <div key={`r1-${i}`} className="flex gap-2 md:gap-3">
+                              <span className="text-emerald-800 hidden sm:inline">{row.hex1}</span>
+                              <span className="flex">
+                                {row.col1.type === 'word' ? (
+                                  <>
+                                    <span className="text-emerald-700 whitespace-pre">{row.col1.pre}</span>
+                                    <button 
+                                      onClick={() => !hackerGuesses.some(g => g.word === row.col1.word) && handleHackerClick(row.col1.word)}
+                                      className={`hover:bg-emerald-500 hover:text-black transition-colors ${hackerGuesses.some(g => g.word === row.col1.word) ? 'bg-emerald-900 text-black line-through' : 'text-emerald-300 font-bold'}`}
+                                    >
+                                      {row.col1.word}
+                                    </button>
+                                    <span className="text-emerald-700 whitespace-pre">{row.col1.post}</span>
+                                  </>
+                                ) : (
+                                  <span className="text-emerald-700 whitespace-pre">{row.col1.str}</span>
+                                )}
+                              </span>
+                            </div>
+                          ))}
                         </div>
-                        
-                        {/* Terminal Output Log */}
-                      <div className="w-48 flex flex-col gap-4 border-l border-emerald-900 pl-6 h-[380px] overflow-y-auto">
-                        <div className="text-xs text-emerald-700 uppercase tracking-widest border-b border-emerald-900 pb-2 mb-2">
-                          System Trace Log
+                        {/* Column 2 */}
+                        <div className="flex flex-col">
+                          {hackerBoard.map((row, i) => (
+                            <div key={`r2-${i}`} className="flex gap-2 md:gap-3">
+                              <span className="text-emerald-800 hidden sm:inline">{row.hex2}</span>
+                              <span className="flex">
+                                {row.col2.type === 'word' ? (
+                                  <>
+                                    <span className="text-emerald-700 whitespace-pre">{row.col2.pre}</span>
+                                    <button 
+                                      onClick={() => !hackerGuesses.some(g => g.word === row.col2.word) && handleHackerClick(row.col2.word)}
+                                      className={`hover:bg-emerald-500 hover:text-black transition-colors ${hackerGuesses.some(g => g.word === row.col2.word) ? 'bg-emerald-900 text-black line-through' : 'text-emerald-300 font-bold'}`}
+                                    >
+                                      {row.col2.word}
+                                    </button>
+                                    <span className="text-emerald-700 whitespace-pre">{row.col2.post}</span>
+                                  </>
+                                ) : (
+                                  <span className="text-emerald-700 whitespace-pre">{row.col2.str}</span>
+                                )}
+                              </span>
+                            </div>
+                          ))}
                         </div>
-                        {hackerGuesses.map((g, i) => (
-                          <div key={i} className="flex flex-col text-sm leading-relaxed bg-black p-2 border border-emerald-900/50">
-                            <span className="text-emerald-400 font-bold">&gt; {g.word}</span>
-                            <span className="text-red-500">&gt; ENTRY DENIED.</span>
-                            <span className="text-yellow-400 font-black animate-pulse mt-1 bg-yellow-900/20 px-1 inline-block w-fit border border-yellow-700/50">
-                              &gt; LIKENESS={g.matches}
-                            </span>
-                          </div>
-                        ))}
                       </div>
+                      
+                      {/* Explicit Feedback Log (Placed at the bottom to prevent layout breaks) */}
+                      <div className="w-full flex flex-col gap-2 bg-black border-2 border-emerald-900 p-4 mt-2">
+                        <div className="text-xs text-emerald-600 uppercase tracking-widest border-b border-emerald-900/50 pb-2 mb-1 flex justify-between">
+                          <span>Connection Trace Log</span>
+                          <span>Target Length: {activePuzzle.target.length} chars</span>
+                        </div>
+                        <div className="flex flex-col gap-2 max-h-[120px] overflow-y-auto">
+                          {hackerGuesses.length === 0 ? (
+                            <span className="text-emerald-700 text-sm animate-pulse">&gt; INITIALIZING... AWAITING FIRST ENTRY.</span>
+                          ) : (
+                            hackerGuesses.map((g, i) => (
+                              <div key={i} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-sm bg-emerald-950/20 p-2 border-l-4 border-yellow-500">
+                                <span className="text-stone-400 w-32">&gt; {g.word}</span>
+                                <span className="text-red-500 font-bold uppercase text-xs sm:text-sm">Entry Denied</span>
+                                <span className="text-yellow-400 font-black tracking-widest bg-yellow-900/40 px-2 py-0.5 sm:ml-auto">
+                                  LIKENESS = {g.matches} / {activePuzzle.target.length}
+                                </span>
+                              </div>
+                            ))
+                          )}
+                        </div>
                       </div>
                     </div>
                   ) : activePuzzle.type === 'wire-routing' ? (
