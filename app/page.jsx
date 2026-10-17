@@ -1264,15 +1264,20 @@ export default function EscapeRoomPage() {
                         </div>
                         
                         {/* Terminal Output Log */}
-                        <div className="w-48 flex flex-col gap-2 border-l border-emerald-900 pl-6 h-[380px] overflow-hidden">
-                          {hackerGuesses.map((g, i) => (
-                            <div key={i} className="flex flex-col text-xs leading-relaxed">
-                              <span className="text-emerald-500">&gt;{g.word}</span>
-                              <span className="text-emerald-700">&gt;Entry denied.</span>
-                              <span className="text-emerald-600">&gt;Likeness={g.matches}</span>
-                            </div>
-                          ))}
+                      <div className="w-48 flex flex-col gap-4 border-l border-emerald-900 pl-6 h-[380px] overflow-y-auto">
+                        <div className="text-xs text-emerald-700 uppercase tracking-widest border-b border-emerald-900 pb-2 mb-2">
+                          System Trace Log
                         </div>
+                        {hackerGuesses.map((g, i) => (
+                          <div key={i} className="flex flex-col text-sm leading-relaxed bg-black p-2 border border-emerald-900/50">
+                            <span className="text-emerald-400 font-bold">&gt; {g.word}</span>
+                            <span className="text-red-500">&gt; ENTRY DENIED.</span>
+                            <span className="text-yellow-400 font-black animate-pulse mt-1 bg-yellow-900/20 px-1 inline-block w-fit border border-yellow-700/50">
+                              &gt; LIKENESS={g.matches}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                       </div>
                     </div>
                   ) : activePuzzle.type === 'wire-routing' ? (
