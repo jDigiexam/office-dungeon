@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { loadMapFromImage } from '@/lib/mapParser';
 import { TERMINAL_DIRECTORY, RIDDLE_BANK } from '@/lib/puzzleData';
+
 
 const DungeonEngine = dynamic(() => import('@/components/DungeonEngine'), { ssr: false });
 
@@ -307,51 +308,6 @@ export default function EscapeRoomPage() {
     }
   };
 
-  const hackerBoard = useMemo(() => {
-    if (activePuzzle?.type !== 'word-hacker') return null;
-    
-    const chars = "!@#$%^&*()_+-=[]{}|;':,./<>?";
-    const words = [...activePuzzle.words];
-    const items = [];
-    
-    // Create 34 slots (17 rows * 2 columns)
-    for(let i = 0; i < 34; i++) {
-      if (i < words.length) items.push({ isWord: true, word: words[i] });
-      else items.push({ isWord: false });
-    }
-    
-    // Shuffle the words into the garbage slots
-    for (let i = items.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [items[i], items[j]] = [items[j], items[i]];
-    }
-    
-    const board = [];
-    for (let i = 0; i < 17; i++) {
-      const hex1 = `0x${(61440 + i * 12).toString(16).toUpperCase()}`;
-      const hex2 = `0x${(61440 + 17 * 12 + i * 12).toString(16).toUpperCase()}`;
-      
-      const buildCol = (item) => {
-        if (item.isWord) {
-          const padLen = 12 - item.word.length;
-          const preLen = Math.floor(Math.random() * padLen);
-          const postLen = padLen - preLen;
-          let pre = "", post = "";
-          for(let k = 0; k < preLen; k++) pre += chars[Math.floor(Math.random() * chars.length)];
-          for(let k = 0; k < postLen; k++) post += chars[Math.floor(Math.random() * chars.length)];
-          return { type: 'word', pre, word: item.word, post };
-        } else {
-          let str = "";
-          for(let k = 0; k < 12; k++) str += chars[Math.floor(Math.random() * chars.length)];
-          return { type: 'garbage', str };
-        }
-      };
-      
-      board.push({ hex1, col1: buildCol(items[i]), hex2, col2: buildCol(items[i + 17]) });
-    }
-    return board;
-  }, [activePuzzle]);
-
   useEffect(() => {
     const storedDeaths = parseInt(sessionStorage.getItem('zeroDay_deaths') || '0', 10);
     const storedTime = parseInt(sessionStorage.getItem('zeroDay_time') || '0', 10);
@@ -551,6 +507,51 @@ export default function EscapeRoomPage() {
       }, 2000);
     }
   };
+
+  const hackerBoard = useMemo(() => {
+    if (activePuzzle?.type !== 'word-hacker') return null;
+    
+    const chars = "!@#$%^&*()_+-=[]{}|;':,./<>?";
+    const words = [...activePuzzle.words];
+    const items = [];
+    
+    // Create 34 slots (17 rows * 2 columns)
+    for(let i = 0; i < 34; i++) {
+      if (i < words.length) items.push({ isWord: true, word: words[i] });
+      else items.push({ isWord: false });
+    }
+    
+    // Shuffle the words into the garbage slots
+    for (let i = items.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [items[i], items[j]] = [items[j], items[i]];
+    }
+    
+    const board = [];
+    for (let i = 0; i < 17; i++) {
+      const hex1 = `0x${(61440 + i * 12).toString(16).toUpperCase()}`;
+      const hex2 = `0x${(61440 + 17 * 12 + i * 12).toString(16).toUpperCase()}`;
+      
+      const buildCol = (item) => {
+        if (item.isWord) {
+          const padLen = 12 - item.word.length;
+          const preLen = Math.floor(Math.random() * padLen);
+          const postLen = padLen - preLen;
+          let pre = "", post = "";
+          for(let k = 0; k < preLen; k++) pre += chars[Math.floor(Math.random() * chars.length)];
+          for(let k = 0; k < postLen; k++) post += chars[Math.floor(Math.random() * chars.length)];
+          return { type: 'word', pre, word: item.word, post };
+        } else {
+          let str = "";
+          for(let k = 0; k < 12; k++) str += chars[Math.floor(Math.random() * chars.length)];
+          return { type: 'garbage', str };
+        }
+      };
+      
+      board.push({ hex1, col1: buildCol(items[i]), hex2, col2: buildCol(items[i + 17]) });
+    }
+    return board;
+  }, [activePuzzle]);
 
   const handleWireClick = (index) => {
     const newGrid = [...puzzleGrid];
