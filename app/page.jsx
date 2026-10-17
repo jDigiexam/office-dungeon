@@ -267,6 +267,7 @@ export default function EscapeRoomPage() {
   const [mastermindCode, setMastermindCode] = useState('');
   const [mastermindGuesses, setMastermindGuesses] = useState([]);
   const [mastermindInput, setMastermindInput] = useState('');
+  const [hackerGuesses, setHackerGuesses] = useState([]);
 
   const [playerGridPos, setPlayerGridPos] = useState({ x: 5, z: 5 });
   const [exploredTiles, setExploredTiles] = useState(new Set());
@@ -484,6 +485,47 @@ export default function EscapeRoomPage() {
     }
   };
 
+  const handleHackerClick = (word) => {
+    const target = activePuzzle.target;
+    let matches = 0;
+    for(let i=0; i<word.length; i++) {
+      if (word[i] === target[i]) matches++;
+    }
+
+    const newGuesses = [...hackerGuesses, { word, matches }];
+    setHackerGuesses(newGuesses);
+    setPuzzleError('');
+
+    if (matches === target.length) {
+      setTimeout(() => handlePuzzleSuccess(activePuzzle), 500);
+    } else if (newGuesses.length >= 4) {
+      setPuzzleError("LOCKOUT PROTOCOL INITIATED.");
+      setTimeout(() => {
+        setHackerGuesses([]);
+        setPuzzleError('');
+      }, 2000);
+    }
+  };
+
+  const handleWireClick = (index) => {
+    const newGrid = [...puzzleGrid];
+    newGrid[index] = (newGrid[index] + 1) % 4; // Rotate 90 degrees
+    setPuzzleGrid(newGrid);
+
+    // Check Win Condition
+    const isWin = newGrid.every((rot, i) => {
+      const shape = activePuzzle.shapes[i];
+      const target = activePuzzle.targetRotations[i];
+      if (shape === 0) return rot % 2 === target % 2; // Straight pipes are symmetrical
+      if (shape === 2) return true; // Crosses are fully symmetrical
+      return rot === target; // Corners must match exactly
+    });
+
+    if (isWin) {
+      setTimeout(() => handlePuzzleSuccess(activePuzzle), 400);
+    }
+  };
+
   const playMemorySequence = async (seq) => {
     setIsPlayingMemory(true);
     setPuzzleError('');
@@ -648,6 +690,16 @@ export default function EscapeRoomPage() {
           setMastermindCode(newCode);
           setMastermindGuesses([]);
           setMastermindInput('');
+        }
+
+        // NEW: Initialize Word Hacker
+        if (terminalData.type === 'word-hacker') {
+          setHackerGuesses([]);
+        }
+
+        // NEW: Initialize Wire Routing (Reuses puzzleGrid)
+        if (terminalData.type === 'wire-routing') {
+          setPuzzleGrid([...terminalData.initialRotations]);
         }
 
         if (terminalData.type === 'signal-sync') {
@@ -1098,6 +1150,73 @@ export default function EscapeRoomPage() {
                       </button>
                     ))}
                   </div>
+                  ) : activePuzzle.type === 'word-hacker' ? (
+                    <div className="flex flex-col md:flex-row gap-8 w-full max-w-2xl mx-auto">
+                      <div className="flex-1 flex flex-col gap-2">
+                        {activePuzzle.words.map((word, idx) => {
+                          const isGuessed = hackerGuesses.some(g => g.word === word);
+                          return (
+                            <button 
+                              key={idx} 
+                              onClick={() => !isGuessed && handleHackerClick(word)}
+                              disabled={isGuessed || hackerGuesses.length >= 4}
+                              className={`font-mono text-xl py-2 px-4 border-2 transition-colors text-left tracking-[0.2em] ${
+                                isGuessed 
+                                  ? 'bg-stone-800 border-stone-800 text-stone-600' 
+                                  : 'bg-black border-stone-700 text-emerald-400 hover:bg-emerald-900 hover:text-emerald-300 hover:border-emerald-500'
+                              }`}
+                            >
+                              &gt; {word}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <div className="flex-1 bg-stone-950 border-2 border-stone-700 p-4 min-h-[240px] flex flex-col gap-2 font-mono">
+                        <div className="text-stone-500 text-xs tracking-widest mb-2 border-b border-stone-800 pb-2">CONNECTION LOG</div>
+                        {hackerGuesses.map((g, i) => (
+                          <div key={i} className="flex justify-between items-center text-sm font-black text-stone-300">
+                            <span>{g.word}</span>
+                            <span className={g.matches === 0 ? "text-red-500" : "text-emerald-500"}>
+                              {g.matches}/{activePuzzle.target.length} MATCH
+                            </span>
+                          </div>
+                        ))}
+                        <div className="mt-auto text-xs text-stone-500 text-right">
+                          ATTEMPTS REMAINING: <span className="text-red-500 font-bold">{4 - hackerGuesses.length}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : activePuzzle.type === 'wire-routing' ? (
+                    <div 
+                      className="grid gap-2 mx-auto bg-stone-950 p-4 border-2 border-stone-700 shadow-[inset_0_0_20px_rgba(0,0,0,1)]" 
+                      style={{ gridTemplateColumns: `repeat(${activePuzzle.gridSize}, minmax(0, 1fr))`, width: `${activePuzzle.gridSize * 96 + 32}px` }}
+                    >
+                      {puzzleGrid.map((rot, idx) => {
+                        const shape = activePuzzle.shapes[idx];
+                        return (
+                          <button 
+                            key={idx} 
+                            onClick={() => handleWireClick(idx)} 
+                            className="h-24 w-24 bg-stone-900 border-2 border-stone-800 hover:border-emerald-700 flex items-center justify-center transition-transform duration-200" 
+                            style={{ transform: `rotate(${rot * 90}deg)` }}
+                          >
+                            {shape === 0 && <div className="w-4 h-full bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]" />}
+                            {shape === 1 && (
+                              <div className="relative w-full h-full">
+                                <div className="absolute top-0 left-1/2 w-4 h-1/2 -translate-x-1/2 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]" />
+                                <div className="absolute top-1/2 left-1/2 w-1/2 h-4 -translate-y-1/2 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]" />
+                              </div>
+                            )}
+                            {shape === 2 && (
+                              <div className="relative w-full h-full flex items-center justify-center">
+                                <div className="absolute w-4 h-full bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]" />
+                                <div className="absolute w-full h-4 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]" />
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
                 ) : activePuzzle.type === 'lights-out' ? (
                   <div 
                     className="grid gap-2 mx-auto" 
