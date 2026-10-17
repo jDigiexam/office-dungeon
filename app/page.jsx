@@ -270,6 +270,13 @@ export default function EscapeRoomPage() {
   const [mastermindInput, setMastermindInput] = useState('');
   const [hackerGuesses, setHackerGuesses] = useState([]);
 
+  // NEW: State for Timing Lock
+  const [timingStage, setTimingStage] = useState(0);
+  const [timingPos, setTimingPos] = useState(0);
+  
+  // NEW: State for Coolant Balancer
+  const [coolantLevels, setCoolantLevels] = useState({ alpha: 0, beta: 0, gamma: 0 });
+
   const [playerGridPos, setPlayerGridPos] = useState({ x: 5, z: 5 });
   const [exploredTiles, setExploredTiles] = useState(new Set());
 
@@ -572,6 +579,65 @@ export default function EscapeRoomPage() {
     }
   };
 
+  // Animation loop for the Timing Lock
+  useEffect(() => {
+    let animationFrame;
+    let pos = timingPos;
+    let dir = 1;
+
+    if (activePuzzle?.type === 'timing-lock' && timingStage < activePuzzle.stages.length) {
+      const currentStage = activePuzzle.stages[timingStage];
+      
+      const animate = () => {
+        pos += currentStage.speed * dir;
+        if (pos >= 100) { pos = 100; dir = -1; }
+        if (pos <= 0) { pos = 0; dir = 1; }
+        setTimingPos(pos);
+        animationFrame = requestAnimationFrame(animate);
+      };
+      animationFrame = requestAnimationFrame(animate);
+    }
+    return () => cancelAnimationFrame(animationFrame);
+  }, [activePuzzle, timingStage]);
+
+  const handleTimingClick = () => {
+    const currentStage = activePuzzle.stages[timingStage];
+    const hitStart = currentStage.target;
+    const hitEnd = currentStage.target + currentStage.width;
+
+    if (timingPos >= hitStart && timingPos <= hitEnd) {
+      playSFX('sfx-terminal-open', 0.5); // Ping sound for success
+      const nextStage = timingStage + 1;
+      setTimingStage(nextStage);
+      setPuzzleError('');
+      
+      if (nextStage === activePuzzle.stages.length) {
+        setTimeout(() => handlePuzzleSuccess(activePuzzle), 500);
+      }
+    } else {
+      setPuzzleError("MISALIGNMENT DETECTED. SEQUENCE RESET.");
+      setTimingStage(0);
+    }
+  };
+
+  const handleCoolantChange = (tank, amount) => {
+    setCoolantLevels(prev => {
+      const newLevels = { ...prev, [tank]: Math.max(0, Math.min(10, prev[tank] + amount)) };
+      
+      // Check win condition
+      const currentPressure = 
+        (newLevels.alpha * activePuzzle.multipliers.alpha) + 
+        (newLevels.beta * activePuzzle.multipliers.beta) + 
+        (newLevels.gamma * activePuzzle.multipliers.gamma);
+
+      if (currentPressure === activePuzzle.target) {
+        setTimeout(() => handlePuzzleSuccess(activePuzzle), 500);
+      }
+      
+      return newLevels;
+    });
+  };
+
   const playMemorySequence = async (seq) => {
     setIsPlayingMemory(true);
     setPuzzleError('');
@@ -741,6 +807,17 @@ export default function EscapeRoomPage() {
         // NEW: Initialize Word Hacker
         if (terminalData.type === 'word-hacker') {
           setHackerGuesses([]);
+        }
+
+        // Initialize Timing Lock
+        if (terminalData.type === 'timing-lock') {
+          setTimingStage(0);
+          setTimingPos(0);
+        }
+
+        // Initialize Coolant Balancer
+        if (terminalData.type === 'coolant-balance') {
+          setCoolantLevels({ alpha: 0, beta: 0, gamma: 0 });
         }
 
         // NEW: Initialize Wire Routing (Reuses puzzleGrid)
@@ -1287,6 +1364,75 @@ export default function EscapeRoomPage() {
                         </div>
                       </div>
                     </div>
+                  ) : activePuzzle.type === 'timing-lock' ? (
+                    <div className="flex flex-col gap-8 w-full max-w-md mx-auto">
+                      <div className="flex justify-between items-center bg-stone-950 p-2 border border-stone-800">
+                        {activePuzzle.stages.map((_, idx) => (
+                          <div key={idx} className={`h-2 flex-1 mx-1 ${idx < timingStage ? 'bg-emerald-500 shadow-[0_0_10px_#10b981]' : 'bg-stone-800'}`} />
+                        ))}
+                      </div>
+  
+                      <div className="relative w-full h-12 bg-stone-950 border-2 border-stone-700 overflow-hidden" onClick={handleTimingClick}>
+                        {/* Safe Zone Indicator */}
+                        <div 
+                          className="absolute h-full bg-emerald-900/50 border-l-2 border-r-2 border-emerald-500"
+                          style={{ 
+                            left: `${activePuzzle.stages[Math.min(timingStage, activePuzzle.stages.length - 1)]?.target}%`, 
+                            width: `${activePuzzle.stages[Math.min(timingStage, activePuzzle.stages.length - 1)]?.width}%` 
+                          }}
+                        />
+                        {/* Moving Cursor */}
+                        <div 
+                          className="absolute h-full w-2 bg-red-500 shadow-[0_0_15px_#ef4444] -ml-1 transition-none"
+                          style={{ left: `${timingPos}%` }}
+                        />
+                      </div>
+                      
+                      <button 
+                        onClick={handleTimingClick}
+                        className="bg-emerald-700 hover:bg-emerald-500 text-black py-4 font-black uppercase tracking-[0.3em] transition-colors"
+                      >
+                        ENGAGE RELAY
+                      </button>
+                    </div>
+
+                  ) : activePuzzle.type === 'coolant-balance' ? (
+                    <div className="flex flex-col gap-8 w-full max-w-lg mx-auto font-mono">
+                      <div className="flex gap-4 justify-between h-48">
+                        {['alpha', 'beta', 'gamma'].map((tank) => (
+                          <div key={tank} className="flex flex-col items-center flex-1 gap-2">
+                            <span className="text-emerald-500 font-bold uppercase tracking-widest">{tank}</span>
+                            <button onClick={() => handleCoolantChange(tank, 1)} className="w-full bg-stone-800 hover:bg-emerald-900 text-stone-300 py-1">▲</button>
+                            
+                            <div className="flex-1 w-full bg-stone-950 border-2 border-stone-700 relative overflow-hidden flex items-end">
+                              <div 
+                                className={`w-full transition-all duration-300 ${tank === 'gamma' ? 'bg-red-800' : 'bg-blue-800'} shadow-[inset_0_0_10px_rgba(0,0,0,0.5)]`}
+                                style={{ height: `${coolantLevels[tank] * 10}%` }}
+                              />
+                              <span className="absolute w-full text-center top-1/2 -translate-y-1/2 text-white font-black drop-shadow-md">
+                                {coolantLevels[tank]}
+                              </span>
+                            </div>
+                            
+                            <button onClick={() => handleCoolantChange(tank, -1)} className="w-full bg-stone-800 hover:bg-emerald-900 text-stone-300 py-1">▼</button>
+                          </div>
+                        ))}
+                      </div>
+  
+                      <div className="bg-stone-950 border-2 border-stone-700 p-4 text-center">
+                        <span className="text-stone-500 text-xs tracking-widest block mb-2">CURRENT SYSTEM PRESSURE</span>
+                        <span className={`text-4xl font-black ${
+                          (coolantLevels.alpha * activePuzzle.multipliers.alpha) + 
+                          (coolantLevels.beta * activePuzzle.multipliers.beta) + 
+                          (coolantLevels.gamma * activePuzzle.multipliers.gamma) > activePuzzle.target ? 'text-red-500' : 'text-emerald-500'
+                        }`}>
+                          {(coolantLevels.alpha * activePuzzle.multipliers.alpha) + 
+                           (coolantLevels.beta * activePuzzle.multipliers.beta) + 
+                           (coolantLevels.gamma * activePuzzle.multipliers.gamma)} / {activePuzzle.target}
+                        </span>
+                      </div>
+                    </div>
+                    
                   ) : activePuzzle.type === 'wire-routing' ? (
                     <div 
                       className="grid gap-2 mx-auto bg-stone-950 p-4 border-2 border-stone-700 shadow-[inset_0_0_20px_rgba(0,0,0,1)]" 
