@@ -281,13 +281,17 @@ export default function EscapeRoomPage() {
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   
   const gameplayPlaylist = [
+    '/01 Hazardous Environments.mp3',
+    '/02 CP Violation.mp3',
+    '/03 The Innsbruck Experiment.mp3',
     '/17 Triage at Dawn.mp3', 
     '/05 Dark Energy.mp3',
     '/06 Requiem for Ravenholm.mp3',
     '/07 Pulse Phase.mp3',
-    '/08 Ravenholm Reprise.mp3',
     '/12 Apprehension and Evasion.mp3',
-    '/14 Our Resurrected Teleport.mp3'
+    '/08 Ravenholm Reprise.mp3',
+    '/14 Our Resurrected Teleport.mp3',
+    '/20 Nova Prospekt.mp3'
   ];
 
   const playSFX = (id, vol = 1.0) => {
@@ -375,6 +379,7 @@ export default function EscapeRoomPage() {
       }, 2000);
     } else {
       triggerMessage("SHADOW ENTITY ERADICATED.");
+      playSFX('sfx-imp-death', 0.8);
     }
   };
 
@@ -411,7 +416,10 @@ export default function EscapeRoomPage() {
     triggerMessage(puzzle.successMessage);
     setActivePuzzle(null);
 
-    if ([8, 18, 28, 17, 38].includes(reward.newTile)) {
+    // Differentiate between normal doors and terminal doors
+    if (reward.newTile === 17) {
+      playSFX('sfx-terminal-open', 1.0);
+    } else if ([8, 18, 28, 38].includes(reward.newTile)) {
       playSFX('sfx-door', 1.0);
     }
   };
@@ -767,7 +775,9 @@ export default function EscapeRoomPage() {
     <main className="relative w-full h-screen overflow-hidden bg-black font-mono select-none">
       
       <audio id="sfx-door" src="/door.mp3" preload="auto" />
+      <audio id="sfx-terminal-open" src="/terminal_open.mp3" preload="auto" />
       <audio id="sfx-imp" src="/imp_sight.mp3" preload="auto" />
+      <audio id="sfx-imp-death" src="/imp_death.mp3" preload="auto" />
       <audio id="sfx-boss" src="/boss_roar.mp3" preload="auto" />
 
       <AudioCrossfader 
