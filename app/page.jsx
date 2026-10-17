@@ -606,7 +606,7 @@ export default function EscapeRoomPage() {
     const hitEnd = currentStage.target + currentStage.width;
 
     if (timingPos >= hitStart && timingPos <= hitEnd) {
-      playSFX('sfx-terminal-open', 0.5); // Ping sound for success
+      playSFX('sfx-ping', 0.5); // Ping sound for success
       const nextStage = timingStage + 1;
       setTimingStage(nextStage);
       setPuzzleError('');
@@ -949,13 +949,14 @@ export default function EscapeRoomPage() {
   return (
     <main className="relative w-full h-screen overflow-hidden bg-black font-mono select-none">
       
-      {/* Update this audio block at the top of your return statement */}
+      {/* Update this audio block at the top of return statement */}
       <audio id="sfx-door" src="/door.mp3" preload="auto" />
       <audio id="sfx-terminal-open" src="/terminal_open.mp3" preload="auto" />
       <audio id="sfx-imp" src="/imp_sight.mp3" preload="auto" />
       <audio id="sfx-imp-death" src="/imp_death.mp3" preload="auto" />
       <audio id="sfx-boss" src="/boss_roar.mp3" preload="auto" />
       <audio id="sfx-shoot" src="/hand_projectile.mp3" preload="auto" />
+      <audio id="sfx-ping" src="/sonar_ping.mp3" preload="auto" />
 
       <AudioCrossfader 
         currentSrc={activeAudioSrc} 
@@ -1432,7 +1433,7 @@ export default function EscapeRoomPage() {
                         </span>
                       </div>
                     </div>
-                    
+
                   ) : activePuzzle.type === 'wire-routing' ? (
                     <div 
                       className="grid gap-2 mx-auto bg-stone-950 p-4 border-2 border-stone-700 shadow-[inset_0_0_20px_rgba(0,0,0,1)]" 
