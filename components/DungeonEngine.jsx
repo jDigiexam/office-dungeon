@@ -612,6 +612,9 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTextu
       if ((isSpacebar || isLeftClick) && document.pointerLockElement) {
         if (isSpacebar) e.preventDefault(); 
         
+        // Trigger the shoot sound
+        playSFX('sfx-shoot', 0.6);
+        
         const dir = new THREE.Vector3();
         camera.getWorldDirection(dir);
         const newProj = { id: Math.random(), startPos: camera.position.clone(), dir, active: true, mesh: null };
@@ -627,7 +630,7 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTextu
       window.removeEventListener('mousedown', handleShoot);
       window.removeEventListener('keydown', handleShoot);
     };
-  }, [camera]);
+  }, [camera, playSFX]);
 
   return (
     <>

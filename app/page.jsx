@@ -774,11 +774,13 @@ export default function EscapeRoomPage() {
   return (
     <main className="relative w-full h-screen overflow-hidden bg-black font-mono select-none">
       
+      {/* Update this audio block at the top of your return statement */}
       <audio id="sfx-door" src="/door.mp3" preload="auto" />
       <audio id="sfx-terminal-open" src="/terminal_open.mp3" preload="auto" />
       <audio id="sfx-imp" src="/imp_sight.mp3" preload="auto" />
       <audio id="sfx-imp-death" src="/imp_death.mp3" preload="auto" />
       <audio id="sfx-boss" src="/boss_roar.mp3" preload="auto" />
+      <audio id="sfx-shoot" src="/hand_projectile.mp3" preload="auto" />
 
       <AudioCrossfader 
         currentSrc={activeAudioSrc} 
