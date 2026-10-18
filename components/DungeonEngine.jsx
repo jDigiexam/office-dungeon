@@ -109,6 +109,25 @@ function CeilingLightMesh({ position, texture }) {
 function ElevatorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTexture, litTexture }) {
   const leftDoor = useRef();
   const rightDoor = useRef();
+
+  // Split the texture down the middle
+  const texLeft = useMemo(() => {
+    if (!doorTexture) return null;
+    const tex = doorTexture.clone();
+    tex.repeat.set(0.5, 1);
+    tex.offset.set(0, 0);
+    tex.needsUpdate = true;
+    return tex;
+  }, [doorTexture]);
+
+  const texRight = useMemo(() => {
+    if (!doorTexture) return null;
+    const tex = doorTexture.clone();
+    tex.repeat.set(0.5, 1);
+    tex.offset.set(0.5, 0);
+    tex.needsUpdate = true;
+    return tex;
+  }, [doorTexture]);
   
   useFrame((_, delta) => {
     const speed = Math.min(delta, 0.1) * 2;
@@ -138,8 +157,8 @@ function ElevatorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTextu
       <mesh position={[0, FLOOR_HT - 0.01, 0]} rotation={[Math.PI / 2, 0, 0]}><planeGeometry args={[1, 1]} /><meshStandardMaterial color="#18181b" /></mesh>
       <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[1, 1]} /><meshStandardMaterial color="#3f3f46" /></mesh>
       <group position={[0, 0, 0.4]}>
-        <mesh ref={leftDoor} position={[-0.25, 1.0, 0]}><boxGeometry args={[0.5, 2.0, 0.05]} /><meshStandardMaterial map={doorTexture} roughness={0.5} emissive="#ffffff" emissiveMap={doorTexture} emissiveIntensity={0.25} /></mesh>
-        <mesh ref={rightDoor} position={[0.25, 1.0, 0]}><boxGeometry args={[0.5, 2.0, 0.05]} /><meshStandardMaterial map={doorTexture} roughness={0.5} emissive="#ffffff" emissiveMap={doorTexture} emissiveIntensity={0.25} /></mesh>
+        <mesh ref={leftDoor} position={[-0.25, 1.0, 0]}><boxGeometry args={[0.5, 2.0, 0.05]} /><meshStandardMaterial map={texLeft} roughness={0.5} emissive="#ffffff" emissiveMap={texLeft} emissiveIntensity={0.25} /></mesh>
+        <mesh ref={rightDoor} position={[0.25, 1.0, 0]}><boxGeometry args={[0.5, 2.0, 0.05]} /><meshStandardMaterial map={texRight} roughness={0.5} emissive="#ffffff" emissiveMap={texRight} emissiveIntensity={0.25} /></mesh>
       </group>
       <mesh position={[0.4, 1.2, 0.51]}><planeGeometry args={[0.15, 0.15]} /><meshStandardMaterial map={litTexture} emissive="#f59e0b" emissiveIntensity={0.8} /></mesh>
     </group>
@@ -830,6 +849,17 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
       lastPos.current.z = curZ;
       if (onPlayerMove) onPlayerMove(curX, curZ);
     }
+
+    // ⬇️ MOVE THE HAND UPDATE HERE, AT THE VERY END ⬇️
+    if (handRef.current) {
+      const handOffset = new THREE.Vector3(0.18, -0.15, -0.3);
+      handOffset.applyQuaternion(camera.quaternion);
+      handRef.current.position.copy(camera.position).add(handOffset);
+      handRef.current.quaternion.copy(camera.quaternion);
+      
+      handRef.current.position.y += Math.abs(Math.sin(bobTime.current)) * 0.02 * bobAmp.current;
+      handRef.current.rotation.z += Math.cos(bobTime.current / 2) * 0.02 * bobAmp.current; 
+    }
   });
 
   return (
@@ -1023,8 +1053,8 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
           
           return <DoorMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={[8,18,28,17,38].includes(tile)} wallTexture={wTex} doorTexture={dTex} trimColor={trimColor} />;
         }
-        
-        if (tile === 3 || tile === 10) return <ElevatorMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={tile === 10} wallTexture={wTex} doorTexture={tDoorMetal} litTexture={tLight} />;
+        // Change doorTexture={tDoorMetal} to doorTexture={tElevatorDoor}
+        if (tile === 3 || tile === 10) return <ElevatorMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={tile === 10} wallTexture={wTex} doorTexture={tElevatorDoor} litTexture={tLight} />;
         if (tile === 4) return <TerminalMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tCrt} />;
 
         if (tile === 5) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tKeyRed} color="#8B0000" />;
