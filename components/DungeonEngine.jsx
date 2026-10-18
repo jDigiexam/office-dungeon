@@ -870,8 +870,6 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
       if(t) { t.magFilter = t.minFilter = THREE.NearestFilter; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.needsUpdate = true; }
     });
     
-    if (tWallLab) tWallLab.repeat.set(1, 3.2);
-    if (tWallContainment) tWallContainment.repeat.set(1, 3.2);
   }, [tWallLab, tWallContainment, tFloorContainment, tFloorLab, tCeiling, tDoorWood, tDoorMetal, tDoorContainment, tLight, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp, tLabBench, tServerRack, tGas, tBioBarrel, tLabStool, tOfficeChair, tChemRack]);
 
   const parsedData = useMemo(() => {
@@ -899,12 +897,8 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         for (let x = 0; x < cols; x++) {
           const tile = grid[z][x];
           
+          // Floor 0 is always Lab tiles. Floors 1+ are Containment tiles.
           let isStoneZone = fIdx > 0;
-
-          if (fIdx === 0) {
-            if (z > 55) isStoneZone = true;
-            else isStoneZone = false;
-          }
 
           if (tile === 1) {
             let isVisible = false;
@@ -1043,7 +1037,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         return (
           <group key={`dec-${idx}`} position={[dec.x + 0.5, dec.baseY + yOffset, dec.z + 0.5]}>
             <sprite scale={scale}>
-              <spriteMaterial map={tex} color="#ffffff" transparent={true} />
+              <spriteMaterial map={tex} color="#ffffff" transparent={true} alphaTest={0.5} />
             </sprite>
           </group>
         );
