@@ -311,37 +311,25 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
     if (!texture) return null;
     const tex = texture.clone();
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(1/8, 1/7); 
+    // Hell Knight is a single row of 7 frames[cite: 30]
+    tex.repeat.set(1/7, 1); 
     tex.magFilter = THREE.NearestFilter; 
     tex.needsUpdate = true;
     return tex;
   }, [texture]);
 
+  // ... (Keep your existing checkLoS function inside here) ...
   const checkLoS = (startX, startZ, endX, endZ) => {
     if (!grid || isNaN(startX) || isNaN(startZ) || isNaN(endX) || isNaN(endZ)) return false;
-    
-    const dx = endX - startX;
-    const dz = endZ - startZ;
+    const dx = endX - startX; const dz = endZ - startZ;
     const dist = Math.sqrt(dx * dx + dz * dz);
-    
     if (dist === 0) return true;
-    
     const steps = Math.ceil(dist * 5); 
-    const stepX = dx / steps;
-    const stepZ = dz / steps;
-
-    let curX = startX;
-    let curZ = startZ;
-
+    const stepX = dx / steps; const stepZ = dz / steps;
+    let curX = startX; let curZ = startZ;
     for (let i = 0; i <= steps; i++) {
-      const gridX = Math.floor(curX);
-      const gridZ = Math.floor(curZ);
-      
-      if ([1, 2, 12, 22, 7, 3, 4, 32].includes(grid[gridZ]?.[gridX])) {
-        return false;
-      }
-      curX += stepX;
-      curZ += stepZ;
+      if ([1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(curZ)]?.[Math.floor(curX)])) return false;
+      curX += stepX; curZ += stepZ;
     }
     return true;
   };
@@ -351,14 +339,9 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
 
     if (isDead.current) {
       const timeSinceDeath = state.clock.elapsedTime - deathTime.current;
-      const deathFrameIndex = Math.min(Math.floor(timeSinceDeath * 8), 6); 
-      
-      bossTex.offset.y = 0;
-      bossTex.offset.x = deathFrameIndex * (1/8);
-
-      if (timeSinceDeath > 1.5) {
-        groupRef.current.visible = false;
-      }
+      bossTex.offset.x = 0; // Freeze on idle frame
+      groupRef.current.position.y -= delta * 0.5; // Sink into the floor
+      if (timeSinceDeath > 1.5) groupRef.current.visible = false;
       return;
     }
     
@@ -370,9 +353,7 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
     const hasLoS = checkLoS(groupRef.current.position.x, groupRef.current.position.z, playerCamera.position.x, playerCamera.position.z);
     const timeSinceShot = state.clock.elapsedTime - lastShot.current;
 
-    if (sqDist > 400) {
-      hasAggroed.current = false;
-    }
+    if (sqDist > 400) hasAggroed.current = false;
 
     if (dist < 15 && hasLoS) {
       if (!hasAggroed.current) {
@@ -381,28 +362,22 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
       }
       groupRef.current.lookAt(playerCamera.position.x, groupRef.current.position.y, playerCamera.position.z);
       
-      if (timeSinceShot > 1.2) {
+      if (timeSinceShot > 1.5) {
         lastShot.current = state.clock.elapsedTime;
         const dir = new THREE.Vector3().subVectors(playerCamera.position, groupRef.current.position).normalize();
-        
         const spawnPos = groupRef.current.position.clone().add(dir.clone().multiplyScalar(0.8));
         spawnPos.y += 0.5; 
         onSpawnEnemyOrb({ id: Math.random(), startPos: spawnPos, dir });
       }
 
-      if (dist > 1.5) {
+      if (dist > 1.5 && timeSinceShot > 0.6) {
         const dir = new THREE.Vector3().subVectors(playerCamera.position, groupRef.current.position).normalize();
         dir.y = 0; 
         const speed = 2.5 * delta; 
-        
         const nextX = groupRef.current.position.x + dir.x * speed;
         const nextZ = groupRef.current.position.z + dir.z * speed;
         const radius = 0.6; 
-
-        const isSolid = (x, z) => {
-          if (!grid) return true;
-          return [1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(z)]?.[Math.floor(x)]);
-        };
+        const isSolid = (x, z) => grid && [1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(z)]?.[Math.floor(x)]);
 
         if (!isSolid(nextX, groupRef.current.position.z) && !isSolid(nextX + (dir.x > 0 ? radius : -radius), groupRef.current.position.z)) {
           groupRef.current.position.x = nextX;
@@ -413,35 +388,34 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
       }
     }
 
-    if (timeSinceShot < 0.3) {
-      bossTex.offset.x = 0; 
-      bossTex.offset.y = 2 * (1/7); 
+    // Map the 7-frame horizontal sheet[cite: 30]
+    if (timeSinceShot < 0.6) {
+      // Attack Windup & Shoot Frames (2, 3, 4)
+      if (timeSinceShot < 0.2) bossTex.offset.x = 2 * (1/7);
+      else if (timeSinceShot < 0.4) bossTex.offset.x = 3 * (1/7);
+      else bossTex.offset.x = 4 * (1/7);
     } else {
-      const walkFrames = [6, 5, 4, 3];
+      // Walking Frames (0, 1, 5, 6)
+      const walkFrames = [0, 1, 5, 6];
       const currentFrame = Math.floor(state.clock.elapsedTime * 6) % 4;
-      bossTex.offset.x = 0; 
-      bossTex.offset.y = walkFrames[currentFrame] * (1/7); 
+      bossTex.offset.x = walkFrames[currentFrame] * (1/7); 
     }
 
     projectilesRef.current.forEach(proj => {
-      if (proj.active && proj.mesh?.current) {
-        if (groupRef.current.position.distanceTo(proj.mesh.current.position) < 1.5) {
-          proj.active = false;            
-          proj.mesh.current.visible = false;
-          hp.current -= 1;
-          
-          if (spriteMaterialRef.current) {
-            spriteMaterialRef.current.color.setHex(0xff0000);
-            setTimeout(() => { 
-              if (spriteMaterialRef.current) spriteMaterialRef.current.color.setHex(0xffffff); 
-            }, 100);
-          }
+      if (proj.active && proj.mesh?.current && groupRef.current.position.distanceTo(proj.mesh.current.position) < 1.5) {
+        proj.active = false;            
+        proj.mesh.current.visible = false;
+        hp.current -= 1;
+        
+        if (spriteMaterialRef.current) {
+          spriteMaterialRef.current.color.setHex(0xff0000);
+          setTimeout(() => { if (spriteMaterialRef.current) spriteMaterialRef.current.color.setHex(0xffffff); }, 100);
+        }
 
-          if (hp.current <= 0 && !isDead.current) {
-            isDead.current = true;
-            deathTime.current = state.clock.elapsedTime;
-            onEradicate(); 
-          }
+        if (hp.current <= 0 && !isDead.current) {
+          isDead.current = true;
+          deathTime.current = state.clock.elapsedTime;
+          onEradicate(); 
         }
       }
     });
@@ -449,8 +423,9 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
 
   return (
     <group ref={groupRef} position={initialPos}>
-      <sprite position={[0, 0.75, 0]} scale={[2.5, 2.5, 1]}>
-        <spriteMaterial ref={spriteMaterialRef} map={bossTex || undefined} color="#ffffff" transparent={true} />
+      {/* Scaled down to 1.8x and repositioned so feet touch the ground */}
+      <sprite position={[0, 0.4, 0]} scale={[1.8, 1.8, 1]}>
+        <spriteMaterial ref={spriteMaterialRef} map={bossTex || undefined} color="#ffffff" transparent={true} alphaTest={0.5} />
       </sprite>
     </group>
   );
@@ -469,37 +444,25 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
     if (!texture) return null;
     const tex = texture.clone();
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(1/7, 1); 
+    // Imp is a single row of exactly 6 frames[cite: 29]
+    tex.repeat.set(1/6, 1); 
     tex.magFilter = THREE.NearestFilter;
     tex.needsUpdate = true;
     return tex;
   }, [texture]);
 
+  // ... (Keep your existing checkLoS function inside here) ...
   const checkLoS = (startX, startZ, endX, endZ) => {
     if (!grid || isNaN(startX) || isNaN(startZ) || isNaN(endX) || isNaN(endZ)) return false;
-    
-    const dx = endX - startX;
-    const dz = endZ - startZ;
+    const dx = endX - startX; const dz = endZ - startZ;
     const dist = Math.sqrt(dx * dx + dz * dz);
-    
     if (dist === 0) return true;
-    
     const steps = Math.ceil(dist * 5); 
-    const stepX = dx / steps;
-    const stepZ = dz / steps;
-
-    let curX = startX;
-    let curZ = startZ;
-
+    const stepX = dx / steps; const stepZ = dz / steps;
+    let curX = startX; let curZ = startZ;
     for (let i = 0; i <= steps; i++) {
-      const gridX = Math.floor(curX);
-      const gridZ = Math.floor(curZ);
-      
-      if ([1, 2, 12, 22, 7, 3, 4, 32].includes(grid[gridZ]?.[gridX])) {
-        return false;
-      }
-      curX += stepX;
-      curZ += stepZ;
+      if ([1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(curZ)]?.[Math.floor(curX)])) return false;
+      curX += stepX; curZ += stepZ;
     }
     return true;
   };
@@ -519,7 +482,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
       hasAggroed.current = false; 
     } else {
       const hasLoS = checkLoS(groupRef.current.position.x, groupRef.current.position.z, playerCamera.position.x, playerCamera.position.z);
-     
       if (hasLoS) {
         isChasing.current = true;
         if (!hasAggroed.current) {
@@ -539,16 +501,11 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
         groupRef.current.lookAt(playerCamera.position.x, groupRef.current.position.y, playerCamera.position.z);
         const dir = new THREE.Vector3().subVectors(playerCamera.position, groupRef.current.position).normalize();
         dir.y = 0; 
-
         const speed = 3.0 * safeDelta;
         const nextX = groupRef.current.position.x + dir.x * speed;
         const nextZ = groupRef.current.position.z + dir.z * speed;
         const radius = 0.3; 
-
-        const isSolid = (x, z) => {
-          if (!grid) return true;
-          return [1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(z)]?.[Math.floor(x)]);
-        };
+        const isSolid = (x, z) => grid && [1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(z)]?.[Math.floor(x)]);
 
         if (!isSolid(nextX, groupRef.current.position.z) && !isSolid(nextX + (dir.x > 0 ? radius : -radius), groupRef.current.position.z)) {
           groupRef.current.position.x = nextX;
@@ -557,42 +514,36 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
           groupRef.current.position.z = nextZ;
         }
 
+        // Loop through all 6 frames[cite: 29]
         if (impTex) {
-          const walkFrame = Math.floor(state.clock.elapsedTime * 6) % 4;
-          impTex.offset.x = walkFrame * (1/7);
+          const walkFrame = Math.floor(state.clock.elapsedTime * 6) % 6;
+          impTex.offset.x = walkFrame * (1/6);
         }
 
-      } else if (dist <= 0.6) {
+      } else {
         isDead.current = true;
         groupRef.current.visible = false;
         onPlayerHit();
       }
     } else {
-       if (impTex) {
-         impTex.offset.x = 0;
-       }
+       if (impTex) impTex.offset.x = 0;
     }
     
     projectilesRef.current.forEach(proj => {
-      if (proj.active && proj.mesh?.current) {
-        if (groupRef.current.position.distanceTo(proj.mesh.current.position) < 1.0) {
-          proj.active = false;            
-          proj.mesh.current.visible = false;
-          
-          hp.current -= 1; 
+      if (proj.active && proj.mesh?.current && groupRef.current.position.distanceTo(proj.mesh.current.position) < 1.0) {
+        proj.active = false;            
+        proj.mesh.current.visible = false;
+        hp.current -= 1; 
 
-          if (spriteMaterialRef.current) {
-            spriteMaterialRef.current.color.setHex(0xff0000);
-            setTimeout(() => { 
-              if (spriteMaterialRef.current) spriteMaterialRef.current.color.setHex(0xffffff); 
-            }, 100);
-          }
+        if (spriteMaterialRef.current) {
+          spriteMaterialRef.current.color.setHex(0xff0000);
+          setTimeout(() => { if (spriteMaterialRef.current) spriteMaterialRef.current.color.setHex(0xffffff); }, 100);
+        }
 
-          if (hp.current <= 0) {
-            isDead.current = true;          
-            groupRef.current.visible = false;
-            onEradicate();
-          }
+        if (hp.current <= 0) {
+          isDead.current = true;          
+          groupRef.current.visible = false;
+          onEradicate();
         }
       }
     });
@@ -600,8 +551,9 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
 
   return (
     <group ref={groupRef} position={initialPos}>
-      <sprite position={[0, 0.6, 0]} scale={[1.6, 2.2, 1]}>
-        <spriteMaterial ref={spriteMaterialRef} map={impTex || undefined} color="#ffffff" transparent={true} />
+      {/* Scaled down to 1.4x and repositioned so feet touch the ground */}
+      <sprite position={[0, 0.2, 0]} scale={[1.4, 1.4, 1]}>
+        <spriteMaterial ref={spriteMaterialRef} map={impTex || undefined} color="#ffffff" transparent={true} alphaTest={0.5} />
       </sprite>
     </group>
   );
