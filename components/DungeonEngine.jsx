@@ -855,14 +855,14 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
 // ----------------------------------------------------
 function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove, onEradicate, onPlayerHit, isPuzzleActive, playSFX }) {
   const [tWallLab, tWallContainment, tFloorContainment, tFloorLab, tCeiling, tDoorWood, tDoorMetal, tDoorContainment, tLight, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp, tLabBench, tServerRack, tGas, tBioBarrel, tLabStool, tOfficeChair, tChemRack] = useTexture([
-    '/lab_wall_tiles.jpg', '/containment_wall_tiles.jpg', 
-    '/containment_floor_tiles.jpg', '/lab_floor_tiles.jpg', 
-    '/ceiling_tiles.jpg',
-    '/door_wood.png', '/terminal_door.jpg', '/containment_door.jpg', '/ceiling_light.jpg', '/hand.png',
-    '/red_keycard.png', '/blue_keycard.png', '/yellow_keycard.png', '/computer_terminal.jpg',
+    '/lab_wall_tiles.png', '/containment_wall_tiles.png', 
+    '/containment_floor_tiles.png', '/lab_floor_tiles.png', 
+    '/ceiling_tiles.png',
+    '/door_wood.png', '/terminal_door.png', '/containment_door.png', '/ceiling_light.png', '/hand.png',
+    '/red_keycard.png', '/blue_keycard.png', '/yellow_keycard.png', '/computer_terminal.png',
     '/Hell Knight.png', '/green projectile 2.png', '/hand_projectile 2.png', '/imp.png',
-    '/lab_bench.jpg', '/server_rack.png', '/gas_containers.png', 
-    '/biohazard_barrel.png', '/lab_stool.png', '/office_chair.png', '/chemical_rack.jpg'
+    '/lab_bench.png', '/server_rack.png', '/gas_containers.png', 
+    '/biohazard_barrel.png', '/lab_stool.png', '/office_chair.png', '/chemical_rack.png'
   ]);
 
   useEffect(() => {
