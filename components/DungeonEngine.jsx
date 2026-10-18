@@ -884,8 +884,8 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
 // 5. MAIN SCENE RENDERING
 // ----------------------------------------------------
 function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove, onEradicate, onPlayerHit, isPuzzleActive, playSFX }) {
-  const [tWallLab, tWallContainment, tFloorContainment, tFloorLab, tCeiling, tDoorWood, tDoorMetal, tDoorContainment, tLight, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp, tLabBench, tServerRack, tGas, tBioBarrel, tLabStool, tOfficeChair, tChemRack] = useTexture([
-    '/lab_wall_tiles.png', '/containment_wall_tiles.png', 
+  const [tWallLab, tWallContainment, tElevatorDoor, tFloorContainment, tFloorLab, tCeiling, tDoorWood, tDoorMetal, tDoorContainment, tLight, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp, tLabBench, tServerRack, tGas, tBioBarrel, tLabStool, tOfficeChair, tChemRack] = useTexture([
+    '/lab_wall_tiles.png', '/containment_wall_tiles.png', '/elevator_door.png',
     '/containment_floor_tiles.png', '/lab_floor_tiles.png', 
     '/ceiling_tiles.png',
     '/door_wood.png', '/terminal_door.png', '/containment_door.png', '/ceiling_light.png', '/hand.png',
@@ -896,7 +896,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
   ]);
 
   useEffect(() => {
-    [tWallLab, tWallContainment, tFloorContainment, tFloorLab, tCeiling, tDoorWood, tDoorMetal, tDoorContainment, tLight, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp, tLabBench, tServerRack, tGas, tBioBarrel, tLabStool, tOfficeChair, tChemRack].forEach(t => {
+    [tWallLab, tWallContainment, tElevatorDoor, tFloorContainment, tFloorLab, tCeiling, tDoorWood, tDoorMetal, tDoorContainment, tLight, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp, tLabBench, tServerRack, tGas, tBioBarrel, tLabStool, tOfficeChair, tChemRack].forEach(t => {
       if(t) { 
         t.magFilter = t.minFilter = THREE.NearestFilter; 
         t.wrapS = t.wrapT = THREE.RepeatWrapping; 
@@ -913,7 +913,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     if (tWallLab) tWallLab.repeat.set(0.25, 0.8);
     if (tWallContainment) tWallContainment.repeat.set(0.25, 0.8);
 
-  }, [tWallLab, tWallContainment, tFloorContainment, tFloorLab, tCeiling, tDoorWood, tDoorMetal, tDoorContainment, tLight, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp, tLabBench, tServerRack, tGas, tBioBarrel, tLabStool, tOfficeChair, tChemRack]);
+  }, [tWallLab, tWallContainment, tElevatorDoor, tFloorContainment, tFloorLab, tCeiling, tDoorWood, tDoorMetal, tDoorContainment, tLight, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp, tLabBench, tServerRack, tGas, tBioBarrel, tLabStool, tOfficeChair, tChemRack]);
   
   const parsedData = useMemo(() => {
     const dummy = new THREE.Object3D();
