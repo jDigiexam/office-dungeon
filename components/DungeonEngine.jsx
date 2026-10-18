@@ -88,14 +88,11 @@ function TerminalMesh({ position, texture }) {
     
     return (
       <group position={position}>
-        <mesh position={[0, 0.4, 0]}>
-          <boxGeometry args={[0.5, 0.8, 0.5]} />
-          <meshStandardMaterial color="#808080" roughness={0.9} />
-        </mesh>
-        <mesh ref={crtRef} position={[0, 1.1, 0]}>
-          <planeGeometry args={[0.7, 0.7]} />
-          <meshStandardMaterial map={texture} emissive="#ffffff" emissiveMap={texture} emissiveIntensity={0.6} transparent={true} side={THREE.DoubleSide} alphaTest={0.5} />
-        </mesh>
+        <sprite ref={crtRef} position={[0, 0.7, 0]} scale={[1.2, 1.2, 1]}>
+          <spriteMaterial map={texture} color="#ffffff" transparent={true} />
+        </sprite>
+        {/* Glow effect matching the green screen */}
+        <pointLight color="#22c55e" intensity={1.5} distance={3} decay={2} position={[0, 0.7, 0]} />
       </group>
     );
 }
@@ -281,7 +278,6 @@ function EnemyOrb({ startPos, dir, onPlayerHit, grid, texture }) {
   );
 }
 
-// 🚨 FIX: Pass playSFX via props
 function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlayerHit, grid, onSpawnEnemyOrb, texture, playSFX }) {
   const groupRef = useRef();
   const spriteMaterialRef = useRef();
@@ -362,7 +358,6 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
     if (dist < 15 && hasLoS) {
       if (!hasAggroed.current) {
         hasAggroed.current = true;
-        // 🚨 FIX: Call the DOM element
         playSFX('sfx-boss', 1.0);
       }
       groupRef.current.lookAt(playerCamera.position.x, groupRef.current.position.y, playerCamera.position.z);
@@ -442,7 +437,6 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
   );
 }
 
-// 🚨 FIX: Pass playSFX via props
 function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlayerHit, grid, texture, playSFX }) {
   const groupRef = useRef();
   const spriteMaterialRef = useRef();
@@ -511,7 +505,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
         isChasing.current = true;
         if (!hasAggroed.current) {
           hasAggroed.current = true;
-          // 🚨 FIX: Call the DOM element
           playSFX('sfx-imp', 1.0);
         }
       } else {
@@ -595,7 +588,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
   );
 }
 
-// 🚨 FIX: Accept and drill playSFX down
 function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTexture, orbTexture, playerProjTexture, impTexture, playSFX }) {
   const { camera } = useThree();
   const projectilesRef = useRef([]);
@@ -612,7 +604,6 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTextu
       if ((isSpacebar || isLeftClick) && document.pointerLockElement) {
         if (isSpacebar) e.preventDefault(); 
         
-        // Trigger the shoot sound
         playSFX('sfx-shoot', 0.6);
         
         const dir = new THREE.Vector3();
@@ -668,7 +659,7 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTextu
               grid={grids?.[e.fIdx]} 
               onSpawnEnemyOrb={(orb) => setEnemyProjectiles(prev => [...prev, orb])}
               texture={bossTexture}
-              playSFX={playSFX} // 🚨 FIX
+              playSFX={playSFX}
             />
           );
         }
@@ -683,7 +674,7 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTextu
             onPlayerHit={onPlayerHit}
             grid={grids?.[e.fIdx]} 
             texture={impTexture} 
-            playSFX={playSFX} // 🚨 FIX
+            playSFX={playSFX}
           />
         );
       })}
@@ -862,44 +853,38 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
 // ----------------------------------------------------
 // 5. MAIN SCENE RENDERING
 // ----------------------------------------------------
-// 🚨 FIX: Accept playSFX and pass it to CombatManager
 function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove, onEradicate, onPlayerHit, isPuzzleActive, playSFX }) {
-  const woodTexList = useTexture([
-    '/wall_timber_structure_cross.png', '/wall_timber_structure_diagonal.png',
-    '/wall_timber_structure_vertical.png', '/wall_timber_structure.png'
-  ]);
-  const stoneTexList = useTexture([
-    '/wall_brick_stone_both.png', '/wall_brick_stone_center_banner.png',
-    '/wall_brick_stone_center_depth.png', '/wall_brick_stone_center.png',
-    '/wall_brick_stone_left.png', '/wall_brick_stone_right.png',
-    '/wall_stone_depth.png', '/wall_stone.png'
-  ]);
-
-  const [tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp] = useTexture([
-    '/floor_stone_pattern.png', '/floor_tiles_tan_large.png', '/door_wood.png', '/door_metal_gate.png',
-    '/door_metal_frame.png', '/window_round_pane_lit.png', '/hand.png',
-    '/red_keycard.png', '/blue_keycard.png', '/yellow_keycard.png', '/right_handed_crt.png',
-    '/Hell Knight.png', '/green projectile 2.png', '/hand_projectile 2.png', '/imp.png'
+  const [tWallLab, tWallContainment, tFloorContainment, tFloorLab, tCeiling, tDoorWood, tDoorMetal, tDoorContainment, tLight, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp, tLabBench, tServerRack, tGas, tBioBarrel, tLabStool, tOfficeChair, tChemRack] = useTexture([
+    '/lab_wall_tiles.jpg', '/containment_wall_tiles.jpg', 
+    '/containment_floor_tiles.jpg', '/lab_floor_tiles.jpg', 
+    '/ceiling_tiles.jpg',
+    '/door_wood.png', '/terminal_door.jpg', '/containment_door.jpg', '/ceiling_light.jpg', '/hand.png',
+    '/red_keycard.png', '/blue_keycard.png', '/yellow_keycard.png', '/computer_terminal.jpg',
+    '/Hell Knight.png', '/green projectile 2.png', '/hand_projectile 2.png', '/imp.png',
+    '/lab_bench.jpg', '/server_rack.png', '/gas_containers.png', 
+    '/biohazard_barrel.png', '/lab_stool.png', '/office_chair.png', '/chemical_rack.jpg'
   ]);
 
   useEffect(() => {
-    [...woodTexList, ...stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp].forEach(t => {
+    [tWallLab, tWallContainment, tFloorContainment, tFloorLab, tCeiling, tDoorWood, tDoorMetal, tDoorContainment, tLight, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp, tLabBench, tServerRack, tGas, tBioBarrel, tLabStool, tOfficeChair, tChemRack].forEach(t => {
       if(t) { t.magFilter = t.minFilter = THREE.NearestFilter; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.needsUpdate = true; }
     });
-    woodTexList.forEach(t => t.repeat.set(1, 3.2));
-    stoneTexList.forEach(t => t.repeat.set(1, 3.2));
-  }, [woodTexList, stoneTexList, tFloorStone, tFloorWood, tDoorWood, tDoorMetal, tDoorMetalFrame, tWindow, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp]);
+    
+    if (tWallLab) tWallLab.repeat.set(1, 3.2);
+    if (tWallContainment) tWallContainment.repeat.set(1, 3.2);
+  }, [tWallLab, tWallContainment, tFloorContainment, tFloorLab, tCeiling, tDoorWood, tDoorMetal, tDoorContainment, tLight, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp, tLabBench, tServerRack, tGas, tBioBarrel, tLabStool, tOfficeChair, tChemRack]);
 
   const parsedData = useMemo(() => {
     const dummy = new THREE.Object3D();
     
-    const wWallsBuffs = woodTexList.slice(0, 4).map(() => createBuffer());
-    const sWallsBuffs = stoneTexList.slice(0, 4).map(() => createBuffer());
+    const wWallBuff = createBuffer();
+    const sWallBuff = createBuffer();
     const wFloorBuff = createBuffer();
     const sFloorBuff = createBuffer();
     const ceilBuff = createBuffer();
     
     const interactives = [];
+    const decorations = []; 
     let totalFloors = 0;
 
     for (let fIdx = 0; fIdx < grids.length; fIdx++) {
@@ -915,21 +900,10 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
           const tile = grid[z][x];
           
           let isStoneZone = fIdx > 0;
-          let tIdx = 0;
 
           if (fIdx === 0) {
-            if (z > 55) {
-              isStoneZone = true;
-              tIdx = (x + z) % 4; 
-            } else if (z > 25) {
-              isStoneZone = false;
-              tIdx = (x % 2 === 0) ? 0 : 1; 
-            } else {
-              isStoneZone = false;
-              tIdx = (z % 2 === 0) ? 3 : 2; 
-            }
-          } else {
-            tIdx = (x * 7 + z * 13) % 4; 
+            if (z > 55) isStoneZone = true;
+            else isStoneZone = false;
           }
 
           if (tile === 1) {
@@ -943,7 +917,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
               dummy.position.set(x + 0.5, baseY + (FLOOR_HT / 2), z + 0.5);
               dummy.rotation.set(0, 0, 0);
               dummy.scale.set(1, 1, 1);
-              if (isStoneZone) sWallsBuffs[tIdx].add(dummy); else wWallsBuffs[tIdx].add(dummy);
+              if (isStoneZone) sWallBuff.add(dummy); else wWallBuff.add(dummy);
             }
             continue; 
           }
@@ -970,26 +944,31 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
             dummy.position.set(x + 0.5, baseY + 2.0 + (lintelHt/2), z + 0.5);
             dummy.rotation.set(0, 0, 0);
             dummy.scale.set(1, lintelHt / FLOOR_HT, 1); 
-            if (isStoneZone) sWallsBuffs[tIdx].add(dummy); else wWallsBuffs[tIdx].add(dummy);
+            if (isStoneZone) sWallBuff.add(dummy); else wWallBuff.add(dummy);
           }
 
           if ([2, 8, 9, 13, 12, 18, 22, 28, 7, 17, 3, 10, 4, 5, 15, 25, 6, 32, 38].includes(tile)) {
-            interactives.push({ tile, x, z, fIdx, baseY, isStoneZone, tIdx });
+            interactives.push({ tile, x, z, fIdx, baseY, isStoneZone });
             if (interactives.length > 5000) return { error: "TOO_MANY_ENTITIES", count: interactives.length };
+          }
+
+          if ([50, 51, 52, 53, 54, 55, 56].includes(tile)) {
+            decorations.push({ tile, x, z, fIdx, baseY });
           }
         }
       }
     }
 
     return { 
-      wWallsFinal: wWallsBuffs.map(b => b.finalize()), 
-      sWallsFinal: sWallsBuffs.map(b => b.finalize()), 
+      wWallFinal: wWallBuff.finalize(), 
+      sWallFinal: sWallBuff.finalize(), 
       wFloorFinal: wFloorBuff.finalize(), 
       sFloorFinal: sFloorBuff.finalize(), 
       ceilFinal: ceilBuff.finalize(), 
-      interactiveElements: interactives 
+      interactiveElements: interactives,
+      decorations 
     };
-  }, [grids, woodTexList.length, stoneTexList.length]);
+  }, [grids]);
 
   if (parsedData.error === "TOO_MANY_FLOORS" || parsedData.error === "TOO_MANY_ENTITIES") {
     return (
@@ -1002,7 +981,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     );
   }
 
-  const { wWallsFinal, sWallsFinal, wFloorFinal, sFloorFinal, ceilFinal, interactiveElements } = parsedData;
+  const { wWallFinal, sWallFinal, wFloorFinal, sFloorFinal, ceilFinal, interactiveElements, decorations } = parsedData;
 
   const enemiesData = useMemo(() => {
     return interactiveElements
@@ -1012,26 +991,20 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
 
   return (
     <>
-      <FastInstancedMesh geometryArgs={{type: 'box', args: [1, FLOOR_HT, 1]}} materialProps={{map: woodTexList[0], color: "#ffffff", roughness: 0.9}} bufferData={wWallsFinal[0]} />
-      <FastInstancedMesh geometryArgs={{type: 'box', args: [1, FLOOR_HT, 1]}} materialProps={{map: woodTexList[1], color: "#ffffff", roughness: 0.9}} bufferData={wWallsFinal[1]} />
-      <FastInstancedMesh geometryArgs={{type: 'box', args: [1, FLOOR_HT, 1]}} materialProps={{map: woodTexList[2], color: "#ffffff", roughness: 0.9}} bufferData={wWallsFinal[2]} />
-      <FastInstancedMesh geometryArgs={{type: 'box', args: [1, FLOOR_HT, 1]}} materialProps={{map: woodTexList[3], color: "#ffffff", roughness: 0.9}} bufferData={wWallsFinal[3]} />
-      
-      <FastInstancedMesh geometryArgs={{type: 'box', args: [1, FLOOR_HT, 1]}} materialProps={{map: stoneTexList[0], color: "#ffffff", roughness: 0.9}} bufferData={sWallsFinal[0]} />
-      <FastInstancedMesh geometryArgs={{type: 'box', args: [1, FLOOR_HT, 1]}} materialProps={{map: stoneTexList[1], color: "#ffffff", roughness: 0.9}} bufferData={sWallsFinal[1]} />
-      <FastInstancedMesh geometryArgs={{type: 'box', args: [1, FLOOR_HT, 1]}} materialProps={{map: stoneTexList[2], color: "#ffffff", roughness: 0.9}} bufferData={sWallsFinal[2]} />
-      <FastInstancedMesh geometryArgs={{type: 'box', args: [1, FLOOR_HT, 1]}} materialProps={{map: stoneTexList[3], color: "#ffffff", roughness: 0.9}} bufferData={sWallsFinal[3]} />
+      <FastInstancedMesh geometryArgs={{type: 'box', args: [1, FLOOR_HT, 1]}} materialProps={{map: tWallLab, color: "#ffffff", roughness: 0.9}} bufferData={wWallFinal} />
+      <FastInstancedMesh geometryArgs={{type: 'box', args: [1, FLOOR_HT, 1]}} materialProps={{map: tWallContainment, color: "#ffffff", roughness: 0.9}} bufferData={sWallFinal} />
 
-      <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorWood, color: "#ffffff", roughness: 1.0}} bufferData={wFloorFinal} />
-      <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorStone, color: "#ffffff", roughness: 1.0}} bufferData={sFloorFinal} />
-      <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorStone, color: "#71717a", roughness: 0.9, side: THREE.DoubleSide}} bufferData={ceilFinal} />
+      <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorLab, color: "#ffffff", roughness: 1.0}} bufferData={wFloorFinal} />
+      <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorContainment, color: "#ffffff", roughness: 1.0}} bufferData={sFloorFinal} />
+      <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tCeiling, color: "#ffffff", roughness: 0.9, side: THREE.DoubleSide}} bufferData={ceilFinal} />
 
       {interactiveElements.map((el, idx) => {
-        const { tile, x, z, fIdx, baseY, isStoneZone, tIdx } = el;
+        const { tile, x, z, fIdx, baseY, isStoneZone } = el;
         
-        const wTexList = isStoneZone ? stoneTexList : woodTexList;
-        const wTex = wTexList[tIdx]; 
-        const dTex = isStoneZone ? tDoorMetal : tDoorWood;
+        const wTex = isStoneZone ? tWallContainment : tWallLab; 
+        
+        let dTex = isStoneZone ? tDoorMetal : tDoorWood;
+        if (tile === 22 || tile === 28) dTex = tDoorContainment;
         
         if ([2,8,12,18,22,28,7,17,32,38].includes(tile)) {
           let trimColor = "#dc2626";
@@ -1043,17 +1016,39 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
           return <DoorMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={[8,18,28,17,38].includes(tile)} wallTexture={wTex} doorTexture={dTex} trimColor={trimColor} />;
         }
         
-        if (tile === 3 || tile === 10) return <ElevatorMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={tile === 10} wallTexture={wTex} doorTexture={tDoorMetalFrame} litTexture={tWindow} />;
+        if (tile === 3 || tile === 10) return <ElevatorMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={tile === 10} wallTexture={wTex} doorTexture={tDoorMetal} litTexture={tLight} />;
         if (tile === 4) return <TerminalMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tCrt} />;
 
         if (tile === 5) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tKeyRed} color="#8B0000" />;
         if (tile === 15) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tKeyBlue} color="#00008B" />;
         if (tile === 25) return <KeycardMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tKeyYellow} color="#B8860B" />;
         
-        if (tile === 6) return <CeilingLightMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tWindow} />;
+        if (tile === 6) return <CeilingLightMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tLight} />;
         return null;
       })}
-      
+
+      {decorations.map((dec, idx) => {
+        let tex = null;
+        let scale = [1, 1, 1];
+        let yOffset = 0.5;
+        
+        if (dec.tile === 50) { tex = tLabBench; scale = [2.0, 1.5, 1]; yOffset = 0.75; }
+        else if (dec.tile === 51) { tex = tServerRack; scale = [1.2, 2.0, 1]; yOffset = 1.0; }
+        else if (dec.tile === 52) { tex = tGas; scale = [1.2, 1.5, 1]; yOffset = 0.75; }
+        else if (dec.tile === 53) { tex = tBioBarrel; scale = [0.8, 1.2, 1]; yOffset = 0.6; }
+        else if (dec.tile === 54) { tex = tLabStool; scale = [0.6, 0.8, 1]; yOffset = 0.4; }
+        else if (dec.tile === 55) { tex = tOfficeChair; scale = [0.8, 1.2, 1]; yOffset = 0.6; }
+        else if (dec.tile === 56) { tex = tChemRack; scale = [1.5, 2.0, 1]; yOffset = 1.0; }
+
+        return (
+          <group key={`dec-${idx}`} position={[dec.x + 0.5, dec.baseY + yOffset, dec.z + 0.5]}>
+            <sprite scale={scale}>
+              <spriteMaterial map={tex} color="#ffffff" transparent={true} />
+            </sprite>
+          </group>
+        );
+      })}
+
       <CombatManager 
         enemiesData={enemiesData} 
         grids={grids} 
@@ -1063,14 +1058,13 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         orbTexture={tEnemyProj} 
         playerProjTexture={tPlayerProj} 
         impTexture={tImp} 
-        playSFX={playSFX} // 🚨 FIX
+        playSFX={playSFX}
       />
       <PlayerControls grids={grids} handTexture={tHand} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} onPlayerMove={onPlayerMove} isPuzzleActive={isPuzzleActive} />
     </>
   );
 }
 
-// 🚨 FIX: Accept playSFX and pass it down
 export default function DungeonEngine({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove, onEradicate, onPlayerHit, isPuzzleActive, currentFloor, playSFX }) {
   
   const isHell = currentFloor === 2;
