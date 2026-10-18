@@ -867,11 +867,24 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
 
   useEffect(() => {
     [tWallLab, tWallContainment, tFloorContainment, tFloorLab, tCeiling, tDoorWood, tDoorMetal, tDoorContainment, tLight, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp, tLabBench, tServerRack, tGas, tBioBarrel, tLabStool, tOfficeChair, tChemRack].forEach(t => {
-      if(t) { t.magFilter = t.minFilter = THREE.NearestFilter; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.needsUpdate = true; }
+      if(t) { 
+        t.magFilter = t.minFilter = THREE.NearestFilter; 
+        t.wrapS = t.wrapT = THREE.RepeatWrapping; 
+        t.needsUpdate = true; 
+      }
     });
     
-  }, [tWallLab, tWallContainment, tFloorContainment, tFloorLab, tCeiling, tDoorWood, tDoorMetal, tDoorContainment, tLight, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp, tLabBench, tServerRack, tGas, tBioBarrel, tLabStool, tOfficeChair, tChemRack]);
+    // Zoom in the flat surfaces to spread the tiles out
+    if (tFloorLab) tFloorLab.repeat.set(0.25, 0.25);
+    if (tFloorContainment) tFloorContainment.repeat.set(0.25, 0.25);
+    if (tCeiling) tCeiling.repeat.set(0.25, 0.25);
 
+    // Zoom in the walls and scale the Y-axis proportionally to the 3.2 height
+    if (tWallLab) tWallLab.repeat.set(0.25, 0.8);
+    if (tWallContainment) tWallContainment.repeat.set(0.25, 0.8);
+
+  }, [tWallLab, tWallContainment, tFloorContainment, tFloorLab, tCeiling, tDoorWood, tDoorMetal, tDoorContainment, tLight, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp, tLabBench, tServerRack, tGas, tBioBarrel, tLabStool, tOfficeChair, tChemRack]);
+  
   const parsedData = useMemo(() => {
     const dummy = new THREE.Object3D();
     
@@ -997,7 +1010,8 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         
         const wTex = isStoneZone ? tWallContainment : tWallLab; 
         
-        let dTex = isStoneZone ? tDoorMetal : tDoorWood;
+        // Use the terminal door by default, and containment door for Yellow Keycard zones
+        let dTex = tDoorMetal; 
         if (tile === 22 || tile === 28) dTex = tDoorContainment;
         
         if ([2,8,12,18,22,28,7,17,32,38].includes(tile)) {
