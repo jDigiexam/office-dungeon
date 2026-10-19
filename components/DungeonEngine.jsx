@@ -437,7 +437,12 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
     if (!texture) return null;
     const tex = texture.clone();
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(1/6, 1); 
+    
+    // Set a tiny crop margin (e.g., 0.5% off the edges) to eliminate bleeding
+    const frameWidth = 1 / 6;
+    const cropMargin = 0.005; 
+    tex.repeat.set(frameWidth - (cropMargin * 2), 1); 
+    
     tex.magFilter = THREE.NearestFilter;
     tex.needsUpdate = true;
     return tex;
@@ -505,9 +510,13 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
           groupRef.current.position.z = nextZ;
         }
 
+        // Loop through all 6 frames
         if (impTex) {
           const walkFrame = Math.floor(state.clock.elapsedTime * 6) % 6;
-          impTex.offset.x = walkFrame * (1/6);
+          const frameWidth = 1 / 6;
+          const cropMargin = 0.005;
+          // Apply the offset plus the margin to center the cropped window
+          impTex.offset.x = (walkFrame * frameWidth) + cropMargin;
         }
 
       } else {
