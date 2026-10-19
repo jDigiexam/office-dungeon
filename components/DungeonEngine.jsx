@@ -26,7 +26,8 @@ function FastInstancedMesh({ geometryArgs, materialProps, bufferData }) {
   if (bufferData.count === 0) return null;
 
   return (
-    <instancedMesh ref={meshRef} args={[null, null, bufferData.count]} frustumCulled={true}>
+    // Changed frustumCulled back to false so the map stops disappearing!
+    <instancedMesh ref={meshRef} args={[null, null, bufferData.count]} frustumCulled={false}>
       {geometryArgs.type === 'box' ? <boxGeometry args={geometryArgs.args} /> : <planeGeometry args={geometryArgs.args} />}
       <meshLambertMaterial {...materialProps} />
     </instancedMesh>
