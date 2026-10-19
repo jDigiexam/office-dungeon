@@ -80,21 +80,20 @@ function KeycardMesh({ position, texture, color }) {
 }
 
 function TerminalMesh({ position, texture }) {
-  const crtRef = useRef();
-  
-  useFrame(({ camera }) => { 
-    if (crtRef.current) crtRef.current.lookAt(camera.position); 
-  });
-  
-  return (
-    <group position={position}>
-      {/* Scale widened to 2.4 and Y lowered to 0.65 so the legs rest firmly on the tiles */}
-      <sprite ref={crtRef} position={[0, 0.65, 0]} scale={[2.4, 1.5, 1]}>
-        <spriteMaterial map={texture} color="#ffffff" transparent={true} alphaTest={0.5} />
-      </sprite>
-      <pointLight color="#22c55e" intensity={1.5} distance={3} decay={2} position={[0, 0.8, 0]} />
-    </group>
-  );
+    const crtRef = useRef();
+    
+    useFrame(({ camera }) => { 
+      if (crtRef.current) crtRef.current.lookAt(camera.position); 
+    });
+    
+    return (
+      <group position={position}>
+        <sprite ref={crtRef} position={[0, 0.65, 0]} scale={[2.4, 1.5, 1]}>
+          <spriteMaterial map={texture} color="#ffffff" transparent={true} alphaTest={0.5} />
+        </sprite>
+        <pointLight color="#22c55e" intensity={1.5} distance={3} decay={2} position={[0, 0.8, 0]} />
+      </group>
+    );
 }
 
 function CeilingLightMesh({ position, texture }) {
@@ -110,7 +109,6 @@ function ElevatorMesh({ position, grid, gx, gz, isOpened, wallTexture, doorTextu
   const leftDoor = useRef();
   const rightDoor = useRef();
 
-  // Split the texture down the middle
   const texLeft = useMemo(() => {
     if (!doorTexture) return null;
     const tex = doorTexture.clone();
@@ -224,7 +222,7 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
     const curY = groupRef.current.position.y;
     const curZ = groupRef.current.position.z;
     
-    const isSolid = grid && [1, 2, 12, 22, 7, 3, 4, 32, 50, 51, 52, 53, 54, 55, 56].includes(grid[Math.floor(curZ)]?.[Math.floor(curX)]);
+    const isSolid = grid && [1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(curZ)]?.[Math.floor(curX)]);
 
     const floorY = Math.floor(startPos.y / FLOOR_HT) * FLOOR_HT;
     const ceilY = floorY + FLOOR_HT;
@@ -311,14 +309,12 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
     if (!texture) return null;
     const tex = texture.clone();
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    // Hell Knight is a single row of 7 frames[cite: 30]
     tex.repeat.set(1/7, 1); 
     tex.magFilter = THREE.NearestFilter; 
     tex.needsUpdate = true;
     return tex;
   }, [texture]);
 
-  // ... (Keep your existing checkLoS function inside here) ...
   const checkLoS = (startX, startZ, endX, endZ) => {
     if (!grid || isNaN(startX) || isNaN(startZ) || isNaN(endX) || isNaN(endZ)) return false;
     const dx = endX - startX; const dz = endZ - startZ;
@@ -339,8 +335,8 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
 
     if (isDead.current) {
       const timeSinceDeath = state.clock.elapsedTime - deathTime.current;
-      bossTex.offset.x = 0; // Freeze on idle frame
-      groupRef.current.position.y -= delta * 0.5; // Sink into the floor
+      bossTex.offset.x = 0; 
+      groupRef.current.position.y -= delta * 0.5; 
       if (timeSinceDeath > 1.5) groupRef.current.visible = false;
       return;
     }
@@ -388,14 +384,11 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
       }
     }
 
-    // Map the 7-frame horizontal sheet[cite: 30]
     if (timeSinceShot < 0.6) {
-      // Attack Windup & Shoot Frames (2, 3, 4)
       if (timeSinceShot < 0.2) bossTex.offset.x = 2 * (1/7);
       else if (timeSinceShot < 0.4) bossTex.offset.x = 3 * (1/7);
       else bossTex.offset.x = 4 * (1/7);
     } else {
-      // Walking Frames (0, 1, 5, 6)
       const walkFrames = [0, 1, 5, 6];
       const currentFrame = Math.floor(state.clock.elapsedTime * 6) % 4;
       bossTex.offset.x = walkFrames[currentFrame] * (1/7); 
@@ -423,7 +416,6 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
 
   return (
     <group ref={groupRef} position={initialPos}>
-      {/* Scaled down to 1.8x and repositioned so feet touch the ground */}
       <sprite position={[0, 0.4, 0]} scale={[1.8, 1.8, 1]}>
         <spriteMaterial ref={spriteMaterialRef} map={bossTex || undefined} color="#ffffff" transparent={true} alphaTest={0.5} />
       </sprite>
@@ -444,14 +436,12 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
     if (!texture) return null;
     const tex = texture.clone();
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    // Imp is a single row of exactly 6 frames[cite: 29]
     tex.repeat.set(1/6, 1); 
     tex.magFilter = THREE.NearestFilter;
     tex.needsUpdate = true;
     return tex;
   }, [texture]);
 
-  // ... (Keep your existing checkLoS function inside here) ...
   const checkLoS = (startX, startZ, endX, endZ) => {
     if (!grid || isNaN(startX) || isNaN(startZ) || isNaN(endX) || isNaN(endZ)) return false;
     const dx = endX - startX; const dz = endZ - startZ;
@@ -514,7 +504,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
           groupRef.current.position.z = nextZ;
         }
 
-        // Loop through all 6 frames[cite: 29]
         if (impTex) {
           const walkFrame = Math.floor(state.clock.elapsedTime * 6) % 6;
           impTex.offset.x = walkFrame * (1/6);
@@ -551,7 +540,6 @@ function ShadowNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPl
 
   return (
     <group ref={groupRef} position={initialPos}>
-      {/* Scaled down to 1.4x and repositioned so feet touch the ground */}
       <sprite position={[0, 0.2, 0]} scale={[1.4, 1.4, 1]}>
         <spriteMaterial ref={spriteMaterialRef} map={impTex || undefined} color="#ffffff" transparent={true} alphaTest={0.5} />
       </sprite>
@@ -757,7 +745,6 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
     const newZ = camera.position.z;
     const radius = 0.28;
 
-    // Direct grid check including all props (50-56)
     const isSolidTile = (x, z) => {
       const gx = Math.floor(x);
       const gz = Math.floor(z);
@@ -769,7 +756,6 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
       const solidList = [1, 2, 12, 22, 7, 3, 4, 32, 50, 51, 52, 53, 54, 55, 56];
       if (solidList.includes(tile)) return true;
 
-      // Desk (4), Lab Bench (50), and Chem Rack (56) spill horizontally into adjacent cells
       const wideTiles = [4, 50, 56];
       if (gx > 0 && wideTiles.includes(curGrid[gz]?.[gx - 1]) && (x - gx) < 0.35) return true;
       if (gx < curGrid[0].length - 1 && wideTiles.includes(curGrid[gz]?.[gx + 1]) && (gx + 1 - x) < 0.35) return true;
@@ -804,7 +790,6 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
       if (onPlayerMove) onPlayerMove(curX, curZ);
     }
 
-    // Always keep hand locked to camera after movement is calculated
     if (handRef.current) {
       const handOffset = new THREE.Vector3(0.18, -0.15, -0.3);
       handOffset.applyQuaternion(camera.quaternion);
@@ -828,7 +813,7 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
       <mesh ref={handRef} renderOrder={999}>
         <planeGeometry args={[0.23, 0.23]} />
         <meshBasicMaterial map={handTexture} transparent={true} depthTest={false} />
-        <pointLight intensity={1.8} distance={15} color="#fffbeb" decay={1} />
+        <pointLight intensity={1.8} distance={10} color="#fffbeb" decay={1} />
       </mesh>
     </>
   );
@@ -837,7 +822,7 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
 // ----------------------------------------------------
 // 5. MAIN SCENE RENDERING
 // ----------------------------------------------------
-function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove, onEradicate, onPlayerHit, isPuzzleActive, playSFX }) {
+function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTeleport, onFloorChange, onEnterElevator, onPlayerMove, onEradicate, onPlayerHit, isPuzzleActive, currentFloor, playSFX }) {
   const [tWallLab, tWallContainment, tElevatorDoor, tFloorContainment, tFloorLab, tCeiling, tDoorWood, tDoorMetal, tDoorContainment, tLight, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp, tLabBench, tServerRack, tGas, tBioBarrel, tLabStool, tOfficeChair, tChemRack] = useTexture([
     '/lab_wall_tiles.png', '/containment_wall_tiles.png', '/elevator_door.png',
     '/containment_floor_tiles.png', '/lab_floor_tiles.png', 
@@ -858,18 +843,14 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
       }
     });
     
-    // Zoom in the flat surfaces to spread the tiles out
     if (tFloorLab) tFloorLab.repeat.set(0.25, 0.25);
     if (tFloorContainment) tFloorContainment.repeat.set(0.25, 0.25);
     if (tCeiling) tCeiling.repeat.set(0.25, 0.25);
 
-    // Zoom in the walls and scale the Y-axis proportionally to the 3.2 height
     if (tWallLab) tWallLab.repeat.set(0.25, 0.8);
     if (tWallContainment) tWallContainment.repeat.set(0.25, 0.8);
-
   }, [tWallLab, tWallContainment, tElevatorDoor, tFloorContainment, tFloorLab, tCeiling, tDoorWood, tDoorMetal, tDoorContainment, tLight, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp, tLabBench, tServerRack, tGas, tBioBarrel, tLabStool, tOfficeChair, tChemRack]);
-  
-  // Pass currentFloor into useMemo dependency
+
   const parsedData = useMemo(() => {
     const dummy = new THREE.Object3D();
     
@@ -882,7 +863,6 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     const interactives = [];
     const decorations = []; 
 
-    // ONLY process the floor the player is actually on
     const fIdx = currentFloor;
     const grid = grids[fIdx];
     if (grid) {
@@ -955,17 +935,6 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     };
   }, [grids, currentFloor]);
 
-  if (parsedData.error === "TOO_MANY_FLOORS" || parsedData.error === "TOO_MANY_ENTITIES") {
-    return (
-      <Html center position={[initialSpawn[0], initialSpawn[1], initialSpawn[2] - 2]} zIndexRange={[100, 0]}>
-        <div style={{ backgroundColor: '#18181b', color: '#f87171', border: '4px solid #dc2626', padding: '2rem', fontFamily: 'monospace', textAlign: 'center', width: '400px' }}>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: '0 0 1rem 0' }}>FATAL RENDER ERROR</h2>
-          <p style={{ margin: '0 0 1rem 0' }}>The engine safely aborted the render because it exceeded maximum memory allocation.</p>
-        </div>
-      </Html>
-    );
-  }
-
   const { wWallFinal, sWallFinal, wFloorFinal, sFloorFinal, ceilFinal, interactiveElements, decorations } = parsedData;
 
   const enemiesData = useMemo(() => {
@@ -976,18 +945,18 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
 
   return (
     <>
-      <FastInstancedMesh geometryArgs={{type: 'box', args: [1, FLOOR_HT, 1]}} materialProps={{map: tWallLab, color: "#ffffff", roughness: 0.9}} bufferData={wWallFinal} />
-      <FastInstancedMesh geometryArgs={{type: 'box', args: [1, FLOOR_HT, 1]}} materialProps={{map: tWallContainment, color: "#ffffff", roughness: 0.9}} bufferData={sWallFinal} />
+      <FastInstancedMesh geometryArgs={{type: 'box', args: [1, FLOOR_HT, 1]}} materialProps={{map: tWallLab, color: "#ffffff"}} bufferData={wWallFinal} />
+      <FastInstancedMesh geometryArgs={{type: 'box', args: [1, FLOOR_HT, 1]}} materialProps={{map: tWallContainment, color: "#ffffff"}} bufferData={sWallFinal} />
 
-      <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorLab, color: "#ffffff", roughness: 1.0}} bufferData={wFloorFinal} />
-      <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorContainment, color: "#ffffff", roughness: 1.0}} bufferData={sFloorFinal} />
+      <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorLab, color: "#ffffff"}} bufferData={wFloorFinal} />
+      <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorContainment, color: "#ffffff"}} bufferData={sFloorFinal} />
       <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tCeiling, color: "#ffffff"}} bufferData={ceilFinal} />
+
       {interactiveElements.map((el, idx) => {
         const { tile, x, z, fIdx, baseY, isStoneZone } = el;
         
         const wTex = isStoneZone ? tWallContainment : tWallLab; 
         
-        // Use the terminal door by default, and containment door for Yellow Keycard zones
         let dTex = tDoorMetal; 
         if (tile === 22 || tile === 28) dTex = tDoorContainment;
         
@@ -995,12 +964,11 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
           let trimColor = "#dc2626";
           if (tile === 12 || tile === 18) trimColor = "#2563eb";
           if (tile === 22 || tile === 28) trimColor = "#eab308";
-          
           if (tile === 7 || tile === 17 || tile === 32 || tile === 38) trimColor = "#a1a1aa"; 
           
           return <DoorMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={[8,18,28,17,38].includes(tile)} wallTexture={wTex} doorTexture={dTex} trimColor={trimColor} />;
         }
-        // Change doorTexture={tDoorMetal} to doorTexture={tElevatorDoor}
+        
         if (tile === 3 || tile === 10) return <ElevatorMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} grid={grids[fIdx]} gx={x} gz={z} isOpened={tile === 10} wallTexture={wTex} doorTexture={tElevatorDoor} litTexture={tLight} />;
         if (tile === 4) return <TerminalMesh key={`int-${idx}`} position={[x + 0.5, baseY, z + 0.5]} texture={tCrt} />;
 
@@ -1012,7 +980,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         return null;
       })}
 
-{decorations.map((dec, idx) => {
+      {decorations.map((dec, idx) => {
         let tex = null;
         let scale = [1, 1, 1];
         let yOffset = 0.5;
@@ -1022,7 +990,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         else if (dec.tile === 52) { tex = tGas; scale = [1.2, 1.5, 1]; yOffset = 0.7; }
         else if (dec.tile === 53) { tex = tBioBarrel; scale = [0.9, 1.2, 1]; yOffset = 0.55; }
         else if (dec.tile === 54) { tex = tLabStool; scale = [0.7, 0.9, 1]; yOffset = 0.4; }
-        else if (dec.tile === 55) { tex = tOfficeChair; scale = [1.2, 1.5, 1]; yOffset = 0.55; } // Lowered from 0.9 to 0.55
+        else if (dec.tile === 55) { tex = tOfficeChair; scale = [1.2, 1.5, 1]; yOffset = 0.55; }
         else if (dec.tile === 56) { tex = tChemRack; scale = [1.5, 2.0, 1]; yOffset = 0.95; }
 
         return (
@@ -1065,19 +1033,7 @@ export default function DungeonEngine({ grids, initialSpawn, onInteract, telepor
         <ambientLight intensity={lightIntensity} color={lightColor} />
         
         <Suspense fallback={null}>
-        <DungeonScene grids={grids} 
-        initialSpawn={initialSpawn}
-        onInteract={onInteract}
-        teleportCoords={teleportCoords}
-        clearTeleport={clearTeleport}
-        onFloorChange={onFloorChange}
-        onEnterElevator={onEnterElevator}
-        onPlayerMove={onPlayerMove}
-        onEradicate={onEradicate}
-        onPlayerHit={onPlayerHit}
-        isPuzzleActive={isPuzzleActive}
-        playSFX={playSFX}
-        currentFloor={currentFloor} />
+          <DungeonScene grids={grids} initialSpawn={initialSpawn} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} onPlayerMove={onPlayerMove} onEradicate={onEradicate} onPlayerHit={onPlayerHit} isPuzzleActive={isPuzzleActive} playSFX={playSFX} currentFloor={currentFloor} />
         </Suspense>
       </Canvas>
     </div>
