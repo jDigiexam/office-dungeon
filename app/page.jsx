@@ -1048,14 +1048,14 @@ export default function EscapeRoomPage() {
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black text-emerald-500">
             <style>{`
               @keyframes cinematic-scroll-win {
-                0% { transform: translateY(100%); }
-                100% { transform: translateY(-100%); }
+                0% { transform: translateY(100vh); }
+                100% { transform: translateY(calc(-100% + 50vh)); }
               }
               .animate-scroll-text-win {
                 animation: cinematic-scroll-win 40s linear forwards;
               }
               @keyframes cinematic-fade-in {
-                0%, 85% { opacity: 0; }
+                0%, 75% { opacity: 0; }
                 100% { opacity: 1; }
               }
               .animate-final-text {
@@ -1098,7 +1098,14 @@ export default function EscapeRoomPage() {
 
                   <p className="text-emerald-400 font-bold tracking-[0.2em] text-sm mt-2">
                     TOTAL TIME: {formatTime(playTime)} | SYSTEM REBOOTS: {deathCount}
-                  </p>
+                    </p>
+
+                    {/* NEW: Centered text that fades in after the scroll finishes */}
+              <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                <p className="text-red-600 font-black tracking-[0.3em] text-3xl drop-shadow-[0_0_15px_rgba(220,38,38,0.8)] animate-final-text">
+                  THE TRUE NIGHTMARE BEGINS.
+                </p>
+              </div>
                 </div>
               </div>
 
