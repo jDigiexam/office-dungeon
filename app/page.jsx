@@ -967,7 +967,7 @@ export default function EscapeRoomPage() {
       {showBait ? (
         <FakePresentation onGlitchComplete={() => setShowBait(false)} />
       ) : !gameStarted ? (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black text-red-600">
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black text-red-600 animate-emerge-static">
           
           <style>{`
             @keyframes cinematic-scroll {
@@ -976,6 +976,15 @@ export default function EscapeRoomPage() {
             }
             .animate-scroll-text {
               animation: cinematic-scroll 45s linear forwards;
+            }
+
+            /* 2. Added the emerge animation here */
+            @keyframes emerge-from-static {
+              0% { opacity: 0; filter: contrast(3) brightness(2) grayscale(1); }
+              100% { opacity: 1; filter: contrast(1) brightness(1) grayscale(0); }
+            }
+            .animate-emerge-static {
+              animation: emerge-from-static 1.5s ease-out forwards;
             }
           `}</style>
 
