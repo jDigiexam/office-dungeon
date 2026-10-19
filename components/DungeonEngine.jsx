@@ -26,9 +26,9 @@ function FastInstancedMesh({ geometryArgs, materialProps, bufferData }) {
   if (bufferData.count === 0) return null;
 
   return (
-    <instancedMesh ref={meshRef} args={[null, null, bufferData.count]} frustumCulled={false}>
+    <instancedMesh ref={meshRef} args={[null, null, bufferData.count]} frustumCulled={true}>
       {geometryArgs.type === 'box' ? <boxGeometry args={geometryArgs.args} /> : <planeGeometry args={geometryArgs.args} />}
-      <meshStandardMaterial {...materialProps} />
+      <meshLambertMaterial {...materialProps} />
     </instancedMesh>
   );
 }
@@ -828,7 +828,7 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
       <mesh ref={handRef} renderOrder={999}>
         <planeGeometry args={[0.23, 0.23]} />
         <meshBasicMaterial map={handTexture} transparent={true} depthTest={false} />
-        <pointLight intensity={2.0} distance={20} color="#fffbeb" decay={2} />
+        <pointLight intensity={1.8} distance={15} color="#fffbeb" decay={1} />
       </mesh>
     </>
   );
@@ -869,6 +869,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
 
   }, [tWallLab, tWallContainment, tElevatorDoor, tFloorContainment, tFloorLab, tCeiling, tDoorWood, tDoorMetal, tDoorContainment, tLight, tHand, tKeyRed, tKeyBlue, tKeyYellow, tCrt, tBoss, tEnemyProj, tPlayerProj, tImp, tLabBench, tServerRack, tGas, tBioBarrel, tLabStool, tOfficeChair, tChemRack]);
   
+  // Pass currentFloor into useMemo dependency
   const parsedData = useMemo(() => {
     const dummy = new THREE.Object3D();
     
@@ -880,23 +881,20 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
     
     const interactives = [];
     const decorations = []; 
-    let totalFloors = 0;
 
-    for (let fIdx = 0; fIdx < grids.length; fIdx++) {
-      const grid = grids[fIdx];
-      if (!grid) continue;
-      
+    // ONLY process the floor the player is actually on
+    const fIdx = currentFloor;
+    const grid = grids[fIdx];
+    if (grid) {
       const rows = grid.length;
       const cols = grid[0].length;
       const baseY = fIdx * FLOOR_HT;
+      const isStoneZone = fIdx > 0;
 
       for (let z = 0; z < rows; z++) {
         for (let x = 0; x < cols; x++) {
           const tile = grid[z][x];
           
-          // Floor 0 is always Lab tiles. Floors 1+ are Containment tiles.
-          let isStoneZone = fIdx > 0;
-
           if (tile === 1) {
             let isVisible = false;
             if (z > 0 && grid[z-1][x] !== 1) isVisible = true;
@@ -921,9 +919,6 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
           }
 
           if (![3,10].includes(tile)) {
-            totalFloors++;
-            if (totalFloors > 1500000) return { error: "TOO_MANY_FLOORS", count: totalFloors };
-            
             dummy.position.set(x + 0.5, baseY, z + 0.5);
             dummy.rotation.set(-Math.PI / 2, 0, 0);
             dummy.scale.set(1, 1, 1);
@@ -940,7 +935,6 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
 
           if ([2, 8, 9, 13, 12, 18, 22, 28, 7, 17, 3, 10, 4, 5, 15, 25, 6, 32, 38].includes(tile)) {
             interactives.push({ tile, x, z, fIdx, baseY, isStoneZone });
-            if (interactives.length > 5000) return { error: "TOO_MANY_ENTITIES", count: interactives.length };
           }
 
           if ([50, 51, 52, 53, 54, 55, 56].includes(tile)) {
@@ -959,7 +953,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
       interactiveElements: interactives,
       decorations 
     };
-  }, [grids]);
+  }, [grids, currentFloor]);
 
   if (parsedData.error === "TOO_MANY_FLOORS" || parsedData.error === "TOO_MANY_ENTITIES") {
     return (
@@ -987,8 +981,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
 
       <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorLab, color: "#ffffff", roughness: 1.0}} bufferData={wFloorFinal} />
       <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tFloorContainment, color: "#ffffff", roughness: 1.0}} bufferData={sFloorFinal} />
-      <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tCeiling, color: "#ffffff", roughness: 0.9, side: THREE.DoubleSide}} bufferData={ceilFinal} />
-
+      <FastInstancedMesh geometryArgs={{type: 'plane', args: [1, 1]}} materialProps={{map: tCeiling, color: "#ffffff"}} bufferData={ceilFinal} />
       {interactiveElements.map((el, idx) => {
         const { tile, x, z, fIdx, baseY, isStoneZone } = el;
         
@@ -1040,7 +1033,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
           </group>
         );
       })}
-      
+
       <CombatManager 
         enemiesData={enemiesData} 
         grids={grids} 
@@ -1072,7 +1065,19 @@ export default function DungeonEngine({ grids, initialSpawn, onInteract, telepor
         <ambientLight intensity={lightIntensity} color={lightColor} />
         
         <Suspense fallback={null}>
-        <DungeonScene grids={grids} initialSpawn={initialSpawn} onInteract={onInteract} teleportCoords={teleportCoords} clearTeleport={clearTeleport} onFloorChange={onFloorChange} onEnterElevator={onEnterElevator} onPlayerMove={onPlayerMove} onEradicate={onEradicate} onPlayerHit={onPlayerHit} isPuzzleActive={isPuzzleActive} playSFX={playSFX} />
+        <DungeonScene grids={grids} 
+        initialSpawn={initialSpawn}
+        onInteract={onInteract}
+        teleportCoords={teleportCoords}
+        clearTeleport={clearTeleport}
+        onFloorChange={onFloorChange}
+        onEnterElevator={onEnterElevator}
+        onPlayerMove={onPlayerMove}
+        onEradicate={onEradicate}
+        onPlayerHit={onPlayerHit}
+        isPuzzleActive={isPuzzleActive}
+        playSFX={playSFX}
+        currentFloor={currentFloor} />
         </Suspense>
       </Canvas>
     </div>
