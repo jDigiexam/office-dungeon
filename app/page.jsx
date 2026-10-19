@@ -1048,18 +1048,18 @@ export default function EscapeRoomPage() {
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black text-emerald-500">
             <style>{`
               @keyframes cinematic-scroll-win {
-                0% { transform: translateY(100vh); }
-                100% { transform: translateY(calc(-100% + 50vh)); }
+                0% { transform: translateY(600px); }
+                100% { transform: translateY(calc(-100% + 400px)); }
               }
               .animate-scroll-text-win {
-                animation: cinematic-scroll-win 40s linear forwards;
+                animation: cinematic-scroll-win 45s linear forwards;
               }
               @keyframes cinematic-fade-in {
                 0%, 75% { opacity: 0; }
                 100% { opacity: 1; }
               }
               .animate-final-text {
-                animation: cinematic-fade-in 40s linear forwards;
+                animation: cinematic-fade-in 45s linear forwards;
               }
             `}</style>
             
@@ -1069,7 +1069,8 @@ export default function EscapeRoomPage() {
                 className="absolute inset-0 z-10 pointer-events-none"
                 style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)' }}
               >
-                <div className="absolute w-full animate-scroll-text-win flex flex-col gap-10 text-center px-16 h-full mt-32">
+                {/* Changed h-full mt-32 to h-max pb-20 */}
+                <div className="absolute w-full animate-scroll-text-win flex flex-col gap-10 text-center px-16 h-max pb-20">
                   <h1 className="text-5xl font-black mb-8 tracking-[0.3em] text-emerald-500 drop-shadow-[0_0_15px_rgba(16,185,129,0.8)]">
                     SYSTEM BREACHED
                   </h1>
@@ -1100,7 +1101,7 @@ export default function EscapeRoomPage() {
                     TOTAL TIME: {formatTime(playTime)} | SYSTEM REBOOTS: {deathCount}
                     </p>
 
-     {/* 2. Moved the red text here, flowing naturally below the green text */}
+     {/* Red text will now scroll up with the rest of the block and stop perfectly */}
      <p className="text-red-600 font-black tracking-[0.3em] text-3xl drop-shadow-[0_0_15px_rgba(220,38,38,0.8)] mt-16 animate-final-text">
                     THE TRUE NIGHTMARE BEGINS.
                   </p>
