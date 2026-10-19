@@ -1056,7 +1056,7 @@ export default function EscapeRoomPage() {
             
             <div className="border-4 border-emerald-900 bg-stone-950 flex flex-col items-center justify-center w-full max-w-3xl shadow-[0_0_50px_rgba(16,185,129,0.2)] relative overflow-hidden h-[600px]">
               
-              <div 
+            <div 
                 className="absolute inset-0 z-10 pointer-events-none"
                 style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)' }}
               >
@@ -1090,10 +1090,10 @@ export default function EscapeRoomPage() {
                   <p className="text-emerald-400 font-bold tracking-[0.2em] text-sm mt-2">
                     TOTAL TIME: {formatTime(playTime)} | SYSTEM REBOOTS: {deathCount}
                   </p>
-                  </p>
                 </div>
               </div>
-                  {/* NEW: Centered text that fades in after the scroll finishes */}
+
+              {/* NEW: Centered text that fades in after the scroll finishes */}
               <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
                 <p className="text-red-600 font-black tracking-[0.3em] text-3xl drop-shadow-[0_0_15px_rgba(220,38,38,0.8)] animate-final-text">
                   THE TRUE NIGHTMARE BEGINS.
