@@ -80,21 +80,22 @@ function KeycardMesh({ position, texture, color }) {
 }
 
 function TerminalMesh({ position, texture }) {
-    const crtRef = useRef();
-    
-    useFrame(({ camera }) => { 
-      if (crtRef.current) crtRef.current.lookAt(camera.position); 
-    });
-    
-    return (
-      <group position={position}>
-        <sprite ref={crtRef} position={[0, 0.7, 0]} scale={[1.2, 1.2, 1]}>
-          <spriteMaterial map={texture} color="#ffffff" transparent={true} />
-        </sprite>
-        {/* Glow effect matching the green screen */}
-        <pointLight color="#22c55e" intensity={1.5} distance={3} decay={2} position={[0, 0.7, 0]} />
-      </group>
-    );
+  const crtRef = useRef();
+  
+  useFrame(({ camera }) => { 
+    if (crtRef.current) crtRef.current.lookAt(camera.position); 
+  });
+  
+  return (
+    <group position={position}>
+      {/* Increased scale from [1.2, 1.2, 1] to [2.0, 2.0, 1] and raised Y position to 1.0 */}
+      <sprite ref={crtRef} position={[0, 1.0, 0]} scale={[2.0, 2.0, 1]}>
+        <spriteMaterial map={texture} color="#ffffff" transparent={true} alphaTest={0.5} />
+      </sprite>
+      {/* Glow effect raised slightly to match the new screen height */}
+      <pointLight color="#22c55e" intensity={1.5} distance={3} decay={2} position={[0, 1.0, 0]} />
+    </group>
+  );
 }
 
 function CeilingLightMesh({ position, texture }) {
@@ -224,7 +225,7 @@ function LightOrb({ projObj, startPos, dir, projectilesRef, grid, texture }) {
     const curY = groupRef.current.position.y;
     const curZ = groupRef.current.position.z;
     
-    const isSolid = grid && [1, 2, 12, 22, 7, 3, 4, 32].includes(grid[Math.floor(curZ)]?.[Math.floor(curX)]);
+    const isSolid = grid && [1, 2, 12, 22, 7, 3, 4, 32, 50, 51, 52, 53, 54, 55, 56].includes(grid[Math.floor(curZ)]?.[Math.floor(curX)]);
 
     const floorY = Math.floor(startPos.y / FLOOR_HT) * FLOOR_HT;
     const ceilY = floorY + FLOOR_HT;
@@ -1026,8 +1027,8 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         else if (dec.tile === 51) { tex = tServerRack; scale = [1.2, 2.0, 1]; yOffset = 1.0; }
         else if (dec.tile === 52) { tex = tGas; scale = [1.2, 1.5, 1]; yOffset = 0.75; }
         else if (dec.tile === 53) { tex = tBioBarrel; scale = [0.8, 1.2, 1]; yOffset = 0.6; }
-        else if (dec.tile === 54) { tex = tLabStool; scale = [0.6, 0.8, 1]; yOffset = 0.4; }
-        else if (dec.tile === 55) { tex = tOfficeChair; scale = [0.8, 1.2, 1]; yOffset = 0.6; }
+        else if (dec.tile === 54) { tex = tLabStool; scale = [1.2, 1.8, 1]; yOffset = 0.9; }
+        else if (dec.tile === 55) { tex = tOfficeChair; scale = [1.2, 1.8, 1]; yOffset = 0.9; }
         else if (dec.tile === 56) { tex = tChemRack; scale = [1.5, 2.0, 1]; yOffset = 1.0; }
 
         return (
