@@ -88,12 +88,11 @@ function TerminalMesh({ position, texture }) {
   
   return (
     <group position={position}>
-      {/* Increased scale from [1.2, 1.2, 1] to [2.0, 2.0, 1] and raised Y position to 1.0 */}
-      <sprite ref={crtRef} position={[0, 1.0, 0]} scale={[2.0, 2.0, 1]}>
+      {/* Scale widened to 2.4 and Y position lowered to 0.75 to plant legs on the ground */}
+      <sprite ref={crtRef} position={[0, 0.75, 0]} scale={[2.4, 1.5, 1]}>
         <spriteMaterial map={texture} color="#ffffff" transparent={true} alphaTest={0.5} />
       </sprite>
-      {/* Glow effect raised slightly to match the new screen height */}
-      <pointLight color="#22c55e" intensity={1.5} distance={3} decay={2} position={[0, 1.0, 0]} />
+      <pointLight color="#22c55e" intensity={1.5} distance={3} decay={2} position={[0, 0.9, 0]} />
     </group>
   );
 }
@@ -772,8 +771,14 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
     const isSolidTile = (x, z) => {
       const gx = Math.floor(x); const gz = Math.floor(z);
       if (gz < 0 || gz >= grids[currentFIdx].length || gx < 0 || gx >= grids[currentFIdx][0].length) return true;
+      
       const tile = grids[currentFIdx][gz][gx];
-      return [1, 2, 12, 22, 7, 3, 4, 32].includes(tile);
+      const isGridSolid = [1, 2, 12, 22, 7, 3, 4, 32].includes(tile);
+      
+      // Also check decorative props in this floor
+      const isPropSolid = parsedData.decorations.some(d => d.fIdx === currentFIdx && d.x === gx && d.z === gz);
+
+      return isGridSolid || isPropSolid;
     };
 
     const collidesAt = (x, z) => (
