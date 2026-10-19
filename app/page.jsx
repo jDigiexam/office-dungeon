@@ -1100,20 +1100,11 @@ export default function EscapeRoomPage() {
                     TOTAL TIME: {formatTime(playTime)} | SYSTEM REBOOTS: {deathCount}
                     </p>
 
-                    {/* NEW: Centered text that fades in after the scroll finishes */}
-              <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-                <p className="text-red-600 font-black tracking-[0.3em] text-3xl drop-shadow-[0_0_15px_rgba(220,38,38,0.8)] animate-final-text">
-                  THE TRUE NIGHTMARE BEGINS.
-                </p>
-              </div>
+     {/* 2. Moved the red text here, flowing naturally below the green text */}
+     <p className="text-red-600 font-black tracking-[0.3em] text-3xl drop-shadow-[0_0_15px_rgba(220,38,38,0.8)] mt-16 animate-final-text">
+                    THE TRUE NIGHTMARE BEGINS.
+                  </p>
                 </div>
-              </div>
-
-              {/* NEW: Centered text that fades in after the scroll finishes */}
-              <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-                <p className="text-red-600 font-black tracking-[0.3em] text-3xl drop-shadow-[0_0_15px_rgba(220,38,38,0.8)] animate-final-text">
-                  THE TRUE NIGHTMARE BEGINS.
-                </p>
               </div>
   
               <div className="absolute bottom-6 z-20">
