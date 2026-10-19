@@ -88,11 +88,11 @@ function TerminalMesh({ position, texture }) {
   
   return (
     <group position={position}>
-      {/* Scale widened to 2.4 and Y position lowered to 0.75 to plant legs on the ground */}
-      <sprite ref={crtRef} position={[0, 0.75, 0]} scale={[2.4, 1.5, 1]}>
+      {/* Scale widened to 2.4 and Y lowered to 0.65 so the legs rest firmly on the tiles */}
+      <sprite ref={crtRef} position={[0, 0.65, 0]} scale={[2.4, 1.5, 1]}>
         <spriteMaterial map={texture} color="#ffffff" transparent={true} alphaTest={0.5} />
       </sprite>
-      <pointLight color="#22c55e" intensity={1.5} distance={3} decay={2} position={[0, 0.9, 0]} />
+      <pointLight color="#22c55e" intensity={1.5} distance={3} decay={2} position={[0, 0.8, 0]} />
     </group>
   );
 }
@@ -702,13 +702,12 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
 
       if (key === 'e') {
         e.preventDefault(); 
-        
         const dir = new THREE.Vector3();
         camera.getWorldDirection(dir);
         const targetX = Math.floor(camera.position.x + dir.x * 1.3);
         const targetZ = Math.floor(camera.position.z + dir.z * 1.3);
         const fIdx = currentFloorRef.current;
-        if (targetZ >= 0 && targetZ < grids[fIdx].length && targetX >= 0 && targetX < grids[fIdx][0].length) {
+        if (targetZ >= 0 && targetZ < grids[fIdx]?.length && targetX >= 0 && targetX < grids[fIdx][0]?.length) {
           onInteract(grids[fIdx][targetZ][targetX], targetX, targetZ, fIdx);
         }
       }
@@ -746,16 +745,6 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
     
     camera.position.y = THREE.MathUtils.lerp(camera.position.y, currentFIdx * FLOOR_HT + 1.2 + bobOffset, 0.4);
 
-    if (handRef.current) {
-      const handOffset = new THREE.Vector3(0.18, -0.15, -0.3);
-      handOffset.applyQuaternion(camera.quaternion);
-      handRef.current.position.copy(camera.position).add(handOffset);
-      handRef.current.quaternion.copy(camera.quaternion);
-      
-      handRef.current.position.y += Math.abs(Math.sin(bobTime.current)) * 0.02 * bobAmp.current;
-      handRef.current.rotation.z += Math.cos(bobTime.current / 2) * 0.02 * bobAmp.current; 
-    }
-
     const oldX = camera.position.x;
     const oldZ = camera.position.z;
 
@@ -766,19 +755,26 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
 
     const newX = camera.position.x;
     const newZ = camera.position.z;
-    const radius = 0.22;
+    const radius = 0.28;
 
+    // Direct grid check including all props (50-56)
     const isSolidTile = (x, z) => {
-      const gx = Math.floor(x); const gz = Math.floor(z);
-      if (gz < 0 || gz >= grids[currentFIdx].length || gx < 0 || gx >= grids[currentFIdx][0].length) return true;
+      const gx = Math.floor(x);
+      const gz = Math.floor(z);
+      if (!grids || !grids[currentFIdx]) return true;
+      const curGrid = grids[currentFIdx];
+      if (gz < 0 || gz >= curGrid.length || gx < 0 || gx >= curGrid[0].length) return true;
       
-      const tile = grids[currentFIdx][gz][gx];
-      const isGridSolid = [1, 2, 12, 22, 7, 3, 4, 32].includes(tile);
-      
-      // Also check decorative props in this floor
-      const isPropSolid = parsedData.decorations.some(d => d.fIdx === currentFIdx && d.x === gx && d.z === gz);
+      const tile = curGrid[gz][gx];
+      const solidList = [1, 2, 12, 22, 7, 3, 4, 32, 50, 51, 52, 53, 54, 55, 56];
+      if (solidList.includes(tile)) return true;
 
-      return isGridSolid || isPropSolid;
+      // Desk (4), Lab Bench (50), and Chem Rack (56) spill horizontally into adjacent cells
+      const wideTiles = [4, 50, 56];
+      if (gx > 0 && wideTiles.includes(curGrid[gz]?.[gx - 1]) && (x - gx) < 0.35) return true;
+      if (gx < curGrid[0].length - 1 && wideTiles.includes(curGrid[gz]?.[gx + 1]) && (gx + 1 - x) < 0.35) return true;
+
+      return false;
     };
 
     const collidesAt = (x, z) => (
@@ -808,7 +804,7 @@ function PlayerControls({ grids, handTexture, onInteract, teleportCoords, clearT
       if (onPlayerMove) onPlayerMove(curX, curZ);
     }
 
-    // ⬇️ MOVE THE HAND UPDATE HERE, AT THE VERY END ⬇️
+    // Always keep hand locked to camera after movement is calculated
     if (handRef.current) {
       const handOffset = new THREE.Vector3(0.18, -0.15, -0.3);
       handOffset.applyQuaternion(camera.quaternion);
@@ -1023,18 +1019,18 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
         return null;
       })}
 
-      {decorations.map((dec, idx) => {
+{decorations.map((dec, idx) => {
         let tex = null;
         let scale = [1, 1, 1];
         let yOffset = 0.5;
         
-        if (dec.tile === 50) { tex = tLabBench; scale = [2.0, 1.5, 1]; yOffset = 0.75; }
-        else if (dec.tile === 51) { tex = tServerRack; scale = [1.2, 2.0, 1]; yOffset = 1.0; }
-        else if (dec.tile === 52) { tex = tGas; scale = [1.2, 1.5, 1]; yOffset = 0.75; }
-        else if (dec.tile === 53) { tex = tBioBarrel; scale = [0.8, 1.2, 1]; yOffset = 0.6; }
-        else if (dec.tile === 54) { tex = tLabStool; scale = [1.2, 1.8, 1]; yOffset = 0.9; }
-        else if (dec.tile === 55) { tex = tOfficeChair; scale = [1.2, 1.8, 1]; yOffset = 0.9; }
-        else if (dec.tile === 56) { tex = tChemRack; scale = [1.5, 2.0, 1]; yOffset = 1.0; }
+        if (dec.tile === 50) { tex = tLabBench; scale = [2.2, 1.4, 1]; yOffset = 0.65; }
+        else if (dec.tile === 51) { tex = tServerRack; scale = [1.2, 2.0, 1]; yOffset = 0.95; }
+        else if (dec.tile === 52) { tex = tGas; scale = [1.2, 1.5, 1]; yOffset = 0.7; }
+        else if (dec.tile === 53) { tex = tBioBarrel; scale = [0.9, 1.2, 1]; yOffset = 0.55; }
+        else if (dec.tile === 54) { tex = tLabStool; scale = [0.7, 0.9, 1]; yOffset = 0.4; }
+        else if (dec.tile === 55) { tex = tOfficeChair; scale = [1.2, 1.5, 1]; yOffset = 0.55; } // Lowered from 0.9 to 0.55
+        else if (dec.tile === 56) { tex = tChemRack; scale = [1.5, 2.0, 1]; yOffset = 0.95; }
 
         return (
           <group key={`dec-${idx}`} position={[dec.x + 0.5, dec.baseY + yOffset, dec.z + 0.5]}>
@@ -1044,7 +1040,7 @@ function DungeonScene({ grids, initialSpawn, onInteract, teleportCoords, clearTe
           </group>
         );
       })}
-
+      
       <CombatManager 
         enemiesData={enemiesData} 
         grids={grids} 
