@@ -568,7 +568,14 @@ function CombatManager({ enemiesData, onEradicate, onPlayerHit, grids, bossTextu
         
         const dir = new THREE.Vector3();
         camera.getWorldDirection(dir);
-        const newProj = { id: Math.random(), startPos: camera.position.clone(), dir, active: true, mesh: null };
+        
+        // Calculate the exact world position of the hand
+        const handOffset = new THREE.Vector3(0.18, -0.15, -0.3);
+        handOffset.applyQuaternion(camera.quaternion);
+        const startPos = camera.position.clone().add(handOffset);
+
+        // Spawn the projectile at the hand's position
+        const newProj = { id: Math.random(), startPos, dir, active: true, mesh: null };
         projectilesRef.current.push(newProj);
         setProjectiles(prev => [...prev, newProj]); 
       }
