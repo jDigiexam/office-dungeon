@@ -310,7 +310,12 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
     if (!texture) return null;
     const tex = texture.clone();
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(1/7, 1); 
+    
+    // Set the tiny crop margin for the 7-frame boss sprite
+    const frameWidth = 1 / 7;
+    const cropMargin = 0.005;
+    tex.repeat.set(frameWidth - (cropMargin * 2), 1); 
+    
     tex.magFilter = THREE.NearestFilter; 
     tex.needsUpdate = true;
     return tex;
@@ -385,14 +390,20 @@ function BossNPC({ initialPos, playerCamera, projectilesRef, onEradicate, onPlay
       }
     }
 
+    // Map the 7-frame horizontal sheet with the centered crop margin
+    const frameWidth = 1 / 7;
+    const cropMargin = 0.005;
+
     if (timeSinceShot < 0.6) {
-      if (timeSinceShot < 0.2) bossTex.offset.x = 2 * (1/7);
-      else if (timeSinceShot < 0.4) bossTex.offset.x = 3 * (1/7);
-      else bossTex.offset.x = 4 * (1/7);
+      // Attack Windup & Shoot Frames (2, 3, 4)
+      if (timeSinceShot < 0.2) bossTex.offset.x = (2 * frameWidth) + cropMargin;
+      else if (timeSinceShot < 0.4) bossTex.offset.x = (3 * frameWidth) + cropMargin;
+      else bossTex.offset.x = (4 * frameWidth) + cropMargin;
     } else {
+      // Walking Frames (0, 1, 5, 6)
       const walkFrames = [0, 1, 5, 6];
       const currentFrame = Math.floor(state.clock.elapsedTime * 6) % 4;
-      bossTex.offset.x = walkFrames[currentFrame] * (1/7); 
+      bossTex.offset.x = (walkFrames[currentFrame] * frameWidth) + cropMargin; 
     }
 
     projectilesRef.current.forEach(proj => {
